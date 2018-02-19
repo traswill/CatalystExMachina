@@ -1,6 +1,7 @@
 # Because why the hell not
 
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.neural_network import MLPRegressor
 import pandas as pd
 import numpy as np
 
@@ -10,8 +11,28 @@ class Learner():
     def __init__(self):
         self.catalyst_dictionary = dict()
 
+        self.features = list()
+        self.labels = list()
+
     def add_catalyst(self, index, catalyst):
         self.catalyst_dictionary[index] = catalyst
+
+    def create_training_set(self):
+        feature_df = None
+        label_list = list()
+
+        for val in self.catalyst_dictionary.values():
+            temp_df = pd.DataFrame(val.features)
+            label_list += [val.label]
+
+            if feature_df is None:
+                feature_df = pd.DataFrame(val.features)
+            else:
+                feature_df = pd.concat([feature_df, temp_df], axis=1)
+
+        feature_df = feature_df.fillna(0)
+        self.features = feature_df.values[3:].T
+        self.labels = label_list
 
 class Catalyst():
     """Catalyst will contain each individual training set"""
@@ -24,6 +45,9 @@ class Catalyst():
 
     def add_element(self, element, weight_loading):
         self.elements[element] = weight_loading
+
+    def set_feature_temperature(self, temp):
+        self.features[6] = temp
 
     def extract_element_features(self, ele):
         """ Extract the features for a single material from Elements.csv"""
@@ -115,23 +139,26 @@ if __name__ == '__main__':
     df = pd.read_excel(r"C:\Users\quick\Desktop\NH3Data.xlsx", index_col=0)
 
     for vals in df.iterrows():
-        cat = Catalyst()
-        cat.ID = vals[0]
-        params = vals[1]
-        cat.add_element(params['Metal 1'],params['M1 Wt %'])
-        cat.add_element(params['Metal 2'],params['M2 Wt %'])
-        cat.add_element(params['Metal 3'],params['M3 Wt %'])
-
         for temp in [250, 300, 350, 400, 450]:
+            cat = Catalyst()
+            cat.ID = vals[0]
+            params = vals[1]
+            cat.add_element(params['Metal 1'],params['M1 Wt %'])
+            cat.add_element(params['Metal 2'],params['M2 Wt %'])
+            cat.add_element(params['Metal 3'],params['M3 Wt %'])
             cat.temperature = temp
             cat.label = params['T'+str(temp)]
             cat.create_element_feature_list(set=True)
             if cat.complete():
-                print('Catalyst {}.{}C complete'.format(cat.ID, cat.temperature))
-                skynet.add_catalyst(index=cat.ID, catalyst=cat)
+                # print('Catalyst {}.{}C complete'.format(cat.ID, cat.temperature))
+                skynet.add_catalyst(index='{}_{}'.format(cat.ID, cat.temperature), catalyst=cat)
             else:
                 print('Catalyst {} NOT complete.  Not added to skynet.'.format(cat.ID))
 
+    skynet.create_training_set()
+    print(skynet.features, skynet.labels)
 
-
-
+    machlearn = RandomForestRegressor()
+    machlearn.fit(skynet.features, skynet.labels)
+    print(machlearn.decision_path(skynet.features))
+    print(machlearn.score(skynet.features, skynet.labels))
