@@ -2,8 +2,11 @@
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import cross_val_score, learning_curve
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
@@ -12,10 +15,16 @@ class Learner():
         self.catalyst_dictionary = dict()
 
         self.features = list()
+        self.filtered_features = list()
         self.labels = list()
+
+        self.learner = None
 
     def add_catalyst(self, index, catalyst):
         self.catalyst_dictionary[index] = catalyst
+
+    def get_training_data_size(self):
+        print(len(self.filtered_features))
 
     def create_training_set(self):
         feature_df = None
@@ -32,7 +41,39 @@ class Learner():
 
         feature_df = feature_df.fillna(0)
         self.features = feature_df.values[3:].T
+        self.filtered_features = self.features
         self.labels = label_list
+
+    def reset_features(self):
+        self.filtered_features = self.features
+
+    def trim_features(self):
+        print(self.filtered_features)
+
+    def set_learner(self, learner):
+        if (learner == 'random forest') or (learner == 0):
+            self.learner = RandomForestRegressor(n_estimators=200)
+        else:
+            print('Learner Selection Out of Bounds.  Please Select a Valid Learner.')
+            exit()
+
+    def train_learner(self):
+        self.learner.fit(self.filtered_features, self.labels)
+
+    def validate_learner(self, n_validations=10, n_folds=10, sv=False):
+        scoredf = None
+        for ii in range(1, n_validations):
+            score = cross_val_score(self.learner, self.filtered_features, self.labels, cv=n_folds)
+            if scoredf is None:
+                scoredf = pd.DataFrame(score)
+            else:
+                tempdf = pd.DataFrame(score)
+                scoredf = pd.concat([scoredf, tempdf], axis=1)
+
+        if sv:
+            scoredf.to_csv(r'C:\Users\quick\Desktop\results.csv')
+        else:
+            return scoredf
 
 class Catalyst():
     """Catalyst will contain each individual training set"""
@@ -40,8 +81,10 @@ class Catalyst():
         self.ID = None
         self.label = None
         self.features = None
+        self.feature_names = None
         self.temperature = None
         self.elements = dict()
+        self.reactor_index = None
 
     def add_element(self, element, weight_loading):
         self.elements[element] = weight_loading
@@ -109,15 +152,22 @@ class Catalyst():
         }
 
         feature_list = list()
+        feature_nm_list = list()
         for feat in features_dict:
             val = features_dict[feat]
             feature_list += val
+            feature_nm_list += [
+                '{nm}_max'.format(nm=feat),
+                '{nm}_mean'.format(nm=feat),
+                '{nm}_median'.format(nm=feat),
+                '{nm}_min'.format(nm=feat)]
 
         if set:
             initial_list = list(self.elements.keys())  + list(self.elements.values())
-            self.features = initial_list + [self.temperature] + feature_list
+            self.features = initial_list + [self.temperature] + [self.reactor_index] + feature_list
+            self.feature_names = ['M1','M2','M3','W1','W2','W3','T','Reactor'] + feature_nm_list
         else:
-            return feature_list
+            return feature_list, feature_nm_list
 
     def complete(self):
         if (self.features is not None) & \
@@ -130,8 +180,6 @@ class Catalyst():
 
 
 if __name__ == '__main__':
-    pass
-
     # Spool up Learner Class
     skynet = Learner()
 
@@ -146,19 +194,30 @@ if __name__ == '__main__':
             cat.add_element(params['Metal 1'],params['M1 Wt %'])
             cat.add_element(params['Metal 2'],params['M2 Wt %'])
             cat.add_element(params['Metal 3'],params['M3 Wt %'])
+            cat.reactor_index = params['Reactor']
             cat.temperature = temp
             cat.label = params['T'+str(temp)]
+            if np.isnan(cat.label):
+                continue
             cat.create_element_feature_list(set=True)
             if cat.complete():
-                # print('Catalyst {}.{}C complete'.format(cat.ID, cat.temperature))
-                skynet.add_catalyst(index='{}_{}'.format(cat.ID, cat.temperature), catalyst=cat)
+                # Prevent overwriting of duplicate keys
+                keymod = 0
+                catkey = '{ID}_{T}_{mod}'.format(ID=cat.ID, T=cat.temperature, mod=keymod)
+                while catkey in skynet.catalyst_dictionary:
+                    keymod+=1
+                    catkey = '{ID}_{T}_{mod}'.format(ID=cat.ID, T=cat.temperature, mod=keymod)
+
+                # Once catalyst has a unique ID modifier, add to skynet
+                skynet.add_catalyst(index=catkey, catalyst=cat)
             else:
                 print('Catalyst {} NOT complete.  Not added to skynet.'.format(cat.ID))
 
+    # Create training data
     skynet.create_training_set()
-    print(skynet.features, skynet.labels)
 
-    machlearn = RandomForestRegressor()
-    machlearn.fit(skynet.features, skynet.labels)
-    print(machlearn.decision_path(skynet.features))
-    print(machlearn.score(skynet.features, skynet.labels))
+    skynet.set_learner(learner=0)
+    skynet.trim_features()
+
+
+
