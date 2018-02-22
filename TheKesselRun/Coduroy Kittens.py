@@ -14,6 +14,7 @@ class Learner():
     def __init__(self):
         self.catalyst_dictionary = dict()
 
+        self.feature_names = list()
         self.features = list()
         self.filtered_features = list()
         self.labels = list()
@@ -28,6 +29,7 @@ class Learner():
 
     def create_training_set(self):
         feature_df = None
+        feature_names = None
         label_list = list()
 
         for val in self.catalyst_dictionary.values():
@@ -36,11 +38,13 @@ class Learner():
 
             if feature_df is None:
                 feature_df = pd.DataFrame(val.features)
+                feature_names = val.feature_names
             else:
                 feature_df = pd.concat([feature_df, temp_df], axis=1)
 
         feature_df = feature_df.fillna(0)
         self.features = feature_df.values[3:].T
+        self.feature_names = feature_names[3:]
         self.filtered_features = self.features
         self.labels = label_list
 
@@ -85,6 +89,7 @@ class Catalyst():
         self.temperature = None
         self.elements = dict()
         self.reactor_index = None
+        self.space_velocity = None
 
     def add_element(self, element, weight_loading):
         self.elements[element] = weight_loading
@@ -96,8 +101,8 @@ class Catalyst():
         """ Extract the features for a single material from Elements.csv"""
 
         eledf = pd.read_csv('ELements.csv', index_col=1)
-        feature_names = eledf.loc[ele].index.values
-        features = eledf.loc[ele].values
+        feature_names = eledf.loc[str(ele)].index.values
+        features = eledf.loc[str(ele)].values
         return features, feature_names
 
     def create_element_feature_list(self, set=False):
@@ -126,11 +131,19 @@ class Catalyst():
                 df.loc[property, :].min(),
             ]
 
-        features_dict = {
-            # Stochimetric Features
+        # Stoichiometric Features
+        stoich_features_dict = {
             'n_ele': [len(self.elements)],
+        }
 
-            # Statistics
+        stoich_feature_list = list()
+        stoich_feature_nm_list = list()
+        for feat in stoich_features_dict:
+            stoich_feature_list += stoich_features_dict[feat]
+            stoich_feature_nm_list += [feat]
+
+        # Statistical Features (calculates max, mean, median, and min)
+        stat_features_dict = {
             'atvol': extract(feature_df, 'AtomicVolume'),
             'atwt': extract(feature_df, 'AtomicWeight'),
             'atrad': extract(feature_df, 'CovalentRadius'),
@@ -151,23 +164,35 @@ class Catalyst():
             'n_val': extract(feature_df, 'NValence')
         }
 
-        feature_list = list()
-        feature_nm_list = list()
-        for feat in features_dict:
-            val = features_dict[feat]
-            feature_list += val
-            feature_nm_list += [
+        stat_feature_list = list()
+        stat_feature_nm_list = list()
+        for feat in stat_features_dict:
+            stat_feature_list += stat_features_dict[feat]
+            stat_feature_nm_list += [
                 '{nm}_max'.format(nm=feat),
                 '{nm}_mean'.format(nm=feat),
                 '{nm}_median'.format(nm=feat),
                 '{nm}_min'.format(nm=feat)]
 
+        # Add all features and names to a list
+        features = list(self.elements.keys()) + list(self.elements.values())
+        feature_names = ['M1','M2','M3','W1','W2','W3']
+
+        features += [self.temperature] + [self.reactor_index] + [self.space_velocity]
+        feature_names += ['T','Reactor','Space Velocity']
+
+        features += stoich_feature_list
+        feature_names += stoich_feature_nm_list
+
+        features += stat_feature_list
+        feature_names += stat_feature_nm_list
+
         if set:
-            initial_list = list(self.elements.keys())  + list(self.elements.values())
-            self.features = initial_list + [self.temperature] + [self.reactor_index] + feature_list
-            self.feature_names = ['M1','M2','M3','W1','W2','W3','T','Reactor'] + feature_nm_list
+            self.features = features
+            self.feature_names = feature_names
         else:
-            return feature_list, feature_nm_list
+
+            return features, feature_names
 
     def complete(self):
         if (self.features is not None) & \
@@ -197,6 +222,7 @@ if __name__ == '__main__':
             cat.reactor_index = params['Reactor']
             cat.temperature = temp
             cat.label = params['T'+str(temp)]
+            cat.space_velocity = params['Space Velocity']
             if np.isnan(cat.label):
                 continue
             cat.create_element_feature_list(set=True)
@@ -213,11 +239,15 @@ if __name__ == '__main__':
             else:
                 print('Catalyst {} NOT complete.  Not added to skynet.'.format(cat.ID))
 
+
+
     # Create training data
     skynet.create_training_set()
+    # print(skynet.filtered_features, skynet.feature_names)
+    # df = pd.DataFrame(skynet.filtered_features, columns=skynet.feature_names)
 
     skynet.set_learner(learner=0)
-    skynet.trim_features()
+    skynet.validate_learner(sv=True)
 
 
 
