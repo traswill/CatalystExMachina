@@ -2,7 +2,7 @@
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
-from sklearn.model_selection import cross_val_score, learning_curve
+from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -65,9 +65,11 @@ class Learner():
         self.learner.fit(self.filtered_features, self.labels)
 
     def validate_learner(self, n_validations=10, n_folds=10, sv=False):
+        cv = ShuffleSplit()
+
         scoredf = None
         for ii in range(1, n_validations):
-            score = cross_val_score(self.learner, self.filtered_features, self.labels, cv=n_folds)
+            score = cross_val_score(self.learner, self.filtered_features, self.labels, cv=cv)
             if scoredf is None:
                 scoredf = pd.DataFrame(score)
             else:
@@ -93,9 +95,6 @@ class Catalyst():
 
     def add_element(self, element, weight_loading):
         self.elements[element] = weight_loading
-
-    def set_feature_temperature(self, temp):
-        self.features[6] = temp
 
     def extract_element_features(self, ele):
         """ Extract the features for a single material from Elements.csv"""
@@ -243,11 +242,15 @@ if __name__ == '__main__':
 
     # Create training data
     skynet.create_training_set()
-    # print(skynet.filtered_features, skynet.feature_names)
+    print(skynet.filtered_features, skynet.feature_names)
     # df = pd.DataFrame(skynet.filtered_features, columns=skynet.feature_names)
 
     skynet.set_learner(learner=0)
-    skynet.validate_learner(sv=True)
-
-
-
+    # skynet.validate_learner(sv=True)
+    learner = RandomForestRegressor(n_estimators=200)
+    pred = cross_val_predict(learner, skynet.features, skynet.labels, cv=10)
+    df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=skynet.catalyst_dictionary[x].ID,
+                                                   T=skynet.catalyst_dictionary[x].temperature)
+                                 for x in skynet.catalyst_dictionary], pred, skynet.labels]).T,
+                      columns=['ID','Predicted Activity','Measured Activity'])
+    df.to_csv(r'C:\Users\quick\Desktop\predictions.csv')
