@@ -7,6 +7,9 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from bokeh.models import ColumnDataSource, LabelSet, HoverTool
+from bokeh.plotting import figure, show, output_file
+import bokeh.palettes as pals
 
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
@@ -18,6 +21,7 @@ class Learner():
         self.features = list()
         self.filtered_features = list()
         self.labels = list()
+        self.predictions = None
 
         self.learner = None
 
@@ -81,6 +85,58 @@ class Learner():
         else:
             return scoredf
 
+    def predict_learner(self):
+        self.predictions = cross_val_predict(self.learner, self.features, self.labels, cv=10)
+
+    def compare_predictions(self):
+        temps = [self.catalyst_dictionary[x].temperature for x in self.catalyst_dictionary]
+        plt.scatter(self.labels, self.predictions, c=temps)
+        plt.xlabel('Measured')
+        plt.ylabel('Predicted')
+        plt.xlim(0,1)
+        plt.ylim(0,1)
+        plt.show()
+
+    def bokeh_plot(self):
+        df = pd.DataFrame(np.array([
+            [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
+            self.predictions,
+            self.labels,
+            [self.catalyst_dictionary[x].temperature for x in self.catalyst_dictionary]]).T,
+                          columns=['ID', 'Predicted', 'Measured', 'Temperature'])
+
+        cat_eles = [self.catalyst_dictionary[x].elements for x in self.catalyst_dictionary]
+        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x.items()) for x in cat_eles]
+        vals = [strg.replace('None(0)','') for strg in vals]
+        vals = [strg.replace('None_2(0)','') for strg in vals]
+        df['Name'] = vals
+
+        tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
+        hover = HoverTool(tooltips=[
+            ('Name', '@Name'),
+            ("ID", "@ID"),
+            ('T', '@Temperature')
+        ])
+        tools.append(hover)
+
+        pal = pals.plasma(5)
+        df['color'] = [pal[i] for i in [int(4*(x-250)/(450-250)) for x in df['Temperature']]]
+
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=1200, title='')
+        p.background_fill_color = "#dddddd"
+        p.xaxis.axis_label = "Predicted Activity"
+        p.yaxis.axis_label = "Measured Activity"
+        p.grid.grid_line_color = "white"
+
+        source = ColumnDataSource(df)
+
+        p.circle("Predicted", "Measured", size=12, source=source,
+                 color='color', line_color="black", fill_alpha=0.8)
+
+        output_file("ML_Statistics.html", title="stats.py")
+
+        show(p)
+
 class Catalyst():
     """Catalyst will contain each individual training set"""
     def __init__(self):
@@ -99,7 +155,7 @@ class Catalyst():
     def extract_element_features(self, ele):
         """ Extract the features for a single material from Elements.csv"""
 
-        eledf = pd.read_csv('ELements.csv', index_col=1)
+        eledf = pd.read_csv(r'./Data/ELements.csv', index_col=1)
         feature_names = eledf.loc[str(ele)].index.values
         features = eledf.loc[str(ele)].values
         return features, feature_names
@@ -208,7 +264,7 @@ if __name__ == '__main__':
     skynet = Learner()
 
     # Create Catalysts
-    df = pd.read_excel(r"C:\Users\quick\Desktop\NH3Data.xlsx", index_col=0)
+    df = pd.read_excel(r".\Data\NH3Data.xlsx", index_col=0)
 
     for vals in df.iterrows():
         for temp in [250, 300, 350, 400, 450]:
@@ -238,19 +294,18 @@ if __name__ == '__main__':
             else:
                 print('Catalyst {} NOT complete.  Not added to skynet.'.format(cat.ID))
 
-
-
     # Create training data
     skynet.create_training_set()
-    print(skynet.filtered_features, skynet.feature_names)
-    # df = pd.DataFrame(skynet.filtered_features, columns=skynet.feature_names)
-
     skynet.set_learner(learner=0)
     # skynet.validate_learner(sv=True)
-    learner = RandomForestRegressor(n_estimators=200)
-    pred = cross_val_predict(learner, skynet.features, skynet.labels, cv=10)
+    skynet.predict_learner()
+    # skynet.compare_predictions()
+    skynet.bokeh_plot()
+    exit()
+
+
     df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=skynet.catalyst_dictionary[x].ID,
                                                    T=skynet.catalyst_dictionary[x].temperature)
-                                 for x in skynet.catalyst_dictionary], pred, skynet.labels]).T,
+                                 for x in skynet.catalyst_dictionary], skynet.predictions, skynet.labels]).T,
                       columns=['ID','Predicted Activity','Measured Activity'])
     df.to_csv(r'C:\Users\quick\Desktop\predictions.csv')
