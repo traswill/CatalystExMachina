@@ -142,12 +142,29 @@ class Catalyst():
     def __init__(self):
         self.ID = None
         self.label = None
+
         self.features = None
         self.feature_names = None
         self.temperature = None
-        self.elements = dict()
+
         self.reactor_index = None
         self.space_velocity = None
+
+        self.input_dict = dict()
+        self.feature_dict = dict()
+        self.elements = dict()
+
+    def input_temperature(self, T):
+        self.input_dict['temperature'] = T
+
+    def input_elements(self):
+        self.input_dict['elements'] = self.elements
+
+    def input_space_velocity(self, space_velocity):
+        self.input_dict['space_velocity'] = space_velocity
+
+    def input_reactor_number(self, reactor_number):
+        self.input_dict['reactor_number'] = reactor_number
 
     def add_element(self, element, weight_loading):
         self.elements[element] = weight_loading
@@ -248,15 +265,6 @@ class Catalyst():
         else:
 
             return features, feature_names
-
-    def complete(self):
-        if (self.features is not None) & \
-                (self.label is not None) & \
-                (self.temperature is not None) & \
-                (self.ID is not None):
-            return True
-        else:
-            return False
 
 
 if __name__ == '__main__':
