@@ -19,7 +19,6 @@ class Learner():
 
         self.feature_names = list()
         self.features = list()
-        self.filtered_features = list()
         self.labels = list()
         self.predictions = None
 
@@ -38,34 +37,23 @@ class Learner():
         self.catalyst_dictionary[index] = catalyst
 
     def get_training_data_size(self):
-        print(len(self.filtered_features))
+        print(len(self.features))
 
     def create_training_set(self):
-        feature_df = None
-        feature_names = None
-        label_list = list()
+        for key, value in self.catalyst_dictionary.items():
+            catalyst_feature_list = list()
+            catalyst_feature_list += list(value.elements.values())
+            catalyst_feature_list += list(value.input_dict.values())
+            catalyst_feature_list += list(value.feature_dict.values())
 
-        for val in self.catalyst_dictionary.values():
-            temp_df = pd.DataFrame(val.features)
-            label_list += [val.label]
+            self.features += [catalyst_feature_list]
+            self.labels += [value.activity]
 
-            if feature_df is None:
-                feature_df = pd.DataFrame(val.features)
-                feature_names = val.feature_names
-            else:
-                feature_df = pd.concat([feature_df, temp_df], axis=1)
+        self.feature_names += ['Loading_1','Loading_2','Loading_3']
+        self.feature_names += list(list(self.catalyst_dictionary.values())[0].input_dict.keys())
+        self.feature_names += list(list(self.catalyst_dictionary.values())[0].feature_dict.keys())
 
-        feature_df = feature_df.fillna(0)
-        self.features = feature_df.values[3:].T
-        self.feature_names = feature_names[3:]
-        self.filtered_features = self.features
-        self.labels = label_list
-
-    def reset_features(self):
-        self.filtered_features = self.features
-
-    def trim_features(self):
-        print(self.filtered_features)
+        self.features = pd.DataFrame(self.features, dtype=float).fillna(0).values
 
     def set_learner(self, learner):
         if (learner == 'random forest') or (learner == 0):
@@ -75,14 +63,14 @@ class Learner():
             exit()
 
     def train_learner(self):
-        self.learner.fit(self.filtered_features, self.labels)
+        self.learner.fit(self.features, self.labels)
 
     def validate_learner(self, n_validations=10, n_folds=10, sv=False):
         cv = ShuffleSplit()
 
         scoredf = None
         for ii in range(1, n_validations):
-            score = cross_val_score(self.learner, self.filtered_features, self.labels, cv=cv)
+            score = cross_val_score(self.learner, self.features, self.labels, cv=cv)
             if scoredf is None:
                 scoredf = pd.DataFrame(score)
             else:
@@ -90,7 +78,7 @@ class Learner():
                 scoredf = pd.concat([scoredf, tempdf], axis=1)
 
         if sv:
-            scoredf.to_csv(r'C:\Users\quick\Desktop\results.csv')
+            scoredf.to_csv(r'.\Results\results.csv')
         else:
             return scoredf
 
@@ -111,7 +99,7 @@ class Learner():
             [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
             self.predictions,
             self.labels,
-            [self.catalyst_dictionary[x].temperature for x in self.catalyst_dictionary]]).T,
+            [self.catalyst_dictionary[x].input_dict['temperature'] for x in self.catalyst_dictionary]]).T,
                           columns=['ID', 'Predicted', 'Measured', 'Temperature'])
 
         cat_eles = [self.catalyst_dictionary[x].elements for x in self.catalyst_dictionary]
@@ -142,7 +130,7 @@ class Learner():
         p.circle("Predicted", "Measured", size=12, source=source,
                  color='color', line_color="black", fill_alpha=0.8)
 
-        output_file("ML_Statistics.html", title="stats.py")
+        output_file(".\\Figures\\ML_Statistics.html", title="stats.py")
 
         show(p)
 
@@ -158,17 +146,22 @@ class Learner():
                 cat.ID = int(vals[0])
                 inputs = vals[1]
 
+                if np.isnan(inputs['T' + str(temp)]):
+                    continue
+
                 cat.add_element(inputs['Element_1'], inputs['Loading_1'])
                 cat.add_element(inputs['Element_2'], inputs['Loading_2'])
                 cat.add_element(inputs['Element_3'], inputs['Loading_3'])
-                cat.input_elements()
 
                 cat.input_reactor_number(inputs['Reactor'])
                 cat.input_temperature(temp)
-                cat.input_space_velocity('Space Velocity')
-                cat.input_ammonia_concentration('Ammonia Concentration')
+                cat.input_space_velocity(inputs['Space Velocity'])
+                cat.input_ammonia_concentration(inputs['Ammonia Concentration'])
 
                 cat.activity = inputs['T' + str(temp)]
+
+                cat.feature_add_n_elements()
+                cat.feature_add_elemental_properties()
 
                 self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=temp), catalyst=cat)
 
@@ -186,9 +179,6 @@ class Catalyst():
     def input_temperature(self, T):
         self.input_dict['temperature'] = T
 
-    def input_elements(self):
-        self.input_dict['elements'] = self.elements
-
     def add_element(self, element, weight_loading):
         self.elements[element] = weight_loading
 
@@ -205,17 +195,20 @@ class Catalyst():
         self.feature_dict[key] = value
 
     def feature_add_statistics(self, key, values):
-        # Maximum
-        self.feature_dict['{}_max'.format(key)] = np.max(values)
+        values = np.array(values, dtype=float)
+        values = values[~np.isnan(values)]
+        if values.size: # Skip if no non-nan values
+            # Maximum
+            self.feature_dict['{}_max'.format(key)] = np.max(values)
 
-        # Minimum
-        self.feature_dict['{}_min'.format(key)] = np.min(values)
+            # Minimum
+            self.feature_dict['{}_min'.format(key)] = np.min(values)
 
-        # Mean
-        self.feature_dict['{}_mean'.format(key)] = np.mean(values)
+            # Mean
+            self.feature_dict['{}_mean'.format(key)] = np.mean(values)
 
-        # Median
-        self.feature_dict['{}_med'.format(key)] = np.median(values)
+            # Median
+            self.feature_dict['{}_med'.format(key)] = np.median(values)
 
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame
@@ -241,10 +234,10 @@ if __name__ == '__main__':
     # Spool up Learner Class
     skynet = Learner()
     skynet.load_NH3_catalysts()
-    exit()
+    skynet.create_training_set()
 
     # Create training data
-    skynet.create_training_set()
+
     skynet.set_learner(learner=0)
     # skynet.validate_learner(sv=True)
     skynet.predict_learner()
