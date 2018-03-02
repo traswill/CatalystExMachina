@@ -1,6 +1,6 @@
 # Because why the hell not
 
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
 import pandas as pd
@@ -10,6 +10,9 @@ import matplotlib.pyplot as plt
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool
 from bokeh.plotting import figure, show, output_file
 import bokeh.palettes as pals
+from sklearn import preprocessing
+from sklearn.model_selection import GridSearchCV
+from bokeh.models import Range1d
 
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
@@ -53,11 +56,39 @@ class Learner():
         self.feature_names += list(list(self.catalyst_dictionary.values())[0].input_dict.keys())
         self.feature_names += list(list(self.catalyst_dictionary.values())[0].feature_dict.keys())
 
-        self.features = pd.DataFrame(self.features, dtype=float).fillna(0).values
+        self.features = pd.DataFrame(self.features, dtype=float).values
+
+    def clean_data(self):
+        """Replaces NaN values with mean value of column"""
+        imp = preprocessing.Imputer(missing_values='NaN', strategy='mean', axis=0)
+        self.features = imp.fit_transform(self.features)
+
+    def scale_data(self):
+        self.features = preprocessing.minmax_scale(self.features)
+
+    def hyperparameter_tuning(self):
+        parameters = {
+            'n_estimators': [10, 50, 100, 500],
+            'min_samples_split': [2, 4, 6],
+            'min_samples_leaf': [1, 2, 3],
+            'bootstrap': [True, False]
+        }
+        clf = GridSearchCV(self.learner, parameters)
+        clf.fit(self.features, self.labels)
+        pd.DataFrame(clf.cv_results_).to_csv(r'.\Results\parameter_tuning.csv')
+
 
     def set_learner(self, learner):
         if (learner == 'random forest') or (learner == 0):
             self.learner = RandomForestRegressor(n_estimators=200)
+            # self.learner = RandomForestRegressor(n_estimators=100, min_sample_leaf=2, min_sample_split=6, bootstrap=True)
+        elif (learner == 'adaboost') or (learner == 1):
+            self.learner = AdaBoostRegressor()
+        elif (learner == 'SGD') or (learner == 2):
+            pass
+        elif (learner == 'neural net') or (learner == 3):
+            # self.learner = MLPRegressor()
+            self.learner = MLPRegressor(activation='relu', learning_rate='adaptive', max_iter=1000)
         else:
             print('Learner Selection Out of Bounds.  Please Select a Valid Learner.')
             exit()
@@ -85,16 +116,16 @@ class Learner():
     def predict_learner(self):
         self.predictions = cross_val_predict(self.learner, self.features, self.labels, cv=10)
 
-    def compare_predictions(self):
-        temps = [self.catalyst_dictionary[x].temperature for x in self.catalyst_dictionary]
-        plt.scatter(self.labels, self.predictions, c=temps)
+    def plot_predictions_basic(self):
+        temperature = [self.catalyst_dictionary[x].input_dict['temperature'] for x in self.catalyst_dictionary]
+        plt.scatter(self.labels, self.predictions, c=temperature)
         plt.xlabel('Measured')
         plt.ylabel('Predicted')
         plt.xlim(0,1)
         plt.ylim(0,1)
         plt.show()
 
-    def bokeh_plot(self):
+    def plot_predictions(self, sv_nm='ML_Statistics'):
         df = pd.DataFrame(np.array([
             [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
             self.predictions,
@@ -119,7 +150,9 @@ class Learner():
         pal = pals.plasma(5)
         df['color'] = [pal[i] for i in [int(4*(x-250)/(450-250)) for x in df['Temperature']]]
 
-        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=1200, title='')
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title='')
+        p.x_range = Range1d(0,1)
+        p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
         p.xaxis.axis_label = "Predicted Activity"
         p.yaxis.axis_label = "Measured Activity"
@@ -130,11 +163,10 @@ class Learner():
         p.circle("Predicted", "Measured", size=12, source=source,
                  color='color', line_color="black", fill_alpha=0.8)
 
-        output_file(".\\Figures\\ML_Statistics.html", title="stats.py")
-
+        output_file(".\\Figures\\{}.html".format(sv_nm), title="stats.py")
         show(p)
 
-    def load_NH3_catalysts(self):
+    def load_NH3_catalysts(self, filter_monometallics=False, filter_bimetallics=False):
         df = pd.read_excel(r".\Data\NH3Data.xlsx", index_col=0)
 
         for vals in df.iterrows():
@@ -147,6 +179,13 @@ class Learner():
                 inputs = vals[1]
 
                 if np.isnan(inputs['T' + str(temp)]):
+                    continue
+
+                if filter_monometallics & (inputs['Element_2'] == 'None') & (inputs['Element_3'] == 'None_2'):
+                    continue
+
+                if filter_bimetallics & ((inputs['Element_2'] == 'None') & (inputs['Element_3'] != 'None_2') |
+                                                 (inputs['Element_2'] != 'None') & (inputs['Element_3'] == 'None_2')):
                     continue
 
                 cat.add_element(inputs['Element_1'], inputs['Loading_1'])
@@ -164,6 +203,14 @@ class Learner():
                 cat.feature_add_elemental_properties()
 
                 self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=temp), catalyst=cat)
+
+    def save_predictions(self):
+        if self.predictions is not None:
+            df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=self.catalyst_dictionary[x].ID,
+                                                           T=self.catalyst_dictionary[x].input_dict['temperature'])
+                                         for x in skynet.catalyst_dictionary], self.predictions, self.labels]).T,
+                              columns=['ID', 'Predicted Activity', 'Measured Activity'])
+            df.to_csv(r'.\Results\predictions.csv')
 
 
 class Catalyst():
@@ -230,24 +277,17 @@ class Catalyst():
 
 
 if __name__ == '__main__':
-
-    # Spool up Learner Class
     skynet = Learner()
-    skynet.load_NH3_catalysts()
+    skynet.load_NH3_catalysts(filter_bimetallics=True, filter_monometallics=True)
     skynet.create_training_set()
-
-    # Create training data
-
+    skynet.clean_data()
+    # skynet.scale_data()
     skynet.set_learner(learner=0)
+
+    # skynet.hyperparameter_tuning()
     # skynet.validate_learner(sv=True)
     skynet.predict_learner()
-    # skynet.compare_predictions()
-    skynet.bokeh_plot()
-    exit()
+    skynet.save_predictions()
+    # skynet.plot_predictions_basic()
+    skynet.plot_predictions(sv_nm='NH3_NoBimetallicsNoMonometallics')
 
-
-    df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=skynet.catalyst_dictionary[x].ID,
-                                                   T=skynet.catalyst_dictionary[x].temperature)
-                                 for x in skynet.catalyst_dictionary], skynet.predictions, skynet.labels]).T,
-                      columns=['ID','Predicted Activity','Measured Activity'])
-    df.to_csv(r'C:\Users\quick\Desktop\predictions.csv')
