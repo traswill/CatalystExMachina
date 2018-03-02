@@ -2,6 +2,7 @@
 
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.neural_network import MLPRegressor
+from sklearn.svm import SVR
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
 import pandas as pd
 import numpy as np
@@ -14,6 +15,8 @@ from sklearn import preprocessing
 from sklearn.model_selection import GridSearchCV
 from bokeh.models import Range1d
 
+# TODO: http://scikit-learn.org/stable/modules/tree.html#regression --- graphviz
+
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
@@ -25,7 +28,8 @@ class Learner():
         self.labels = list()
         self.predictions = None
 
-        self.learner = None
+        self.machina = None
+        self.machina_tuning_parameters = None
 
     def add_catalyst(self, index, catalyst):
         base_index = index
@@ -67,41 +71,41 @@ class Learner():
         self.features = preprocessing.minmax_scale(self.features)
 
     def hyperparameter_tuning(self):
-        parameters = {
-            'n_estimators': [10, 50, 100, 500],
-            'min_samples_split': [2, 4, 6],
-            'min_samples_leaf': [1, 2, 3],
-            'bootstrap': [True, False]
-        }
-        clf = GridSearchCV(self.learner, parameters)
+        clf = GridSearchCV(self.machina, self.machina_tuning_parameters)
         clf.fit(self.features, self.labels)
         pd.DataFrame(clf.cv_results_).to_csv(r'.\Results\parameter_tuning.csv')
 
-
     def set_learner(self, learner):
         if (learner == 'random forest') or (learner == 0):
-            self.learner = RandomForestRegressor(n_estimators=200)
-            # self.learner = RandomForestRegressor(n_estimators=100, min_sample_leaf=2, min_sample_split=6, bootstrap=True)
+            self.machina = RandomForestRegressor(min_samples_leaf=2, min_samples_split=2, n_estimators=50)
+
+            self.machina_tuning_parameters = {
+                'n_estimators': [10, 50, 100, 500],
+                'min_samples_split': [2, 4, 6],
+                'min_samples_leaf': [1, 2, 3],
+                'bootstrap': [True, False]
+            }
         elif (learner == 'adaboost') or (learner == 1):
-            self.learner = AdaBoostRegressor()
+            self.machina = AdaBoostRegressor()
         elif (learner == 'SGD') or (learner == 2):
             pass
         elif (learner == 'neural net') or (learner == 3):
-            # self.learner = MLPRegressor()
-            self.learner = MLPRegressor(activation='relu', learning_rate='adaptive', max_iter=1000)
+            self.machina = MLPRegressor()
+        elif (learner == 'svm') or (learner == 4):
+            self.machina = SVR()
         else:
             print('Learner Selection Out of Bounds.  Please Select a Valid Learner.')
             exit()
 
     def train_learner(self):
-        self.learner.fit(self.features, self.labels)
+        self.machina.fit(self.features, self.labels)
 
     def validate_learner(self, n_validations=10, n_folds=10, sv=False):
         cv = ShuffleSplit()
 
         scoredf = None
         for ii in range(1, n_validations):
-            score = cross_val_score(self.learner, self.features, self.labels, cv=cv)
+            score = cross_val_score(self.machina, self.features, self.labels, cv=cv)
             if scoredf is None:
                 scoredf = pd.DataFrame(score)
             else:
@@ -114,7 +118,7 @@ class Learner():
             return scoredf
 
     def predict_learner(self):
-        self.predictions = cross_val_predict(self.learner, self.features, self.labels, cv=10)
+        self.predictions = cross_val_predict(self.machina, self.features, self.labels, cv=10)
 
     def plot_predictions_basic(self):
         temperature = [self.catalyst_dictionary[x].input_dict['temperature'] for x in self.catalyst_dictionary]
@@ -125,7 +129,7 @@ class Learner():
         plt.ylim(0,1)
         plt.show()
 
-    def plot_predictions(self, sv_nm='ML_Statistics'):
+    def plot_predictions(self, svnm='ML_Statistics'):
         df = pd.DataFrame(np.array([
             [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
             self.predictions,
@@ -163,7 +167,7 @@ class Learner():
         p.circle("Predicted", "Measured", size=12, source=source,
                  color='color', line_color="black", fill_alpha=0.8)
 
-        output_file(".\\Figures\\{}.html".format(sv_nm), title="stats.py")
+        output_file(".\\Figures\\{}.html".format(svnm), title="stats.py")
         show(p)
 
     def load_NH3_catalysts(self, filter_monometallics=False, filter_bimetallics=False):
@@ -273,9 +277,6 @@ class Catalyst():
     def feature_add_n_elements(self):
         self.feature_dict['n_elements'] = len(self.elements.keys())
 
-
-
-
 if __name__ == '__main__':
     skynet = Learner()
     skynet.load_NH3_catalysts(filter_bimetallics=True, filter_monometallics=True)
@@ -283,11 +284,10 @@ if __name__ == '__main__':
     skynet.clean_data()
     # skynet.scale_data()
     skynet.set_learner(learner=0)
-
     # skynet.hyperparameter_tuning()
     # skynet.validate_learner(sv=True)
     skynet.predict_learner()
     skynet.save_predictions()
     # skynet.plot_predictions_basic()
-    skynet.plot_predictions(sv_nm='NH3_NoBimetallicsNoMonometallics')
+    skynet.plot_predictions()
 
