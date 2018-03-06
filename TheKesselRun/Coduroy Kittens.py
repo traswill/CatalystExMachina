@@ -271,6 +271,7 @@ class Learner():
     def extract_important_features(self):
         df = pd.DataFrame(self.machina.feature_importances_, index=self.feature_names, columns=['Feature Importance'])
         df.to_csv('.//Results//Feature_Importance.csv')
+        print(df.sort_values(by='Feature Importance', ascending=False).head(10))
 
 
 class Catalyst():
@@ -341,10 +342,10 @@ if __name__ == '__main__':
     skynet.set_learner(learner='randomforest')
     # skynet.hyperparameter_tuning()
     # skynet.validate_learner(sv=True)
-    skynet.predict_learner()
-    # skynet.train_learner()
-    # skynet.extract_important_features()
+    # skynet.predict_learner()
+    skynet.train_learner()
+    skynet.extract_important_features()
     # skynet.save_predictions()
     # skynet.plot_predictions_basic()
-    skynet.plot_predictions()
+    # skynet.plot_predictions()
 
