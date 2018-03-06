@@ -1,21 +1,26 @@
-# Because why the hell not
+# Created by Travis Williams
+# Property of the University of South Carolina
+# Contact: travisw@email.sc.edu
+# Project Start: February 15, 2018
 
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
-from sklearn.neural_network import MLPRegressor
-from sklearn.svm import SVR
-from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+
+from sklearn import preprocessing, tree
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import GridSearchCV
+from sklearn.svm import SVR
+from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
+
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool
 from bokeh.plotting import figure, show, output_file
 import bokeh.palettes as pals
-from sklearn import preprocessing
-from sklearn.model_selection import GridSearchCV
 from bokeh.models import Range1d
 
-# TODO: http://scikit-learn.org/stable/modules/tree.html#regression --- graphviz
+import seaborn as sns
+
 
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
@@ -43,8 +48,51 @@ class Learner():
         # Add to dictionary
         self.catalyst_dictionary[index] = catalyst
 
-    def get_training_data_size(self):
-        print(len(self.features))
+    def load_nh3_catalysts(self, filter_monometallics=False, filter_bimetallics=False):
+        df = pd.read_excel(r".\Data\NH3Data.xlsx", index_col=0)
+
+        for vals in df.iterrows():
+            if np.isnan(vals[0]):
+                continue
+
+            for temp in [250, 300, 350, 400, 450]:
+                cat = Catalyst()
+                cat.ID = int(vals[0])
+                inputs = vals[1]
+
+                if np.isnan(inputs['T' + str(temp)]):
+                    continue
+
+                if filter_monometallics & (inputs['Element_2'] == 'None') & (inputs['Element_3'] == 'None_2'):
+                    continue
+
+                if filter_bimetallics & ((inputs['Element_2'] == 'None') & (inputs['Element_3'] != 'None_2') |
+                                                 (inputs['Element_2'] != 'None') & (inputs['Element_3'] == 'None_2')):
+                    continue
+
+                cat.add_element(inputs['Element_1'], inputs['Loading_1'])
+                cat.add_element(inputs['Element_2'], inputs['Loading_2'])
+                cat.add_element(inputs['Element_3'], inputs['Loading_3'])
+
+                cat.input_reactor_number(inputs['Reactor'])
+                cat.input_temperature(temp)
+                cat.input_space_velocity(inputs['Space Velocity'])
+                cat.input_ammonia_concentration(inputs['Ammonia Concentration'])
+
+                cat.activity = inputs['T' + str(temp)]
+
+                cat.feature_add_n_elements()
+                cat.feature_add_elemental_properties()
+
+                self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=temp), catalyst=cat)
+
+        self.create_training_set()
+
+    def get_n_samples(self):
+        return len(self.features)
+
+    def get_n_features(self):
+        return len(self.features[0])
 
     def create_training_set(self):
         for key, value in self.catalyst_dictionary.items():
@@ -62,21 +110,46 @@ class Learner():
 
         self.features = pd.DataFrame(self.features, dtype=float).values
 
-    def clean_data(self):
-        """Replaces NaN values with mean value of column"""
-        imp = preprocessing.Imputer(missing_values='NaN', strategy='mean', axis=0)
-        self.features = imp.fit_transform(self.features)
+    def preprocess_data(self, clean=False, scale=False):
+        if clean:
+            # Replaces NaN values with mean value of column
+            imp = preprocessing.Imputer(missing_values='NaN', strategy='mean', axis=0)
+            self.features = imp.fit_transform(self.features)
 
-    def scale_data(self):
-        self.features = preprocessing.minmax_scale(self.features)
+        if scale:
+            self.features = preprocessing.minmax_scale(self.features)
 
     def hyperparameter_tuning(self):
+        if (self.machina == 'randomforest'):
+            self.machina_tuning_parameters = {
+                'n_estimators': [10, 50, 100, 500],
+                'min_samples_split': [2, 4, 6],
+                'min_samples_leaf': [1, 2, 3],
+                'bootstrap': [True, False]
+            }
+
+        elif (self.machina == 'adaboost'):
+            pass
+
+        elif (self.machina == 'SGD'):
+            pass
+
+        elif (self.machina == 'neuralnet'):
+            pass
+
+        elif (self.machina == 'svm'):
+            pass
+
+        else:
+            print('Learner Selection Out of Bounds.  Please Select a Valid Learner: randomforest, adaboost, neuralnet, svm')
+            exit()
+
         clf = GridSearchCV(self.machina, self.machina_tuning_parameters)
         clf.fit(self.features, self.labels)
         pd.DataFrame(clf.cv_results_).to_csv(r'.\Results\parameter_tuning.csv')
 
     def set_learner(self, learner):
-        if (learner == 'random forest') or (learner == 0):
+        if learner == 'randomforest':
             self.machina = RandomForestRegressor(min_samples_leaf=2, min_samples_split=2, n_estimators=50)
 
             self.machina_tuning_parameters = {
@@ -85,16 +158,25 @@ class Learner():
                 'min_samples_leaf': [1, 2, 3],
                 'bootstrap': [True, False]
             }
-        elif (learner == 'adaboost') or (learner == 1):
+
+        elif learner == 'adaboost':
             self.machina = AdaBoostRegressor()
-        elif (learner == 'SGD') or (learner == 2):
+
+        elif learner == 'tree':
+            self.machina = tree.DecisionTreeRegressor()
+
+        elif learner == 'SGD':
             pass
-        elif (learner == 'neural net') or (learner == 3):
+
+        elif learner == 'neuralnet':
             self.machina = MLPRegressor()
-        elif (learner == 'svm') or (learner == 4):
+
+        elif learner == 'svm':
             self.machina = SVR()
+
         else:
-            print('Learner Selection Out of Bounds.  Please Select a Valid Learner.')
+            print('Learner Selection Out of Bounds. \n '
+                  'Please Select a Valid Learner: randomforest, adaboost, SGD, neuralnet, svm')
             exit()
 
     def train_learner(self):
@@ -130,6 +212,9 @@ class Learner():
         plt.show()
 
     def plot_predictions(self, svnm='ML_Statistics'):
+        if self.predictions is None:
+            self.predict_learner()
+
         df = pd.DataFrame(np.array([
             [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
             self.predictions,
@@ -170,44 +255,6 @@ class Learner():
         output_file(".\\Figures\\{}.html".format(svnm), title="stats.py")
         show(p)
 
-    def load_NH3_catalysts(self, filter_monometallics=False, filter_bimetallics=False):
-        df = pd.read_excel(r".\Data\NH3Data.xlsx", index_col=0)
-
-        for vals in df.iterrows():
-            if np.isnan(vals[0]):
-                continue
-
-            for temp in [250, 300, 350, 400, 450]:
-                cat = Catalyst()
-                cat.ID = int(vals[0])
-                inputs = vals[1]
-
-                if np.isnan(inputs['T' + str(temp)]):
-                    continue
-
-                if filter_monometallics & (inputs['Element_2'] == 'None') & (inputs['Element_3'] == 'None_2'):
-                    continue
-
-                if filter_bimetallics & ((inputs['Element_2'] == 'None') & (inputs['Element_3'] != 'None_2') |
-                                                 (inputs['Element_2'] != 'None') & (inputs['Element_3'] == 'None_2')):
-                    continue
-
-                cat.add_element(inputs['Element_1'], inputs['Loading_1'])
-                cat.add_element(inputs['Element_2'], inputs['Loading_2'])
-                cat.add_element(inputs['Element_3'], inputs['Loading_3'])
-
-                cat.input_reactor_number(inputs['Reactor'])
-                cat.input_temperature(temp)
-                cat.input_space_velocity(inputs['Space Velocity'])
-                cat.input_ammonia_concentration(inputs['Ammonia Concentration'])
-
-                cat.activity = inputs['T' + str(temp)]
-
-                cat.feature_add_n_elements()
-                cat.feature_add_elemental_properties()
-
-                self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=temp), catalyst=cat)
-
     def save_predictions(self):
         if self.predictions is not None:
             df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=self.catalyst_dictionary[x].ID,
@@ -215,6 +262,15 @@ class Learner():
                                          for x in skynet.catalyst_dictionary], self.predictions, self.labels]).T,
                               columns=['ID', 'Predicted Activity', 'Measured Activity'])
             df.to_csv(r'.\Results\predictions.csv')
+        else:
+            print('No predictions to save...')
+
+    def visualize_tree(self):
+        pass
+
+    def extract_important_features(self):
+        df = pd.DataFrame(self.machina.feature_importances_, index=self.feature_names, columns=['Feature Importance'])
+        df.to_csv('.//Results//Feature_Importance.csv')
 
 
 class Catalyst():
@@ -277,17 +333,18 @@ class Catalyst():
     def feature_add_n_elements(self):
         self.feature_dict['n_elements'] = len(self.elements.keys())
 
+
 if __name__ == '__main__':
     skynet = Learner()
-    skynet.load_NH3_catalysts(filter_bimetallics=True, filter_monometallics=True)
-    skynet.create_training_set()
-    skynet.clean_data()
-    # skynet.scale_data()
-    skynet.set_learner(learner=0)
+    skynet.load_nh3_catalysts(filter_bimetallics=True, filter_monometallics=True)
+    skynet.preprocess_data(clean=True)
+    skynet.set_learner(learner='randomforest')
     # skynet.hyperparameter_tuning()
     # skynet.validate_learner(sv=True)
     skynet.predict_learner()
-    skynet.save_predictions()
+    # skynet.train_learner()
+    # skynet.extract_important_features()
+    # skynet.save_predictions()
     # skynet.plot_predictions_basic()
     skynet.plot_predictions()
 
