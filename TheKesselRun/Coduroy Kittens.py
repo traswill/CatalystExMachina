@@ -88,6 +88,26 @@ class Learner():
 
         self.create_training_set()
 
+    def load_nh3_catalysts_updated(self):
+        df = pd.read_csv(r".\Data\Processed\AllData.csv", index_col=0)
+
+        for index, row in df.iterrows():
+            cat = Catalyst()
+            cat.ID = row['ID']
+            cat.add_element(row['Ele1'], row['Wt1'])
+            cat.add_element(row['Ele2'], row['Wt2'])
+            cat.add_element(row['Ele3'], row['Wt3'])
+            cat.input_reactor_number(int(row['Reactor']))
+            cat.input_temperature(row['Temperature'])
+            cat.input_space_velocity(row['Space Velocity'])
+            cat.input_ammonia_concentration(row['NH3'])
+            cat.activity = row['Concentration']
+
+            cat.feature_add_n_elements()
+            cat.feature_add_elemental_properties()
+
+            self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
+
     def get_n_samples(self):
         return len(self.features)
 
@@ -337,7 +357,7 @@ class Catalyst():
 
 if __name__ == '__main__':
     skynet = Learner()
-    skynet.load_nh3_catalysts(filter_bimetallics=True, filter_monometallics=True)
+    skynet.load_nh3_catalysts_updated()
     skynet.preprocess_data(clean=True)
     skynet.set_learner(learner='randomforest')
     # skynet.hyperparameter_tuning()
