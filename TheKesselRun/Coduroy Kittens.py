@@ -88,12 +88,20 @@ class Learner():
 
         self.create_training_set()
 
-    def load_nh3_catalysts_updated(self):
+    def load_nh3_catalysts_updated(self, filter_monometallics=False, filter_bimetallics=False):
         df = pd.read_csv(r".\Data\Processed\AllData.csv", index_col=0)
 
         for index, row in df.iterrows():
             cat = Catalyst()
             cat.ID = row['ID']
+
+            if filter_monometallics & (row['Ele2'] == '-') & (row['Ele3'] == '--'):
+                continue
+
+            if filter_bimetallics & ((row['Ele2'] == '-') & (row['Ele3'] != '--') |
+                                             (row['Ele2'] != '-') & (row['Ele3'] == '--')):
+                continue
+
             cat.add_element(row['Ele1'], row['Wt1'])
             cat.add_element(row['Ele2'], row['Wt2'])
             cat.add_element(row['Ele3'], row['Wt3'])
@@ -107,6 +115,8 @@ class Learner():
             cat.feature_add_elemental_properties()
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
+
+        self.create_training_set()
 
     def get_n_samples(self):
         return len(self.features)
@@ -286,12 +296,22 @@ class Learner():
             print('No predictions to save...')
 
     def visualize_tree(self):
+        """ Find a way to visualize the decision tree """
         pass
 
     def extract_important_features(self):
+        """ Save all feature importances, print top 10 """
         df = pd.DataFrame(self.machina.feature_importances_, index=self.feature_names, columns=['Feature Importance'])
         df.to_csv('.//Results//Feature_Importance.csv')
         print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+
+    def filter_training_by_temperature(self):
+        """ Select all of one temperature, then train data to remove temperature as a major effect """
+        pass
+
+    def restrict_feature_set(self):
+        """ Allow user to specify features, then predict using only those features """
+        pass
 
 
 class Catalyst():
@@ -357,15 +377,17 @@ class Catalyst():
 
 if __name__ == '__main__':
     skynet = Learner()
-    skynet.load_nh3_catalysts_updated()
+    skynet.load_nh3_catalysts_updated(filter_monometallics=True, filter_bimetallics=True)
     skynet.preprocess_data(clean=True)
     skynet.set_learner(learner='randomforest')
     # skynet.hyperparameter_tuning()
     # skynet.validate_learner(sv=True)
-    # skynet.predict_learner()
     skynet.train_learner()
     skynet.extract_important_features()
     # skynet.save_predictions()
     # skynet.plot_predictions_basic()
-    # skynet.plot_predictions()
+    skynet.predict_learner()
+    skynet.plot_predictions()
 
+# TODO Modify plot to incorporate experimental error
+# TODO Plot only by temperature (remove it as a variable)
