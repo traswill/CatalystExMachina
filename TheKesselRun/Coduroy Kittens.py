@@ -14,7 +14,7 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVR
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
 
-from bokeh.models import ColumnDataSource, LabelSet, HoverTool
+from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker
 from bokeh.plotting import figure, show, output_file
 import bokeh.palettes as pals
 from bokeh.models import Range1d
@@ -285,6 +285,76 @@ class Learner():
         output_file(".\\Figures\\{}.html".format(svnm), title="stats.py")
         show(p)
 
+    def plot_averaged(self, svnm='ML_Statistics_Averaged', whiskers=False):
+        if self.predictions is None:
+            self.predict_learner()
+
+        df = pd.DataFrame(np.array([
+            [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
+            self.predictions,
+            self.labels,
+            [self.catalyst_dictionary[x].input_dict['temperature'] for x in self.catalyst_dictionary]]).T,
+                          columns=['ID', 'Predicted', 'Measured', 'Temperature'])
+
+        cat_eles = [self.catalyst_dictionary[x].elements for x in self.catalyst_dictionary]
+        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x.items()) for x in cat_eles]
+        vals = [strg.replace('None(0)','') for strg in vals]
+        vals = [strg.replace('None_2(0)','') for strg in vals]
+        df['Name'] = vals
+
+        tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
+        hover = HoverTool(tooltips=[
+            ('Name', '@Name'),
+            ("ID", "@ID"),
+            ('T', '@Temperature')
+        ])
+        tools.append(hover)
+
+        pal = pals.plasma(7)
+        df['color'] = [pal[i] for i in [int(6*(x-150)/(450-150)) for x in df['Temperature']]]
+
+        unique_names = np.unique(df.loc[:, 'Name'].values)
+
+        final_df = pd.DataFrame()
+
+        for nm in unique_names:
+            nmdf = df.loc[df.loc[:, 'Name'] == nm]
+            unique_temp = np.unique(nmdf.loc[:, 'Temperature'].values)
+
+            for temperature in unique_temp:
+                tdf = nmdf.loc[nmdf.loc[:, 'Temperature'] == temperature]
+                add_df = tdf.iloc[0, :].copy()
+                add_df['Measured'] = tdf['Measured'].mean()
+                add_df['Measured Standard Error'] = tdf['Measured'].sem()
+                add_df['Upper'] = tdf['Measured'].mean() + tdf['Measured'].sem()
+                add_df['Lower'] = tdf['Measured'].mean() - tdf['Measured'].sem()
+                add_df['n Samples'] = tdf['Measured'].count()
+
+                final_df = pd.concat([final_df, add_df], axis=1)
+
+        df = final_df.transpose()
+
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title='')
+        p.x_range = Range1d(0,1)
+        p.y_range = Range1d(0,1)
+        p.background_fill_color = "#dddddd"
+        p.xaxis.axis_label = "Predicted Activity"
+        p.yaxis.axis_label = "Measured Activity"
+        p.grid.grid_line_color = "white"
+
+        source = ColumnDataSource(df)
+
+        p.circle("Predicted", "Measured", size=8, source=source,
+                 color='color', line_color="black", fill_alpha=0.8)
+
+        if whiskers:
+            p.add_layout(
+                Whisker(source=source, base="Predicted", upper="Upper", lower="Lower", level="overlay")
+            )
+
+        output_file(".\\Figures\\{}.html".format(svnm), title="stats.py")
+        show(p)
+
     def save_predictions(self):
         if self.predictions is not None:
             df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=self.catalyst_dictionary[x].ID,
@@ -296,7 +366,7 @@ class Learner():
             print('No predictions to save...')
 
     def visualize_tree(self):
-        """ Find a way to visualize the decision tree """
+        """ Find a way to visualize the decision treeu """
         pass
 
     def extract_important_features(self):
@@ -380,14 +450,15 @@ if __name__ == '__main__':
     skynet.load_nh3_catalysts_updated(filter_monometallics=True, filter_bimetallics=True)
     skynet.preprocess_data(clean=True)
     skynet.set_learner(learner='randomforest')
+    skynet.plot_averaged()
     # skynet.hyperparameter_tuning()
     # skynet.validate_learner(sv=True)
-    skynet.train_learner()
-    skynet.extract_important_features()
+    # skynet.train_learner()
+    # skynet.extract_important_features()
     # skynet.save_predictions()
     # skynet.plot_predictions_basic()
-    skynet.predict_learner()
-    skynet.plot_predictions()
+    # skynet.predict_learner()
+    # skynet.plot_predictions()
 
 # TODO Modify plot to incorporate experimental error
 # TODO Plot only by temperature (remove it as a variable)
