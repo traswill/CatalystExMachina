@@ -123,7 +123,7 @@ class Learner():
 
             # Add Element Loadings to DF
             for key, value in catalyst.elements.items():
-                loading_df.loc[loading_df.index == '{} Loading'.format(key), nm] = value
+                loading_df.loc[loading_df.index == '{} Loading'.format(key), nm] = value / 100
 
             # Add temperature, space velocity, nh3conc, and reactor number
             for key, value in catalyst.input_dict.items():
@@ -131,7 +131,7 @@ class Learner():
 
             # Add number of elements
             for key, value in catalyst.feature_dict.items():
-                loading_df.loc[key, nm] = value
+                loading_df.loc[key, nm] = int(value)
 
         # Remove elements with 0 loading values (i.e. Hydrogen)
         loading_df.drop(labels=['- Loading','-- Loading'], inplace=True)
@@ -153,6 +153,37 @@ class Learner():
         # Set master (never modified) and slave (for filtering)
         self.master_dataset = pd.concat([loading_df.transpose(), self.labels_df, other_df],  axis=1)
         self.slave_dataset = self.master_dataset
+
+    def add_feature_statistics(self):
+        """  This method adds atomic data in the form of Properties P1, P2, and P3 to the DF """
+
+        # Grab all atomic properties of only used elements
+        nms = self.master_dataset.columns.values
+        nms = [nm.replace(' Loading','') for nm in nms if 'Loading' in nm]
+        eledf = pd.read_csv('.\\Data\\Elements_Cleaned.csv', index_col='Abbreviation')
+        eledf = eledf.loc[nms]
+
+        # Add each atomic property to feature dataframe
+        # 1. Grab Headers
+        hdrs = ['{}_Element1'.format(x) for x in eledf.columns] + \
+               ['{}_Element2'.format(x) for x in eledf.columns] + \
+               ['{}_Element3'.format(x) for x in eledf.columns]
+
+        for hdr in hdrs:
+            self.master_dataset[hdr] = eledf[]
+        print(hdrs)
+
+        exit()
+        #
+        #
+        # for catalyst_index, rw in self.master_dataset.iterrows():
+        #     eles = [x for x in rw['Element Dictionary'].keys() if (x != '-') & (x != '--')]
+        #
+        #     for prop, data in eledf.loc[eles].iteritems():
+        #         for ind, val in enumerate(data):
+        #             self.master_dataset.loc[catalyst_index, '{prop}_Element{ind}'.format(prop=prop, ind=ind)] = data.values[ind]
+        #
+        # self.slave_dataset = self.master_dataset
 
     def filter_catalysts(self, filter=None, temperature=None):
         ele_df = pd.DataFrame([list(x.keys()) for x in [cat.elements for cat in self.catalyst_dictionary.values()]],
@@ -552,14 +583,14 @@ if __name__ == '__main__':
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
     skynet.create_training_set_eles()
-    # skynet.load_nh3_catalysts()
+    skynet.add_feature_statistics()
     skynet.filter_catalysts_eles(filter='3ele', temperature=None)
     skynet.preprocess_data(clean=True)
 
     skynet.train_learner()
     skynet.extract_important_features()
     skynet.predict_learner()
-    # skynet.plot_predictions(svnm='test')
-    # skynet.plot_averaged(svnm='3-Element')
-    skynet.plot_predictions_basic(svnm='Loading-Only')
+    skynet.plot_predictions(svnm='3-Element-v2')
+    skynet.plot_averaged(svnm='3-Element-v2')
+    skynet.plot_predictions_basic(svnm='3-Element-v2')
 
