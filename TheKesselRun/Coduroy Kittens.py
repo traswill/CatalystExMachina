@@ -61,7 +61,6 @@ class Learner():
         for index, row in df.iterrows():
             cat = Catalyst()
             cat.ID = row['ID']
-
             cat.add_element(row['Ele1'], row['Wt1'])
             cat.add_element(row['Ele2'], row['Wt2'])
             cat.add_element(row['Ele3'], row['Wt3'])
@@ -72,184 +71,88 @@ class Learner():
             cat.activity = row['Concentration']
 
             cat.feature_add_n_elements()
-            # cat.feature_add_elemental_properties()
+            cat.feature_add_elemental_properties()
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
 
-        # self.create_training_set()
+    def create_training_set(self):
+        # Set up catalyst loading dictionary with loadings
+        loading_df = pd.read_csv('.\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
+        loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
 
-    def create_training_set_stats(self):
-        """ This training set uses statistical values of atomic properties for each element in the catalyst """
-        feats = list()
-        feat_names = list()
-        lbls = list()
+        i = 0
+        for catid, catobj in self.catalyst_dictionary.items():
+            # Reset loading dictionary
+            load_df = loading_df.copy()
 
-        for key, value in self.catalyst_dictionary.items():
-            catalyst_feature_list = list()
-            catalyst_feature_list += list(value.elements.values())
-            catalyst_feature_list += list(value.input_dict.values())
-            catalyst_feature_list += list(value.feature_dict.values())
+            # Add elements and loading to loading dict
+            for ele, wt in catobj.elements.items():
+                load_df.loc[catid, '{} Loading'.format(ele)] = wt
 
-            feats += [catalyst_feature_list]
-            lbls += [value.activity]
+            # Create DF from inputs
+            inputdf = pd.DataFrame.from_dict(catobj.input_dict, orient='index').transpose()
+            inputdf.index = [catid]
 
-        feat_names += ['Loading_1','Loading_2','Loading_3']
-        feat_names += list(list(self.catalyst_dictionary.values())[0].input_dict.keys())
-        feat_names += list(list(self.catalyst_dictionary.values())[0].feature_dict.keys())
+            # Create DF from features
+            featdf = pd.DataFrame.from_dict(catobj.feature_dict, orient='index').transpose()
+            featdf.index = [catid]
 
-        self.features_df = pd.DataFrame(feats, dtype=float, columns=feat_names)
-        self.labels_df = pd.DataFrame(lbls, columns=['Measured Activity'])
+            # Create DF from activity
+            actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Measured Activity'])
 
-        other_df = pd.DataFrame(np.array([
-            [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
-            [self.catalyst_dictionary[x].elements for x in self.catalyst_dictionary],
-        ]).T,
-                                columns=['ID', 'Element Dictionary'])
+            # Create element dictionary
+            eldictdf = pd.DataFrame(catobj.elements.items(), index=[catid], columns=['Element Dictionary'])
 
-        self.master_dataset = pd.concat([other_df, self.labels_df, self.features_df], axis=1)
-        self.slave_dataset = self.master_dataset
+            # Combine DFs
+            df = pd.concat([load_df, inputdf, featdf, actdf, eldictdf], axis=1)
+            self.master_dataset = pd.concat([self.master_dataset, df], axis=0)
 
-    def create_training_set_eles(self):
-        """ This training set uses each element on the periodic table as an input with the value being the loading """
+        self.master_dataset.dropna(how='all', axis=1, inplace=True)
+        self.master_dataset.fillna(value=-1, inplace=True)
 
-        # Set up empty DF with element loading as index
-        loading_df = pd.read_csv('.\\Data\\Elements.csv', usecols=['Abbreviation'])
-        loading_df.index = ['{} Loading'.format(ele) for ele in loading_df.loc[:, 'Abbreviation'].values]
-        loading_df.drop(columns='Abbreviation', inplace=True)
+    def filter_training_set(self, filter=None, temperature=None, features=None):
+        def filter_elements(filter):
+            if filter == 'mono':
+                dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 1].index
 
-        # Populate loading values for each catalyst
-        for cat_id, catalyst in self.catalyst_dictionary.items():
-            nm = '{} Loading'.format(cat_id)
-            loading_df[nm] = 0
+            elif filter == 'bi':
+                dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 2].index
 
-            # Add Element Loadings to DF
-            n_eles = 0
-            for key, value in catalyst.elements.items():
-                loading_df.loc[loading_df.index == '{} Loading'.format(key), nm] = value / 100
+            elif filter == '3ele':
+                dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 3].index
 
-                if value > 0.0:
-                    n_eles += 1
+            else:
+                dat_filter = []
 
-            # Add temperature, space velocity, nh3conc, and reactor number
-            non_eles = 0
-            for key, value in catalyst.input_dict.items():
-                loading_df.loc[key, nm] = value
+            return dat_filter
 
-            # Add number of elements
-            loading_df.loc['n_elements', nm] = n_eles
+        def filter_temp(temperature):
+            if temperature is not None:
+                temp_filter = self.master_dataset[self.master_dataset.loc[:, 'temperature'] != temperature].index
+            else:
+                temp_filter = []
 
-        # Remove elements with 0 loading values (i.e. Hydrogen)
-        loading_df.drop(labels=['- Loading','-- Loading'], inplace=True)
-        loading_df.drop(index=loading_df[loading_df.mean(axis=1) == 0.0].index, inplace=True)
+            return temp_filter
 
-        # Set Up Labels DF
-        self.labels_df = pd.DataFrame([x.activity for x in self.catalyst_dictionary.values()],
-                                      index=['{} Loading'.format(x) for x in self.catalyst_dictionary.keys()],
-                                      columns=['Measured Activity'])
+        def filter_features(feats):
+            # Not implemented
+            return []
 
-        # Set up catalyst IDs and Element Dictionary
-        other_df = pd.DataFrame(np.array([
-            [self.catalyst_dictionary[x].ID for x in self.catalyst_dictionary],
-            [self.catalyst_dictionary[x].elements for x in self.catalyst_dictionary],
-        ]).T,
-                                columns=['ID', 'Element Dictionary'],
-                                index=['{} Loading'.format(x) for x in self.catalyst_dictionary.keys()])
+        self.filter = np.union1d(filter_elements(filter),
+                                 filter_temp(temperature)
+                                 )
 
-        # Set master (never modified) and slave (for filtering)
-        self.master_dataset = pd.concat([loading_df.transpose(), self.labels_df, other_df],  axis=1)
-        self.slave_dataset = self.master_dataset
-
-    def add_feature_statistics(self):
-        """  This method adds atomic data in the form of Properties P1, P2, and P3 to the DF """
-
-        # Grab all atomic properties of only used elements
-        nms = self.master_dataset.columns.values
-        nms = [nm.replace(' Loading','') for nm in nms if 'Loading' in nm]
-        eledf = pd.read_csv('.\\Data\\Elements_Cleaned.csv', index_col='Abbreviation')
-        eledf = eledf.loc[nms]
-
-        for catalyst_index, rw in self.master_dataset.iterrows():
-            eles = [x for x in rw['Element Dictionary'].keys() if (x != '-') & (x != '--')]
-
-            for prop, data in eledf.loc[eles].iteritems():
-                for ind, val in enumerate(data):
-                    self.master_dataset.loc[catalyst_index, '{prop}_Element{ind}'.format(prop=prop, ind=ind)] = data.values[ind]
-
-        self.slave_dataset = self.master_dataset
-
-    def save_features(self, svnm='Features'):
-        pd.DataFrame(self.master_dataset).to_csv('.\\Data\\{}.csv'.format(svnm))
-
-    def load_features(self, rdnm='Features'):
-        self.master_dataset = pd.read_csv('.\\Data\\{}.csv'.format(rdnm), index_col=0)
-        self.master_dataset['Element Dictionary'] = self.master_dataset['Element Dictionary'].apply(ast.literal_eval)
-
-    def filter_catalysts(self, filter=None, temperature=None):
-        ele_df = pd.DataFrame([list(x.keys()) for x in [cat.elements for cat in self.catalyst_dictionary.values()]],
-                          columns=['Ele1','Ele2','Ele3'])
-
-        if filter == 'mono':
-            dat_filter = ele_df[(ele_df.loc[:, 'Ele2'] == '-') & (ele_df.loc[:, 'Ele3'] == '--')].index
-
-        elif filter == 'bi':
-            dat_filter = ele_df[((ele_df.loc[:, 'Ele2'] == '-') & (ele_df.loc[:, 'Ele3'] != '--')) |
-                            ((ele_df.loc[:, 'Ele2'] != '-') & (ele_df.loc[:, 'Ele3'] == '--'))].index
-        elif filter == '3ele':
-            dat_filter = ele_df[(ele_df.loc[:, 'Ele2'] == '-') | (ele_df.loc[:, 'Ele3'] == '--')].index
-
-        else:
-            dat_filter = []
-
-        if temperature is not None:
-            temp_filter = self.master_dataset[self.master_dataset.loc[:, 'temperature'] != temperature].index
-        else:
-            temp_filter = []
-
-        self.filter = np.union1d(dat_filter, temp_filter)
-        self.slave_dataset = self.master_dataset.drop(self.master_dataset.iloc[:, self.filter]).copy()
-        self.set_dataframes()
-
-    def filter_catalysts_eles(self, filter=None, temperature=None):
-        if filter == 'mono':
-            dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 1].index
-
-        elif filter == 'bi':
-            dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 2].index
-
-        elif filter == '3ele':
-            dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 3].index
-
-        else:
-            dat_filter = []
-
-        if temperature is not None:
-            temp_filter = self.master_dataset[self.master_dataset.loc[:, 'temperature'] != temperature].index
-        else:
-            temp_filter = []
-
-        self.filter = np.union1d(dat_filter, temp_filter)
+        # Filter Master to Slave
         self.slave_dataset = self.master_dataset.drop(index=self.filter).copy()
-        self.set_dataframes()
 
-    def set_dataframes(self):
-        self.slave_dataset = self.slave_dataset.dropna(axis=1, how='all')
-
-        self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'ID', 'Element Dictionary'],
-                                                   axis=1)
+        # Set all other DFs from slave
+        self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).copy()
         self.labels_df = self.slave_dataset['Measured Activity'].copy()
-        self.plot_df = self.slave_dataset.loc[:, ['Measured Activity', 'ID', 'Element Dictionary']].copy()
+        self.plot_df = self.slave_dataset.loc[:, ['Measured Activity', 'Element Dictionary']].copy()
 
+        # Set Features and Labels
         self.features = self.features_df.values
         self.labels = self.labels_df.values
-
-    def preprocess_data(self, clean=False, scale=False):
-        if clean:
-            # Replaces NaN values with mean value of column
-            imp = preprocessing.Imputer(missing_values='NaN', strategy='mean', axis=0, copy=True)
-            self.features = imp.fit_transform(self.features)
-
-        if scale:
-            self.features = preprocessing.minmax_scale(self.features.values)
 
     def hyperparameter_tuning(self):
         if (self.machina == 'randomforest'):
@@ -350,16 +253,14 @@ class Learner():
             self.predict_learner()
 
         df = pd.DataFrame(np.array([
-            self.slave_dataset.loc[:, 'ID'],
+            [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
             self.predictions,
             self.labels,
-            self.slave_dataset.loc[:, 'temperature']]).T,
+            self.slave_dataset.loc[:, 'temperature'].values]).T,
                           columns=['ID', 'Predicted', 'Measured', 'Temperature'])
 
         cat_eles = self.slave_dataset.loc[:, 'Element Dictionary']
-        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x.items()) for x in cat_eles]
-        vals = [strg.replace('None(0)','') for strg in vals]
-        vals = [strg.replace('None_2(0)','') for strg in vals]
+        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x) for x in cat_eles]
         df['Name'] = vals
 
         tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
@@ -368,10 +269,20 @@ class Learner():
             ("ID", "@ID"),
             ('T', '@Temperature')
         ])
+
         tools.append(hover)
 
-        pal = pals.plasma(7)
-        df['color'] = [pal[i] for i in [int(6*(x-250)/(450-250)) for x in df['Temperature']]]
+        unique_temps = len(df['Temperature'].unique())
+        max_temp = df['Temperature'].max()
+        min_temp = df['Temperature'].min()
+
+        if max_temp == min_temp:
+            df['color'] = pals.plasma(5)[4]
+        else:
+            pal = pals.plasma(unique_temps+1)
+            df['color'] = [pal[i]
+                           for i in [int(unique_temps*(float(x)-min_temp)/(max_temp-min_temp))
+                                     for x in df['Temperature']]]
 
         p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title='')
         p.x_range = Range1d(0,1)
@@ -394,14 +305,14 @@ class Learner():
             self.predict_learner()
 
         df = pd.DataFrame(np.array([
-            self.slave_dataset.loc[:, 'ID'].values,
+            [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
             self.predictions,
             self.labels,
             self.slave_dataset.loc[:, 'temperature'].values]).T,
                           columns=['ID', 'Predicted', 'Measured', 'Temperature'])
 
         cat_eles = self.slave_dataset.loc[:, 'Element Dictionary']
-        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x.items()) for x in cat_eles]
+        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x) for x in cat_eles]
         df['Name'] = vals
 
         tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
@@ -412,8 +323,17 @@ class Learner():
         ])
         tools.append(hover)
 
-        pal = pals.plasma(7)
-        df['color'] = [pal[i] for i in [int(6*(x-150)/(450-150)) for x in df['Temperature']]]
+        unique_temps = len(df['Temperature'].unique())
+        max_temp = df['Temperature'].max()
+        min_temp = df['Temperature'].min()
+
+        if max_temp == min_temp:
+            df['color'] = pals.plasma(5)[4]
+        else:
+            pal = pals.plasma(unique_temps + 1)
+            df['color'] = [pal[i]
+                           for i in [int(unique_temps * (float(x) - min_temp) / (max_temp - min_temp))
+                                     for x in df['Temperature']]]
 
         unique_names = np.unique(df.loc[:, 'Name'].values)
 
@@ -477,10 +397,6 @@ class Learner():
         df.to_csv('.//Results//{}.csv'.format(svnm))
         print(df.sort_values(by='Feature Importance', ascending=False).head(10))
 
-    def restrict_feature_set(self):
-        """ Allow user to specify features, then predict using only those features """
-        pass
-
 
 class Catalyst():
     """Catalyst will contain each individual training set"""
@@ -528,49 +444,30 @@ class Catalyst():
 
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame
-        eledf = pd.read_csv(r'./Data/ELements.csv', index_col=1)
+        eledf = pd.read_csv(r'./Data/ELements_Cleaned.csv', index_col=1)
 
         # Slice Elements.csv based on elements present
         eledf = eledf.loc[list(self.elements.keys())]
 
         for feature_name, feature_values in eledf.T.iterrows():
-            if feature_name == 'OxidationStates':
-                continue  # Oxidation State loads as a string and causes errors.  TODO: Fix this?
-
-            self.feature_add_statistics(feature_name, feature_values.values)
+            self.feature_add('{}_0'.format(feature_name), feature_values.values[0])
+            self.feature_add('{}_1'.format(feature_name), feature_values.values[1])
+            self.feature_add('{}_2'.format(feature_name), feature_values.values[2])
 
     def feature_add_n_elements(self):
-        self.feature_dict['n_elements'] = len(self.elements.keys())
+        n_eles = 0
+        for val in self.elements.values():
+            if val > 0:
+                n_eles += 1
 
-
-def generate_plots():
-    skynet = Learner()
-    skynet.set_learner(learner='randomforest')
-    skynet.load_nh3_catalysts()
-
-    skynet.filter_catalysts()
-    skynet.preprocess_data(clean=True)
-    skynet.plot_predictions_basic(svnm='All-Data')
-
-    skynet.filter_catalysts(filter='3ele')
-    skynet.preprocess_data(clean=True)
-    skynet.plot_predictions_basic(svnm='3-Element')
-
-    skynet.filter_catalysts(filter='mono')
-    skynet.preprocess_data(clean=True)
-    skynet.plot_predictions_basic(svnm='No-Monometallics')
-
-    skynet.filter_catalysts(filter='bi')
-    skynet.preprocess_data(clean=True)
-    skynet.plot_predictions_basic(svnm='No-Bimetallics')
+        self.feature_add('n_elements',n_eles)
 
 def temp_step():
     skynet = Learner()
     skynet.set_learner(learner='randomforest')
-    skynet.load_features()
 
     for temp in [250, 300, 350, 400, 450]:
-        skynet.filter_catalysts_eles(filter='3ele', temperature=temp)
+        skynet.create_training_set()
         skynet.preprocess_data(clean=True)
         skynet.train_learner()
         skynet.extract_important_features('3-Element-v2-{}C-Feature-Importance'.format(temp))
@@ -578,24 +475,18 @@ def temp_step():
         skynet.plot_predictions_basic(svnm='3-Element-v2-{}C'.format(temp))
 
 if __name__ == '__main__':
-    # generate_plots()
     # temp_step()
     # exit()
     skynet = Learner()
     skynet.set_learner(learner='randomforest')
-    # skynet.load_nh3_catalysts()
-    # skynet.create_training_set_eles()
-    # skynet.add_feature_statistics()
-    # skynet.save_features()
-    # exit()
-    skynet.load_features()
-    skynet.filter_catalysts_eles(filter='3ele', temperature=400)
-    skynet.preprocess_data(clean=True)
+    skynet.load_nh3_catalysts()
+    skynet.create_training_set()
+    skynet.filter_training_set(filter='3ele', temperature=400)
 
     skynet.train_learner()
     skynet.extract_important_features()
     skynet.predict_learner()
     skynet.plot_predictions(svnm='3-Element-v2-400')
-    skynet.plot_averaged(svnm='3-Element-v2-400')
-    # skynet.plot_predictions_basic(svnm='3-Element-v2')
+    # skynet.plot_averaged(svnm='3-Element-v2-400')
+    skynet.plot_predictions_basic(svnm='3-Element-v2')
 
