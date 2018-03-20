@@ -10,17 +10,23 @@ import matplotlib.pyplot as plt
 from sklearn import preprocessing, tree
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
 from sklearn.neural_network import MLPRegressor
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.svm import SVR
-from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict
+from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict, GroupKFold
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.utils import shuffle
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker
-from bokeh.plotting import figure, show, output_file
+from bokeh.plotting import figure, show, output_file, save
 import bokeh.palettes as pals
 from bokeh.models import Range1d
 
 import seaborn as sns
 import ast
+import graphviz
+import os
+from itertools import compress
+
 
 
 class Learner():
@@ -42,6 +48,9 @@ class Learner():
         self.machina_tuning_parameters = None
 
         self.filter = None
+
+        self.svfl = None
+        self.svnm = None
 
     def add_catalyst(self, index, catalyst):
         base_index = index
@@ -87,7 +96,7 @@ class Learner():
 
             # Add elements and loading to loading dict
             for ele, wt in catobj.elements.items():
-                load_df.loc[catid, '{} Loading'.format(ele)] = wt
+                load_df.loc[catid, '{} Loading'.format(ele)] = wt / 100
 
             # Create DF from inputs
             inputdf = pd.DataFrame.from_dict(catobj.input_dict, orient='index').transpose()
@@ -110,7 +119,7 @@ class Learner():
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
         self.master_dataset.fillna(value=-1, inplace=True)
 
-    def filter_training_set(self, filter=None, temperature=None, features=None):
+    def filter_training_set(self, filter=None, temperature=None, features=None, svfl='.\\Results', svnm='Test'):
         def filter_elements(filter):
             if filter == 'mono':
                 dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 1].index
@@ -138,12 +147,19 @@ class Learner():
             # Not implemented
             return []
 
+        def filter_bad_data():
+            bad_filter = self.master_dataset[self.master_dataset['W Loading'] > 0].index
+            return bad_filter
+
         self.filter = np.union1d(filter_elements(filter),
                                  filter_temp(temperature)
                                  )
 
+        self.filter = np.union1d(self.filter, filter_bad_data())
+
         # Filter Master to Slave
         self.slave_dataset = self.master_dataset.drop(index=self.filter).copy()
+        self.slave_dataset = shuffle(self.slave_dataset)
 
         # Set all other DFs from slave
         self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).copy()
@@ -154,44 +170,41 @@ class Learner():
         self.features = self.features_df.values
         self.labels = self.labels_df.values
 
+        # Set Save Locations based on filter
+        self.svfl = svfl
+        self.svnm = svnm
+
+        if not os.path.exists(self.svfl):
+            os.makedirs(self.svfl)
+            os.makedirs('{}\\{}'.format(self.svfl, 'Trees'))
+
     def hyperparameter_tuning(self):
-        if (self.machina == 'randomforest'):
-            self.machina_tuning_parameters = {
-                'n_estimators': [10, 50, 100, 500],
-                'min_samples_split': [2, 4, 6],
-                'min_samples_leaf': [1, 2, 3],
-                'bootstrap': [True, False]
-            }
-
-        elif (self.machina == 'adaboost'):
-            pass
-
-        elif (self.machina == 'SGD'):
-            pass
-
-        elif (self.machina == 'neuralnet'):
-            pass
-
-        elif (self.machina == 'svm'):
-            pass
-
-        else:
-            print('Learner Selection Out of Bounds.  Please Select a Valid Learner: randomforest, adaboost, neuralnet, svm')
-            exit()
-
-        clf = GridSearchCV(self.machina, self.machina_tuning_parameters)
-        clf.fit(self.features, self.labels)
-        pd.DataFrame(clf.cv_results_).to_csv(r'.\Results\parameter_tuning.csv')
+        # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
+        gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True, n_iter=250)
+        gs.fit(self.features, self.labels)
+        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner):
         if learner == 'randomforest':
-            self.machina = RandomForestRegressor(min_samples_leaf=2, min_samples_split=2, n_estimators=50)
+            # v1: n_est=50, max_depth=None, minleaf=2, minsplit=2
+            # v2: {'n_estimators': 50, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'auto', 'max_depth': None, 'bootstrap': True}
+            # v3: {'n_estimators': 250, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'sqrt', 'max_depth': None, 'bootstrap': False}
+            # v4:
+            self.machina = RandomForestRegressor(
+                n_estimators=250,
+                max_depth=None,
+                min_samples_leaf=2,
+                min_samples_split=2,
+                max_features='auto',
+                bootstrap=True)
 
             self.machina_tuning_parameters = {
-                'n_estimators': [10, 50, 100, 500],
-                'min_samples_split': [2, 4, 6],
-                'min_samples_leaf': [1, 2, 3],
-                'bootstrap': [True, False]
+                'n_estimators': [10, 50, 100, 250, 500, 1000, 2000, 5000],
+                'max_features': ['auto', 'sqrt', 10],
+                'max_depth': [None, 3, 5],
+                'min_samples_split': [2, 5, 10],
+                'min_samples_leaf': [1, 2, 4],
+                'bootstrap':[True, False]
             }
 
         elif learner == 'adaboost':
@@ -217,7 +230,7 @@ class Learner():
     def train_learner(self):
         self.machina.fit(self.features, self.labels)
 
-    def validate_learner(self, n_validations=10, n_folds=10, sv=False):
+    def validate_learner(self, n_validations=10, n_folds=10, sv=None):
         cv = ShuffleSplit()
 
         scoredf = None
@@ -229,23 +242,80 @@ class Learner():
                 tempdf = pd.DataFrame(score)
                 scoredf = pd.concat([scoredf, tempdf], axis=1)
 
-        if sv:
-            scoredf.to_csv(r'.\Results\results.csv')
-        else:
-            return scoredf
+        scoredf.to_csv('{}\\tenfold_{}.csv'.format(self.svfl, self.svnm))
+
 
     def predict_learner(self):
-        self.predictions = cross_val_predict(self.machina, self.features, self.labels, cv=10)
+        groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
 
-    def plot_predictions_basic(self, svnm='Fig'):
-        self.predict_learner()
-        plt.scatter(self.predictions, self.labels, c=self.slave_dataset.loc[:, 'temperature'], edgecolors='k')
+        self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+                                             groups=groups, cv=GroupKFold(10))
+
+
+
+    def plot_predictions_basic(self, avg=False):
+        if self.predictions is None:
+            self.predict_learner()
+
+        tempertures = self.slave_dataset.loc[:, 'temperature'].values
+
+        unique_temps = np.unique(tempertures)
+        n_temps = len(unique_temps)
+        max_temp = np.max(unique_temps)
+        min_temp = np.min(unique_temps)
+
+        if max_temp == min_temp:
+            clr = 'r'
+
+            mask = [int(max_temp) == np.array(tempertures, dtype=int)]
+
+            plt.scatter(self.predictions[mask],
+                        self.labels[mask],
+                        color=clr,
+                        edgecolors='k',
+                        label='{} C'.format(int(max_temp)))
+        else:
+            pal = pals.viridis(n_temps + 1)
+            clr = [str(pal[i]) for i in [int(n_temps * (float(x) - min_temp) / (max_temp - min_temp))
+                                     for x in tempertures]]
+
+            for temp in unique_temps:
+                mask = [int(temp) == np.array(tempertures, dtype=int)]
+
+                plt.scatter(self.predictions[mask],
+                            self.labels[mask],
+                            color=np.array(clr)[mask],
+                            edgecolors='k',
+                            label='{} C'.format(int(temp)))
+
+        # if avg:
+        #     final_df = pd.DataFrame()
+        #
+        #     for nm in unique_names:
+        #         nmdf = df.loc[df.loc[:, 'Name'] == nm]
+        #         unique_temp = np.unique(nmdf.loc[:, 'Temperature'].values)
+        #
+        #         for temperature in unique_temp:
+        #             tdf = nmdf.loc[nmdf.loc[:, 'Temperature'] == temperature]
+        #             add_df = tdf.iloc[0, :].copy()
+        #             add_df['Measured'] = tdf['Measured'].mean()
+        #             add_df['Measured Standard Error'] = tdf['Measured'].sem()
+        #             add_df['Upper'] = tdf['Measured'].mean() + tdf['Measured'].sem()
+        #             add_df['Lower'] = tdf['Measured'].mean() - tdf['Measured'].sem()
+        #             add_df['n Samples'] = tdf['Measured'].count()
+        #
+        #             final_df = pd.concat([final_df, add_df], axis=1)
+        #
+        #     df = final_df.transpose()
+
         plt.xlabel('Predicted')
         plt.ylabel('Measured')
         plt.xlim(0,1)
         plt.ylim(0,1)
+        # plt.title(self.svnm)
+        plt.legend()
         plt.tight_layout()
-        plt.savefig('.//Figures//{}.png'.format(svnm))
+        plt.savefig('{}//{}.png'.format(self.svfl, self.svnm), dpi=400)
         plt.close()
 
     def plot_predictions(self, svnm='ML_Statistics'):
@@ -284,7 +354,7 @@ class Learner():
                            for i in [int(unique_temps*(float(x)-min_temp)/(max_temp-min_temp))
                                      for x in df['Temperature']]]
 
-        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title='')
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
         p.x_range = Range1d(0,1)
         p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
@@ -297,10 +367,10 @@ class Learner():
         p.circle("Predicted", "Measured", size=12, source=source,
                  color='color', line_color="black", fill_alpha=0.8)
 
-        output_file(".\\Figures\\{}.html".format(svnm), title="stats.py")
-        show(p)
+        output_file("{}\\{}.html".format(self.svfl, self.svnm), title="stats.py")
+        save(p)
 
-    def plot_averaged(self, svnm='ML_Statistics_Averaged', whiskers=False):
+    def plot_averaged(self, whiskers=False):
         if self.predictions is None:
             self.predict_learner()
 
@@ -356,7 +426,7 @@ class Learner():
 
         df = final_df.transpose()
 
-        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title='')
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
         p.x_range = Range1d(0,1)
         p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
@@ -374,8 +444,8 @@ class Learner():
                 Whisker(source=source, base="Predicted", upper="Upper", lower="Lower", level="overlay")
             )
 
-        output_file(".\\Figures\\{}.html".format(svnm), title="stats.py")
-        show(p)
+        output_file("{}\\{}_avg.html".format(self.svfl, self.svnm), title="stats.py")
+        save(p)
 
     def save_predictions(self):
         if self.predictions is not None:
@@ -383,19 +453,57 @@ class Learner():
                                                            T=self.catalyst_dictionary[x].input_dict['temperature'])
                                          for x in self.catalyst_dictionary], self.predictions, self.labels]).T,
                               columns=['ID', 'Predicted Activity', 'Measured Activity'])
-            df.to_csv(r'.\Results\predictions.csv')
+            df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
 
-    def visualize_tree(self):
+    def visualize_tree(self, n=1):
         """ Find a way to visualize the decision tree """
-        pass
+        if n == 1:
+            gv = tree.export_graphviz(self.machina.estimators_[0],
+                                      filled=True,
+                                      out_file='{}//Trees//{}.dot'.format(self.svfl, self.svnm),
+                                      feature_names=self.features_df.columns,
+                                      rounded=True)
+
+            os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}_singtree.png'.format(fl=self.svfl,
+                                                                                                 nm=self.svnm))
+
+        else:
+            for index, forest in enumerate(self.machina.estimators_):
+                gv = tree.export_graphviz(forest,
+                                          filled=True,
+                                          out_file='{}//Trees//{}.dot'.format(self.svfl, self.svnm),
+                                          feature_names=self.features_df.columns,
+                                          rounded=True)
+
+                os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}-{ind}.png'.format(fl=self.svfl,
+                                                                                                  nm=self.svnm,
+                                                                                                  ind=index))
+
 
     def extract_important_features(self, svnm='Feature_Importance'):
         """ Save all feature importances, print top 10 """
         df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns, columns=['Feature Importance'])
-        df.to_csv('.//Results//{}.csv'.format(svnm))
+        df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
         print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+
+    def evaluate_learner(self):
+        mask = self.labels != 0
+        err = abs(np.array(self.predictions[mask]) - np.array(self.labels[mask]))
+        mean_ave_err = np.mean(err / np.array(self.labels[mask]))
+        acc = 1 - mean_ave_err
+
+        print('\n----- Model {} -----'.format(self.svnm))
+        print('Accuracy: {:0.3f}'.format(acc))
+        print('Average Error: {:0.3f}'.format(np.mean(err)))
+
+    def create_feature_interactions(self):
+        polygen = PolynomialFeatures(degree=2, interaction_only=True, include_bias=False)
+        self.features = polygen.fit_transform(self.features, self.labels)
+        nms = polygen.get_feature_names(input_features=self.features_df.columns.values)
+        self.features_df = pd.DataFrame(self.features, columns=nms)
+        self.features_df.to_csv('test.csv')
 
 
 class Catalyst():
@@ -444,7 +552,7 @@ class Catalyst():
 
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame
-        eledf = pd.read_csv(r'./Data/ELements_Cleaned.csv', index_col=1)
+        eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
 
         # Slice Elements.csv based on elements present
         eledf = eledf.loc[list(self.elements.keys())]
@@ -462,31 +570,48 @@ class Catalyst():
 
         self.feature_add('n_elements',n_eles)
 
-def temp_step():
-    skynet = Learner()
-    skynet.set_learner(learner='randomforest')
 
-    for temp in [250, 300, 350, 400, 450]:
-        skynet.create_training_set()
-        skynet.preprocess_data(clean=True)
-        skynet.train_learner()
-        skynet.extract_important_features('3-Element-v2-{}C-Feature-Importance'.format(temp))
-        skynet.predict_learner()
-        skynet.plot_predictions_basic(svnm='3-Element-v2-{}C'.format(temp))
-
-if __name__ == '__main__':
-    # temp_step()
-    # exit()
+def temp_step(svfl='.\\Results\\', svnm='test'):
     skynet = Learner()
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
     skynet.create_training_set()
-    skynet.filter_training_set(filter='3ele', temperature=400)
+
+    for temp in [250, 300, 350, 400, 450]:
+        svnm_temp = '{s}-{t}C'.format(s=svnm, t=temp)
+        skynet.filter_training_set(filter='3ele', temperature=temp, svfl=svfl, svnm=svnm_temp)
+        skynet.train_learner()
+        skynet.extract_important_features()
+        skynet.predict_learner()
+        skynet.visualize_tree()
+        skynet.plot_predictions_basic()
+        skynet.plot_predictions()
+        skynet.plot_averaged()
+
+
+if __name__ == '__main__':
+    svfl = '.\\Results\\v5'
+    svnm = '3-Ele-v5'
+
+    # temp_step(svfl=svfl, svnm=svnm)
+
+    skynet = Learner()
+    skynet.set_learner(learner='randomforest')
+    skynet.load_nh3_catalysts()
+    skynet.create_training_set()
+    skynet.filter_training_set(filter='3ele', temperature=None, svfl=svfl, svnm=svnm)
+    # skynet.create_feature_interactions()
+    # skynet.hyperparameter_tuning()
+    # exit()
 
     skynet.train_learner()
     skynet.extract_important_features()
     skynet.predict_learner()
-    skynet.plot_predictions(svnm='3-Element-v2-400')
-    # skynet.plot_averaged(svnm='3-Element-v2-400')
-    skynet.plot_predictions_basic(svnm='3-Element-v2')
+    skynet.evaluate_learner()
+    # exit()
+
+    # skynet.visualize_tree(svnm='{}-tree'.format(sv))
+    skynet.plot_predictions()
+    skynet.plot_averaged(whiskers=True)
+    skynet.plot_predictions_basic()
 
