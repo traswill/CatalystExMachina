@@ -15,6 +15,7 @@ from sklearn.svm import SVR
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict, GroupKFold
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.utils import shuffle
+from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker
 from bokeh.plotting import figure, show, output_file, save
@@ -179,9 +180,12 @@ class Learner():
             os.makedirs('{}\\{}'.format(self.svfl, 'Trees'))
 
     def hyperparameter_tuning(self):
+        groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
+
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
-        gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True, n_iter=250)
-        gs.fit(self.features, self.labels)
+        gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(10),
+                                return_train_score=True, n_iter=500)
+        gs.fit(self.features, self.labels, groups=groups)
         pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner):
@@ -189,7 +193,6 @@ class Learner():
             # v1: n_est=50, max_depth=None, minleaf=2, minsplit=2
             # v2: {'n_estimators': 50, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'auto', 'max_depth': None, 'bootstrap': True}
             # v3: {'n_estimators': 250, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'sqrt', 'max_depth': None, 'bootstrap': False}
-            # v4:
             self.machina = RandomForestRegressor(
                 n_estimators=250,
                 max_depth=None,
@@ -449,9 +452,7 @@ class Learner():
 
     def save_predictions(self):
         if self.predictions is not None:
-            df = pd.DataFrame(np.array([['{ID}_{T}'.format(ID=self.catalyst_dictionary[x].ID,
-                                                           T=self.catalyst_dictionary[x].input_dict['temperature'])
-                                         for x in self.catalyst_dictionary], self.predictions, self.labels]).T,
+            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels]).T,
                               columns=['ID', 'Predicted Activity', 'Measured Activity'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
@@ -494,9 +495,17 @@ class Learner():
         mean_ave_err = np.mean(err / np.array(self.labels[mask]))
         acc = 1 - mean_ave_err
 
+        mean_abs_err = mean_absolute_error(self.labels, self.predictions)
+        r2 = r2_score(self.labels, self.predictions)
+
         print('\n----- Model {} -----'.format(self.svnm))
+        print('R2: {:0.3f}'.format(r2))
+        print('Average Error: {:0.3f}'.format(mean_abs_err))
         print('Accuracy: {:0.3f}'.format(acc))
-        print('Average Error: {:0.3f}'.format(np.mean(err)))
+        print('\n')
+
+        pd.DataFrame([r2, mean_abs_err, acc],
+                     index=['R2','Mean Abs Error','Accuracy']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
 
     def create_feature_interactions(self):
         polygen = PolynomialFeatures(degree=2, interaction_only=True, include_bias=False)
@@ -591,7 +600,7 @@ def temp_step(svfl='.\\Results\\', svnm='test'):
 
 if __name__ == '__main__':
     svfl = '.\\Results\\v5'
-    svnm = '3-Ele-v5'
+    svnm = '3Ele-v5'
 
     # temp_step(svfl=svfl, svnm=svnm)
 
@@ -608,6 +617,7 @@ if __name__ == '__main__':
     skynet.extract_important_features()
     skynet.predict_learner()
     skynet.evaluate_learner()
+    # skynet.save_predictions()
     # exit()
 
     # skynet.visualize_tree(svnm='{}-tree'.format(sv))
