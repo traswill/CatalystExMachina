@@ -27,13 +27,13 @@ import ast
 import graphviz
 import os
 from itertools import compress
-
+import time
 
 
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self):
+    def __init__(self, dataset='Full'):
         self.catalyst_dictionary = dict()
 
         self.master_dataset = pd.DataFrame()
@@ -53,9 +53,16 @@ class Learner():
         self.svfl = None
         self.svnm = None
 
+        self.groups = None
+        self.dataset = dataset
+
+        self.start_time = time.time()
+
     def add_catalyst(self, index, catalyst):
         base_index = index
         mod = 0
+
+        index = '{}_{}'.format(base_index, mod)
 
         # Determine if key already exists in dictionary, modify key if so
         while index in self.catalyst_dictionary:
@@ -66,7 +73,7 @@ class Learner():
         self.catalyst_dictionary[index] = catalyst
 
     def load_nh3_catalysts(self):
-        df = pd.read_csv(r".\Data\Processed\AllData.csv", index_col=0)
+        df = pd.read_csv(r".\Data\Processed\AllData_Condensed.csv", index_col=0)
 
         for index, row in df.iterrows():
             cat = Catalyst()
@@ -82,6 +89,7 @@ class Learner():
 
             cat.feature_add_n_elements()
             cat.feature_add_elemental_properties()
+            # cat.feature_add_statistics()
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
 
@@ -90,7 +98,6 @@ class Learner():
         loading_df = pd.read_csv('.\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
         loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
 
-        i = 0
         for catid, catobj in self.catalyst_dictionary.items():
             # Reset loading dictionary
             load_df = loading_df.copy()
@@ -120,7 +127,9 @@ class Learner():
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
         self.master_dataset.fillna(value=-1, inplace=True)
 
-    def filter_training_set(self, filter=None, temperature=None, features=None, svfl='.\\Results', svnm='Test'):
+    def filter_training_set(self, filter=None, temperature=None, features=None,
+                            group=None,
+                            svfl='.\\Results', svnm='Test'):
         def filter_elements(filter):
             if filter == 'mono':
                 dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 1].index
@@ -161,6 +170,7 @@ class Learner():
         # Filter Master to Slave
         self.slave_dataset = self.master_dataset.drop(index=self.filter).copy()
         self.slave_dataset = shuffle(self.slave_dataset)
+        # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
         # Set all other DFs from slave
         self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).copy()
@@ -179,13 +189,24 @@ class Learner():
             os.makedirs(self.svfl)
             os.makedirs('{}\\{}'.format(self.svfl, 'Trees'))
 
-    def hyperparameter_tuning(self):
-        groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
+        self.group_for_training(group=group)
 
+    def group_for_training(self, group=None):
+        if group == 'sample':
+            # Group by Sample ID
+            self.groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
+        elif group == 's-t':
+            # Group by Sample ID and Temperature (allow same element-different T in training sets)
+            self.groups = ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
+        else:
+            self.groups = None
+
+
+    def hyperparameter_tuning(self):
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
         gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(10),
                                 return_train_score=True, n_iter=500)
-        gs.fit(self.features, self.labels, groups=groups)
+        gs.fit(self.features, self.labels, groups=self.groups)
         pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner):
@@ -194,7 +215,7 @@ class Learner():
             # v2: {'n_estimators': 50, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'auto', 'max_depth': None, 'bootstrap': True}
             # v3: {'n_estimators': 250, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'sqrt', 'max_depth': None, 'bootstrap': False}
             self.machina = RandomForestRegressor(
-                n_estimators=250,
+                n_estimators=50,
                 max_depth=None,
                 min_samples_leaf=2,
                 min_samples_split=2,
@@ -249,10 +270,8 @@ class Learner():
 
 
     def predict_learner(self):
-        groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
-
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
-                                             groups=groups, cv=GroupKFold(10))
+                                             groups=self.groups, cv=GroupKFold(10))
 
 
 
@@ -502,10 +521,11 @@ class Learner():
         print('R2: {:0.3f}'.format(r2))
         print('Average Error: {:0.3f}'.format(mean_abs_err))
         print('Accuracy: {:0.3f}'.format(acc))
+        print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
         print('\n')
 
-        pd.DataFrame([r2, mean_abs_err, acc],
-                     index=['R2','Mean Abs Error','Accuracy']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
+        pd.DataFrame([r2, mean_abs_err, acc, time.time() - self.start_time],
+                     index=['R2','Mean Abs Error','Accuracy','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
 
     def create_feature_interactions(self):
         polygen = PolynomialFeatures(degree=2, interaction_only=True, include_bias=False)
@@ -529,7 +549,8 @@ class Catalyst():
         self.input_dict['temperature'] = T
 
     def add_element(self, element, weight_loading):
-        self.elements[element] = weight_loading
+        if (element != '-') & (element != '--'):
+            self.elements[element] = weight_loading
 
     def input_space_velocity(self, space_velocity):
         self.input_dict['space_velocity'] = space_velocity
@@ -543,21 +564,16 @@ class Catalyst():
     def feature_add(self, key, value):
         self.feature_dict[key] = value
 
-    def feature_add_statistics(self, key, values):
-        values = np.array(values, dtype=float)
-        values = values[~np.isnan(values)]
-        if values.size: # Skip if no non-nan values
-            # Maximum
-            self.feature_dict['{}_max'.format(key)] = np.max(values)
+    def feature_add_statistics(self):
+        # Load Elements.csv as DataFrame
+        eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
 
-            # Minimum
-            self.feature_dict['{}_min'.format(key)] = np.min(values)
+        # Slice Elements.csv based on elements present
+        eledf = eledf.loc[list(self.elements.keys())]
 
-            # Mean
-            self.feature_dict['{}_mean'.format(key)] = np.mean(values)
-
-            # Median
-            self.feature_dict['{}_med'.format(key)] = np.median(values)
+        for prop in eledf:
+            self.feature_add('{}_mean'.format(prop), eledf.loc[:, prop].mean())
+            self.feature_add('{}_mad'.format(prop), eledf.loc[:, prop].mad())
 
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame
@@ -567,9 +583,10 @@ class Catalyst():
         eledf = eledf.loc[list(self.elements.keys())]
 
         for feature_name, feature_values in eledf.T.iterrows():
-            self.feature_add('{}_0'.format(feature_name), feature_values.values[0])
-            self.feature_add('{}_1'.format(feature_name), feature_values.values[1])
-            self.feature_add('{}_2'.format(feature_name), feature_values.values[2])
+            for index, _ in enumerate(self.elements):
+                self.feature_add('{nm}_{index}'.format(nm=feature_name, index=index),
+                                 feature_values.values[index])
+
 
     def feature_add_n_elements(self):
         n_eles = 0
@@ -599,8 +616,16 @@ def temp_step(svfl='.\\Results\\', svnm='test'):
 
 
 if __name__ == '__main__':
-    svfl = '.\\Results\\v5'
-    svnm = '3Ele-v5'
+    ver = 'v7-avg'
+    filter = '3ele'
+    temp_filter = None
+
+    if filter == '3ele':
+        svnm = '3-Ele-{}'.format(ver)
+    else:
+        svnm = 'All-{}'.format(ver)
+
+    svfl = '.\\Results\\{}'.format(ver)
 
     # temp_step(svfl=svfl, svnm=svnm)
 
@@ -608,8 +633,9 @@ if __name__ == '__main__':
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
     skynet.create_training_set()
-    skynet.filter_training_set(filter='3ele', temperature=None, svfl=svfl, svnm=svnm)
-    # skynet.create_feature_interactions()
+    skynet.filter_training_set(filter=filter, temperature=temp_filter,
+                               group='s-t',
+                               svfl=svfl, svnm='3-Ele-v7')
     # skynet.hyperparameter_tuning()
     # exit()
 
