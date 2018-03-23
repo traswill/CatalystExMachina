@@ -20,7 +20,7 @@ from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_er
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker
 from bokeh.plotting import figure, show, output_file, save
 import bokeh.palettes as pals
-from bokeh.models import Range1d
+from bokeh.models import Range1d, DataRange1d
 
 import seaborn as sns
 import ast
@@ -33,14 +33,13 @@ import time
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, dataset='Full'):
+    def __init__(self, import_file='AllData', svfl='.\\Results', svnm='Test'):
         self.catalyst_dictionary = dict()
 
         self.master_dataset = pd.DataFrame()
         self.slave_dataset = pd.DataFrame()
         self.features_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
-
         self.features = list()
         self.labels = list()
         self.predictions = list()
@@ -49,16 +48,21 @@ class Learner():
         self.machina_tuning_parameters = None
 
         self.filter = None
-
-        self.svfl = None
-        self.svnm = None
-
         self.groups = None
-        self.dataset = dataset
 
+        self.svfl = svfl
+        self.svnm = svnm
+        if not os.path.exists(self.svfl):
+            os.makedirs(self.svfl)
+            os.makedirs('{}\\{}'.format(self.svfl, 'trees'))
+            os.makedirs('{}\\{}'.format(self.svfl, 'figures'))
+            os.makedirs('{}\\{}'.format(self.svfl, 'htmls'))
+
+        self.impfl = import_file
         self.start_time = time.time()
 
     def add_catalyst(self, index, catalyst):
+        """ Add Catalysts to self.catalyst_dictionary.  This is the primary input function for the model. """
         base_index = index
         mod = 0
 
@@ -73,7 +77,8 @@ class Learner():
         self.catalyst_dictionary[index] = catalyst
 
     def load_nh3_catalysts(self):
-        df = pd.read_csv(r".\Data\Processed\AllData_Condensed.csv", index_col=0)
+        """ Import NH3 data from Katie's HiTp dataset(cleaned). """
+        df = pd.read_csv(r".\Data\Processed\{}.csv".format(self.impfl), index_col=0)
 
         for index, row in df.iterrows():
             cat = Catalyst()
@@ -92,6 +97,8 @@ class Learner():
             # cat.feature_add_statistics()
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
+
+        self.create_training_set()
 
     def create_training_set(self):
         # Set up catalyst loading dictionary with loadings
@@ -125,11 +132,25 @@ class Learner():
             self.master_dataset = pd.concat([self.master_dataset, df], axis=0)
 
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
-        self.master_dataset.fillna(value=-1, inplace=True)
+        self.master_dataset.fillna(value=0, inplace=True)
 
-    def filter_training_set(self, filter=None, temperature=None, features=None,
-                            group=None,
-                            svfl='.\\Results', svnm='Test'):
+    def filter_training_set(self, filter=None, temperature=None, group=None, features=None):
+        """ Filters Data from import file for partitioned model training
+
+        :: filter :: (string)
+            mono - only predict with monometallics
+            bi - only pridict with bimetallics
+            3ele - only predict with Ru-X-K catalysts
+        :: temperature :: (int)
+            Partition to only predict with catalysts at designated temperature
+        :: group :: (string)
+            Determines how data is partitioned into 10-fold validation groups.
+            blind - Catalyst ID cannot be in both test and training set
+            semiblind - Catalyst ID_Temp cannot be in both test and training set
+        :: features ::
+            Not Yet Implemented
+        """
+
         def filter_elements(filter):
             if filter == 'mono':
                 dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 1].index
@@ -139,7 +160,6 @@ class Learner():
 
             elif filter == '3ele':
                 dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 3].index
-
             else:
                 dat_filter = []
 
@@ -181,28 +201,21 @@ class Learner():
         self.features = self.features_df.values
         self.labels = self.labels_df.values
 
-        # Set Save Locations based on filter
-        self.svfl = svfl
-        self.svnm = svnm
-
-        if not os.path.exists(self.svfl):
-            os.makedirs(self.svfl)
-            os.makedirs('{}\\{}'.format(self.svfl, 'Trees'))
-
         self.group_for_training(group=group)
 
     def group_for_training(self, group=None):
-        if group == 'sample':
+        """ Comment """
+        if group == 'blind':
             # Group by Sample ID
             self.groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
-        elif group == 's-t':
+        elif group == 'semiblind':
             # Group by Sample ID and Temperature (allow same element-different T in training sets)
             self.groups = ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
         else:
             self.groups = None
 
-
     def hyperparameter_tuning(self):
+        """ Comment """
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
         gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(10),
                                 return_train_score=True, n_iter=500)
@@ -210,6 +223,7 @@ class Learner():
         pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner):
+        """ Comment """
         if learner == 'randomforest':
             # v1: n_est=50, max_depth=None, minleaf=2, minsplit=2
             # v2: {'n_estimators': 50, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'auto', 'max_depth': None, 'bootstrap': True}
@@ -252,9 +266,11 @@ class Learner():
             exit()
 
     def train_learner(self):
+        """ Comment """
         self.machina.fit(self.features, self.labels)
 
     def validate_learner(self, n_validations=10, n_folds=10, sv=None):
+        """ Comment """
         cv = ShuffleSplit()
 
         scoredf = None
@@ -270,12 +286,21 @@ class Learner():
 
 
     def predict_learner(self):
+        """ Comment """
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              groups=self.groups, cv=GroupKFold(10))
 
-
+    def save_predictions(self):
+        """ Comment """
+        if self.predictions is not None:
+            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels]).T,
+                              columns=['ID', 'Predicted Activity', 'Measured Activity'])
+            df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
+        else:
+            print('No predictions to save...')
 
     def plot_predictions_basic(self, avg=False):
+        """ Comment """
         if self.predictions is None:
             self.predict_learner()
 
@@ -341,6 +366,7 @@ class Learner():
         plt.close()
 
     def plot_predictions(self, svnm='ML_Statistics'):
+        """ Comment """
         if self.predictions is None:
             self.predict_learner()
 
@@ -393,6 +419,7 @@ class Learner():
         save(p)
 
     def plot_averaged(self, whiskers=False):
+        """ Comment """
         if self.predictions is None:
             self.predict_learner()
 
@@ -469,16 +496,8 @@ class Learner():
         output_file("{}\\{}_avg.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
 
-    def save_predictions(self):
-        if self.predictions is not None:
-            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels]).T,
-                              columns=['ID', 'Predicted Activity', 'Measured Activity'])
-            df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
-        else:
-            print('No predictions to save...')
-
     def visualize_tree(self, n=1):
-        """ Find a way to visualize the decision tree """
+        """ Comment """
         if n == 1:
             gv = tree.export_graphviz(self.machina.estimators_[0],
                                       filled=True,
@@ -501,14 +520,20 @@ class Learner():
                                                                                                   nm=self.svnm,
                                                                                                   ind=index))
 
+    def extract_important_features(self, svnm=None):
+        """ Save all feature importance, print top 10 """
 
-    def extract_important_features(self, svnm='Feature_Importance'):
-        """ Save all feature importances, print top 10 """
-        df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns, columns=['Feature Importance'])
-        df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
-        print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+        df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
+                          columns=['Feature Importance'])
+
+        if svnm is None:
+            return df
+        else:
+            df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
+            print(df.sort_values(by='Feature Importance', ascending=False).head(10))
 
     def evaluate_learner(self):
+        """ Comment """
         mask = self.labels != 0
         err = abs(np.array(self.predictions[mask]) - np.array(self.labels[mask]))
         mean_ave_err = np.mean(err / np.array(self.labels[mask]))
@@ -527,12 +552,72 @@ class Learner():
         pd.DataFrame([r2, mean_abs_err, acc, time.time() - self.start_time],
                      index=['R2','Mean Abs Error','Accuracy','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
 
-    def create_feature_interactions(self):
-        polygen = PolynomialFeatures(degree=2, interaction_only=True, include_bias=False)
-        self.features = polygen.fit_transform(self.features, self.labels)
-        nms = polygen.get_feature_names(input_features=self.features_df.columns.values)
-        self.features_df = pd.DataFrame(self.features, columns=nms)
-        self.features_df.to_csv('test.csv')
+    def plot_important_features(self):
+        """ Comment """
+        featdf = self.extract_important_features()
+        top5feats = featdf.nlargest(5, 'Feature Importance').index.values.tolist()
+        feats = self.slave_dataset.loc[:, top5feats+['Measured Activity']]
+        feats['hue'] = np.ceil(feats['Measured Activity'].values * 5)
+
+        # feats = feats[feats['temperature'] == 300.0]
+
+        # sns.pairplot(feats, hue='temperature', y_vars=['Measured Activity'], x_vars=top5feats)
+        sns.pairplot(feats, hue='temperature', diag_kind='kde')
+        plt.tight_layout()
+        plt.savefig('{}\\{}-featrels.png'.format(self.svfl, self.svnm))
+        plt.close()
+
+    def plot_important_features_bokeh(self, temp_slice=None, xaxis='Measured', yaxis='Predicted',
+                                      xlabel='Measured Activity', ylabel='Predicted Activity',
+                                      svtag='', yrng=DataRange1d(), xrng=DataRange1d()):
+        """ Comment """
+
+        featdf = pd.DataFrame(self.slave_dataset.copy())
+        featdf['Name'] = [''.join('{}({})'.format(key, str(int(val))) for key, val in x)
+                         for x in self.slave_dataset.loc[:, 'Element Dictionary']]
+        featdf['ID'] = [x.split('_')[0] for x in featdf.index.values]
+        featdf.drop(columns='Element Dictionary', inplace=True)
+        featdf['Predicted'] = self.predictions
+        featdf['Measured'] = self.labels
+        unique_temps = len(featdf['temperature'].unique())
+        max_temp = featdf['temperature'].max()
+        min_temp = featdf['temperature'].min()
+
+        if max_temp == min_temp:
+            featdf['color'] = pals.plasma(5)[4]
+        else:
+            pal = pals.plasma(unique_temps + 1)
+            featdf['color'] = [pal[i]
+                           for i in [int(unique_temps * (float(x) - min_temp) / (max_temp - min_temp))
+                                     for x in featdf['temperature']]]
+
+        if temp_slice is not None:
+            featdf = featdf[featdf['temperature'] == temp_slice]
+
+        tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
+        hover = HoverTool(tooltips=[
+            ('Name', '@Name'),
+            ("ID", "@ID"),
+            ('T', '@temperature')
+        ])
+
+        tools.append(hover)
+
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
+        p.x_range = xrng
+        p.y_range = yrng
+        p.background_fill_color = "#dddddd"
+        p.xaxis.axis_label = xlabel
+        p.yaxis.axis_label = ylabel
+        p.grid.grid_line_color = "white"
+
+        source = ColumnDataSource(featdf)
+
+        p.circle(xaxis, yaxis, size=12, source=source,
+                 color='color', line_color="black", fill_alpha=0.8)
+
+        output_file("{}\\{}-{}.html".format(self.svfl, self.svnm, svtag), title="stats.py")
+        save(p)
 
 
 class Catalyst():
@@ -616,26 +701,33 @@ def temp_step(svfl='.\\Results\\', svnm='test'):
 
 
 if __name__ == '__main__':
-    ver = 'v7-avg'
-    filter = '3ele'
-    temp_filter = None
+    # Properties
+    nm = 'v7'
+    dattype = 'avg' # avg or all
+    filter = 'All' # 3ele, bi, or mono
+    temp = None
+    group = 'blind'
 
-    if filter == '3ele':
-        svnm = '3-Ele-{}'.format(ver)
-    else:
-        svnm = 'All-{}'.format(ver)
+    # Create Names
+    svfl = '.\\Results\\{}'.format('{}-avg'.format(nm) if dattype == 'avg' else nm)
+    svnm = '{a}{avg}-{b}-{c}{d}'.format(
+        a=filter,
+        avg='-avg' if dattype=='avg' else '',
+        b=nm,
+        c=group,
+        d='-{}'.format(temp) if temp is not None else ''
+    )
+    print(svnm)
 
-    svfl = '.\\Results\\{}'.format(ver)
-
-    # temp_step(svfl=svfl, svnm=svnm)
-
-    skynet = Learner()
+    # Begin Machine Learning
+    skynet = Learner(
+        import_file='AllData_Condensed' if dattype=='avg' else 'AllData',
+        svfl=svfl,
+        svnm='{}'.format(svnm)
+    )
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
-    skynet.create_training_set()
-    skynet.filter_training_set(filter=filter, temperature=temp_filter,
-                               group='s-t',
-                               svfl=svfl, svnm='3-Ele-v7')
+    skynet.filter_training_set(filter=filter, temperature=temp, group=group)
     # skynet.hyperparameter_tuning()
     # exit()
 
@@ -643,11 +735,21 @@ if __name__ == '__main__':
     skynet.extract_important_features()
     skynet.predict_learner()
     skynet.evaluate_learner()
+
+    for tp in [250, 300, 350]:
+        for index, ftr in enumerate(['NdValence_1', "IonizationEnergies_2_1", 'Column_1']):
+            ftrnm = ['Number of d-Valence Electrons','Second Ionization Energy','Column']
+            nm = ftrnm[index]
+            skynet.plot_important_features_bokeh(
+                temp_slice=tp, svtag='{}-{}'.format(ftr, tp),
+                xaxis=ftr, xlabel=nm, xrng=DataRange1d(),
+                yaxis='Measured', ylabel='Measured Activity', yrng=Range1d(0,1)
+            )
     # skynet.save_predictions()
-    # exit()
+
 
     # skynet.visualize_tree(svnm='{}-tree'.format(sv))
-    skynet.plot_predictions()
-    skynet.plot_averaged(whiskers=True)
-    skynet.plot_predictions_basic()
+    # skynet.plot_predictions()
+    # skynet.plot_averaged(whiskers=True)
+    # skynet.plot_predictions_basic()
 
