@@ -30,7 +30,7 @@ def extract_activity_information(df):
             continue
 
         reactor = tmp[0].split('_')[-1].split('.')[0].replace('R', '')
-        type = 'down' if 'd' in tmp[0].split('-')[2] else 'up'
+        type = 'down' if 'd' in re.search('\d{3}d*\d',tmp[0]).group() else 'up'
         temp = tmp[0].split('_')[0][-8:].split('-')[1][:3]
         pred = tmp[1]
 
@@ -214,6 +214,22 @@ def read_v4_data():
         df = merge_activity_catalysts(actdf, catdf, nh3scale=nh3scale)
         df.to_csv('..//Processed//SS{}.csv'.format(num))
 
+def read_v4_data_8():
+    datpth = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\RAW\NH3_v4_data_8.xlsx'
+    referencedata_df = load_info_sheet(datpth, sheetname='Info', thresh=12, skip_footer=45, skiprow=1)
+    activitydata_df = load_activity_sheet(datpth, sheet='Data', cols='A,D')
+
+    actdf = extract_activity_information(activitydata_df)
+
+    # Katie said to drop the down ramp because they were exposed to a higher concentration of NH3
+    actdf.drop(actdf[actdf.loc[:, 'Ramp Direction'] == 'down'].index, inplace=True)
+
+    catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
+
+    df = merge_activity_catalysts(actdf, catdf, nh3scale=100)
+    df.to_csv('..//Processed//SS8.csv')
+
+
 def create_super_monster_file():
     pths = glob.glob('..//Processed//SS*.csv')
 
@@ -222,5 +238,8 @@ def create_super_monster_file():
 
 
 if __name__ == '__main__':
-    read_v4_data()
+    # read_v4_data()
+    # read_v4_data_8()
+
+
     create_super_monster_file()

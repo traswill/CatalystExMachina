@@ -38,6 +38,8 @@ class Learner():
 
         self.master_dataset = pd.DataFrame()
         self.slave_dataset = pd.DataFrame()
+        self.test_dataset = pd.DataFrame()
+
         self.features_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
         self.features = list()
@@ -98,9 +100,9 @@ class Learner():
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
 
-        self.create_training_set()
+        self.create_master_dataset()
 
-    def create_training_set(self):
+    def create_master_dataset(self):
         # Set up catalyst loading dictionary with loadings
         loading_df = pd.read_csv('.\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
         loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
@@ -134,7 +136,7 @@ class Learner():
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
         self.master_dataset.fillna(value=0, inplace=True)
 
-    def filter_training_set(self, filter=None, temperature=None, group=None, features=None):
+    def filter_master_dataset(self, filter=None, temperature=None, group=None, features=None):
         """ Filters Data from import file for partitioned model training
 
         :: filter :: (string)
@@ -192,6 +194,9 @@ class Learner():
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
+        self.set_training_data()
+
+    def set_training_data(self):
         # Set all other DFs from slave
         self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).copy()
         self.labels_df = self.slave_dataset['Measured Activity'].copy()
@@ -202,6 +207,23 @@ class Learner():
         self.labels = self.labels_df.values
 
         self.group_for_training(group=group)
+
+    def create_test_dataset(self, catids):
+        # Create Temporary indexer to slice slave dataset
+        ind = [int(idtag.split('_')[0]) for idtag in self.slave_dataset.index]
+        self.slave_dataset['temp_ind'] = ind
+
+        # Slice the dataset, copying all values of catids
+        self.test_dataset = self.slave_dataset[self.slave_dataset['temp_ind'].isin(catids)].copy()
+
+        # Drop the temporary indexer
+        self.slave_dataset.drop(columns=['temp_ind'], inplace=True)
+        self.test_dataset.drop(columns=['temp_ind'], inplace=True)
+
+        # Remove test dataset from slave dataset to prepare for training
+        self.slave_dataset.drop(labels=self.test_dataset.index, inplace=True)
+
+        self.set_training_data()
 
     def group_for_training(self, group=None):
         """ Comment """
@@ -265,11 +287,31 @@ class Learner():
                   'Please Select a Valid Learner: randomforest, adaboost, SGD, neuralnet, svm')
             exit()
 
-    def train_learner(self):
+    def train_data(self):
         """ Comment """
-        self.machina.fit(self.features, self.labels)
+        self.machina = self.machina.fit(self.features, self.labels)
 
-    def validate_learner(self, n_validations=10, n_folds=10, sv=None):
+    def predict_testdata(self):
+        # Predict Activities
+        data = self.test_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).values
+        predvals = self.machina.predict(data)
+
+        original_test_df = self.master_dataset.loc[self.test_dataset.index].copy()
+        measvals = original_test_df.loc[:, 'Measured Activity'].values
+
+        comparison_df = pd.DataFrame([predvals, measvals],
+                           index=['Predicted Activity','Measured Activity'],
+                           columns=original_test_df.index).T
+
+        comparison_df.to_csv('.\\Results\\Predictions\\ss3-7_predict_ss8.csv')
+        comparison_df.plot(x='Predicted Activity', y='Measured Activity', kind='scatter')
+        plt.xlim(0,1)
+        plt.ylim(0,1)
+        plt.show()
+
+        exit()
+
+    def predict_tenfold(self, n_validations=10, n_folds=10, sv=None):
         """ Comment """
         cv = ShuffleSplit()
 
@@ -284,8 +326,7 @@ class Learner():
 
         scoredf.to_csv('{}\\tenfold_{}.csv'.format(self.svfl, self.svnm))
 
-
-    def predict_learner(self):
+    def predict_crossvalidate(self):
         """ Comment """
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              groups=self.groups, cv=GroupKFold(10))
@@ -302,7 +343,7 @@ class Learner():
     def plot_predictions_basic(self, avg=False):
         """ Comment """
         if self.predictions is None:
-            self.predict_learner()
+            self.predict_crossvalidate()
 
         tempertures = self.slave_dataset.loc[:, 'temperature'].values
 
@@ -368,7 +409,7 @@ class Learner():
     def plot_predictions(self, svnm='ML_Statistics'):
         """ Comment """
         if self.predictions is None:
-            self.predict_learner()
+            self.predict_crossvalidate()
 
         df = pd.DataFrame(np.array([
             [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
@@ -421,7 +462,7 @@ class Learner():
     def plot_averaged(self, whiskers=False):
         """ Comment """
         if self.predictions is None:
-            self.predict_learner()
+            self.predict_crossvalidate()
 
         df = pd.DataFrame(np.array([
             [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
@@ -526,11 +567,13 @@ class Learner():
         df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
                           columns=['Feature Importance'])
 
+        print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+
         if svnm is None:
             return df
         else:
             df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
-            print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+
 
     def evaluate_learner(self):
         """ Comment """
@@ -569,7 +612,7 @@ class Learner():
 
     def plot_important_features_bokeh(self, temp_slice=None, xaxis='Measured', yaxis='Predicted',
                                       xlabel='Measured Activity', ylabel='Predicted Activity',
-                                      svtag='', yrng=DataRange1d(), xrng=DataRange1d()):
+                                      svtag='', yrng=None, xrng=None):
         """ Comment """
 
         featdf = pd.DataFrame(self.slave_dataset.copy())
@@ -593,6 +636,11 @@ class Learner():
 
         if temp_slice is not None:
             featdf = featdf[featdf['temperature'] == temp_slice]
+
+        if xrng is None:
+            xrng = DataRange1d()
+        if yrng is None:
+            yrng = DataRange1d()
 
         tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
         hover = HoverTool(tooltips=[
@@ -686,14 +734,14 @@ def temp_step(svfl='.\\Results\\', svnm='test'):
     skynet = Learner()
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
-    skynet.create_training_set()
+    skynet.create_master_dataset()
 
     for temp in [250, 300, 350, 400, 450]:
         svnm_temp = '{s}-{t}C'.format(s=svnm, t=temp)
-        skynet.filter_training_set(filter='3ele', temperature=temp, svfl=svfl, svnm=svnm_temp)
-        skynet.train_learner()
+        skynet.filter_master_dataset(filter='3ele', temperature=temp, svfl=svfl, svnm=svnm_temp)
+        skynet.train_data()
         skynet.extract_important_features()
-        skynet.predict_learner()
+        skynet.predict_crossvalidate()
         skynet.visualize_tree()
         skynet.plot_predictions_basic()
         skynet.plot_predictions()
@@ -702,7 +750,7 @@ def temp_step(svfl='.\\Results\\', svnm='test'):
 
 if __name__ == '__main__':
     # Properties
-    nm = 'v7'
+    nm = 'v7_stats'
     dattype = 'avg' # avg or all
     filter = 'All' # 3ele, bi, or mono
     temp = None
@@ -725,31 +773,40 @@ if __name__ == '__main__':
         svfl=svfl,
         svnm='{}'.format(svnm)
     )
+
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
-    skynet.filter_training_set(filter=filter, temperature=temp, group=group)
+    skynet.filter_master_dataset(filter=filter, temperature=temp, group=group)
     # skynet.hyperparameter_tuning()
     # exit()
 
-    skynet.train_learner()
+    skynet.create_test_dataset(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
+    skynet.train_data()
+    skynet.predict_testdata()
+    exit()
     skynet.extract_important_features()
-    skynet.predict_learner()
+    skynet.predict_crossvalidate()
     skynet.evaluate_learner()
 
-    for tp in [250, 300, 350]:
-        for index, ftr in enumerate(['NdValence_1', "IonizationEnergies_2_1", 'Column_1']):
-            ftrnm = ['Number of d-Valence Electrons','Second Ionization Energy','Column']
-            nm = ftrnm[index]
-            skynet.plot_important_features_bokeh(
-                temp_slice=tp, svtag='{}-{}'.format(ftr, tp),
-                xaxis=ftr, xlabel=nm, xrng=DataRange1d(),
-                yaxis='Measured', ylabel='Measured Activity', yrng=Range1d(0,1)
-            )
+    # for tp in [250, 300, 350]:
+    #     # cols = ['NdValence_1', "IonizationEnergies_2_1", 'Column_1']
+    #     # col_nms = ['Number of d-Valence Electrons', 'Second Ionization Energy', 'Column']
+    #
+    #     cols = ['FusionEnthalpy_mean', 'IonizationEnergies_2_mad', 'HeatFusion_mean', 'ZungerPP-r_d_mean']
+    #     col_nms = ['Mean Fusion Enthalpy','MAD 2nd Ionization Energy','Mean Heat of Fusion','Mean Zunger d Radius']
+    #
+    #     for index, ftr in enumerate(cols):
+    #         nm = col_nms[index]
+    #         skynet.plot_important_features_bokeh(
+    #             temp_slice=tp, svtag='{}-{}'.format(ftr, tp),
+    #             xaxis=ftr, xlabel=nm, xrng=DataRange1d(),
+    #             yaxis='Measured', ylabel='Measured Activity', yrng=Range1d(0,1)
+    #         )
     # skynet.save_predictions()
 
 
     # skynet.visualize_tree(svnm='{}-tree'.format(sv))
-    # skynet.plot_predictions()
-    # skynet.plot_averaged(whiskers=True)
-    # skynet.plot_predictions_basic()
+    skynet.plot_predictions()
+    skynet.plot_averaged(whiskers=True)
+    skynet.plot_predictions_basic()
 
