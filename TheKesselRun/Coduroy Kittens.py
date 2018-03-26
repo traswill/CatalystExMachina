@@ -33,7 +33,7 @@ import time
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, import_file='AllData', svfl='.\\Results', svnm='Test', feature_type=0):
+    def __init__(self, import_type='avg', n_ele_filter=3, temp_filter=None, group='byID', nm='v7', feature_generator=0):
         self.catalyst_dictionary = dict()
 
         self.master_dataset = pd.DataFrame()
@@ -49,19 +49,29 @@ class Learner():
         self.machina = None
         self.machina_tuning_parameters = None
 
-        self.feature_type = feature_type
-        self.filter = None
-        self.groups = None
+        # Options
+        self.impfl = import_type
+        self.n_ele_filter = n_ele_filter
+        self.temp_filter = temp_filter
+        self.group = group
+        self.nm = nm
+        self.feature_generator = feature_generator
 
-        self.svfl = svfl
-        self.svnm = svnm
+        self.svfl = './/Results//{}'.format(nm)
+        self.svnm = '{nm}-{nele}ele-{temp}-{grp}-f{feat}'.format(
+            nm=nm,
+            nele=n_ele_filter,
+            temp='{}C'.format(temp_filter) if temp_filter is not None else 'All',
+            grp=group,
+            feat=feature_generator
+        )
+
         if not os.path.exists(self.svfl):
             os.makedirs(self.svfl)
             os.makedirs('{}\\{}'.format(self.svfl, 'trees'))
             os.makedirs('{}\\{}'.format(self.svfl, 'figures'))
             os.makedirs('{}\\{}'.format(self.svfl, 'htmls'))
 
-        self.impfl = import_file
         self.start_time = time.time()
 
     def add_catalyst(self, index, catalyst):
@@ -81,7 +91,10 @@ class Learner():
 
     def load_nh3_catalysts(self):
         """ Import NH3 data from Katie's HiTp dataset(cleaned). """
-        df = pd.read_csv(r".\Data\Processed\{}.csv".format(self.impfl), index_col=0)
+        if self.impfl == 'avg':
+            df = pd.read_csv(r".\Data\Processed\AllData_Condensed.csv", index_col=0)
+        else:
+            df = pd.read_csv(r".\Data\Processed\AllData.csv", index_col=0)
 
         for index, row in df.iterrows():
             cat = Catalyst()
@@ -101,8 +114,7 @@ class Learner():
                 0: cat.feature_add_elemental_properties,
                 1: cat.feature_add_statistics
             }
-            feature_generator.get(self.feature_type, lambda: print('No Feature Generator Selected'))()
-
+            feature_generator.get(self.feature_generator, lambda: print('No Feature Generator Selected'))()
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
 
@@ -142,9 +154,7 @@ class Learner():
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
         self.master_dataset.fillna(value=0, inplace=True)
 
-        print(self.master_dataset)
-
-    def filter_master_dataset(self, filter=None, temperature=None, group=None, features=None):
+    def filter_master_dataset(self, features_filter=None):
         """ Filters Data from import file for partitioned model training
 
         :: filter :: (string)
@@ -160,61 +170,53 @@ class Learner():
         :: features ::
             Not Yet Implemented
         """
+        filter_dict_neles = {
+            1: self.master_dataset[self.master_dataset['n_elements'] == 1].index,
+            2: self.master_dataset[self.master_dataset['n_elements'] == 2].index,
+            3: self.master_dataset[self.master_dataset['n_elements'] == 3].index
+        }
 
-        def filter_elements(filter):
-            if filter == 'mono':
-                dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 1].index
+        n_ele_slice = filter_dict_neles.get(self.n_ele_filter, pd.DataFrame().index)  # TODO: Allow for list to be passed
 
-            elif filter == 'bi':
-                dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 2].index
+        if self.temp_filter is None:
+            temp_slice = self.master_dataset.index
+        else:
+            temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temp_filter].index
 
-            elif filter == '3ele':
-                dat_filter = self.master_dataset[self.master_dataset['n_elements'] != 3].index
-            else:
-                dat_filter = []
-
-            return dat_filter
-
-        def filter_temp(temperature):
-            if temperature is not None:
-                temp_filter = self.master_dataset[self.master_dataset.loc[:, 'temperature'] != temperature].index
-            else:
-                temp_filter = []
-
-            return temp_filter
+        remove_tungston_slice = self.master_dataset[self.master_dataset['W Loading'] == 0].index
 
         def filter_features(feats):
             # Not implemented
             return []
 
-        def filter_bad_data():
-            bad_filter = self.master_dataset[self.master_dataset['W Loading'] > 0].index
-            return bad_filter
+        filt = n_ele_slice.join(temp_slice, how='inner').join(remove_tungston_slice, how='inner')
 
-        self.filter = np.union1d(filter_elements(filter),
-                                 filter_temp(temperature)
-                                 )
-
-        self.filter = np.union1d(self.filter, filter_bad_data())
-
-        # Filter Master to Slave
-        self.slave_dataset = self.master_dataset.drop(index=self.filter).copy()
+        # Filter master to slave, shuffle slave
+        self.slave_dataset = self.master_dataset.loc[filt].copy()
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
         self.set_training_data()
+        self.group_for_training()
 
     def set_training_data(self):
         # Set all other DFs from slave
-        self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).copy()
+        self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1)
         self.labels_df = self.slave_dataset['Measured Activity'].copy()
-        self.plot_df = self.slave_dataset.loc[:, ['Measured Activity', 'Element Dictionary']].copy()
 
         # Set Features and Labels
         self.features = self.features_df.values
         self.labels = self.labels_df.values
 
-        self.group_for_training(group=group)
+    def group_for_training(self):
+        """ Comment """
+
+        group_dict = {
+            'byID': [x.split('_')[0] for x in self.slave_dataset.index.values],
+            'byID_Temp': ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
+        }
+
+        self.groups = group_dict.get(self.group, None)
 
     def create_test_dataset(self, catids):
         # Create Temporary indexer to slice slave dataset
@@ -233,17 +235,6 @@ class Learner():
 
         self.set_training_data()
 
-    def group_for_training(self, group=None):
-        """ Comment """
-        if group == 'blind':
-            # Group by Sample ID
-            self.groups = [x.split('_')[0] for x in self.slave_dataset.index.values]
-        elif group == 'semiblind':
-            # Group by Sample ID and Temperature (allow same element-different T in training sets)
-            self.groups = ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
-        else:
-            self.groups = None
-
     def hyperparameter_tuning(self):
         """ Comment """
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
@@ -252,21 +243,31 @@ class Learner():
         gs.fit(self.features, self.labels, groups=self.groups)
         pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
-    def set_learner(self, learner):
+    def set_learner(self, learner, params='default'):
         """ Comment """
-        if learner == 'randomforest':
-            # v1: n_est=50, max_depth=None, minleaf=2, minsplit=2
-            # v2: {'n_estimators': 50, 'min_samples_split': 2, 'min_samples_leaf': 2, 'max_features': 'auto', 'max_depth': None, 'bootstrap': True}
-            # v3: {'n_estimators': 250, 'min_samples_split': 2, 'min_samples_leaf': 1, 'max_features': 'sqrt', 'max_depth': None, 'bootstrap': False}
-            self.machina = RandomForestRegressor(
-                n_estimators=50,
-                max_depth=None,
-                min_samples_leaf=2,
-                min_samples_split=2,
-                max_features='auto',
-                bootstrap=True)
+        learn_selector = {
+            'randomforest': RandomForestRegressor,
+            'adaboost': AdaBoostRegressor,
+            'tree': tree.DecisionTreeRegressor,
+            'SGD': None,
+            'neuralnet': MLPRegressor,
+            'svm': SVR
+        }
 
-            self.machina_tuning_parameters = {
+        param_selector = {
+            'default': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
+                        'max_features':'auto', 'bootstrap':True},
+            'v1': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2},
+            'v2': {'n_estimators': 50, 'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2,
+                        'max_features': 'auto', 'bootstrap': True},
+            'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
+                        'max_features': 'sqrt', 'bootstrap': False},
+
+        }
+
+        self.machina = learn_selector.get(learner, lambda: 'Error')()
+        self.machina.set_params(**param_selector.get(params))
+        self.machina_tuning_parameters = {
                 'n_estimators': [10, 50, 100, 250, 500, 1000, 2000, 5000],
                 'max_features': ['auto', 'sqrt', 10],
                 'max_depth': [None, 3, 5],
@@ -275,32 +276,12 @@ class Learner():
                 'bootstrap':[True, False]
             }
 
-        elif learner == 'adaboost':
-            self.machina = AdaBoostRegressor()
-
-        elif learner == 'tree':
-            self.machina = tree.DecisionTreeRegressor()
-
-        elif learner == 'SGD':
-            pass
-
-        elif learner == 'neuralnet':
-            self.machina = MLPRegressor()
-
-        elif learner == 'svm':
-            self.machina = SVR()
-
-        else:
-            print('Learner Selection Out of Bounds. \n '
-                  'Please Select a Valid Learner: randomforest, adaboost, SGD, neuralnet, svm')
-            exit()
-
     def train_data(self):
         """ Comment """
         self.machina = self.machina.fit(self.features, self.labels)
 
     def predict_testdata(self):
-        # Predict Activities
+        """ Comment - Work in Progress """
         data = self.test_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).values
         predvals = self.machina.predict(data)
 
@@ -319,21 +300,6 @@ class Learner():
 
         exit()
 
-    def predict_tenfold(self, n_validations=10, n_folds=10, sv=None):
-        """ Comment """
-        cv = ShuffleSplit()
-
-        scoredf = None
-        for ii in range(1, n_validations):
-            score = cross_val_score(self.machina, self.features, self.labels, cv=cv)
-            if scoredf is None:
-                scoredf = pd.DataFrame(score)
-            else:
-                tempdf = pd.DataFrame(score)
-                scoredf = pd.concat([scoredf, tempdf], axis=1)
-
-        scoredf.to_csv('{}\\tenfold_{}.csv'.format(self.svfl, self.svnm))
-
     def predict_crossvalidate(self):
         """ Comment """
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
@@ -347,6 +313,25 @@ class Learner():
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
+
+    def preplotcessing(self):
+        self.plot_df = self.slave_dataset.copy()
+        self.plot_df['Predicted Activity'] = self.predictions
+
+        unique_temps = np.unique(self.slave_dataset.loc[:, 'temperature'].values)
+        n_temps = len(unique_temps)
+        max_temp = np.max(unique_temps)
+        min_temp = np.min(unique_temps)
+
+        palette = sns.color_palette('viridis', n_colors=n_temps+1)
+        self.plot_df['temp_hues'] = [
+            str(palette[i]) for i in [int(n_temps * (float(x) - min_temp) / (max_temp - min_temp))
+                                      for x in self.slave_dataset.loc[:, 'temperature'].values]
+        ]
+
+        print(self.plot_df['temp_hues'])
+
+        pass
 
     def plot_predictions_basic(self, avg=False):
         """ Comment """
@@ -738,63 +723,33 @@ class Catalyst():
         self.feature_add('n_elements',n_eles)
 
 
-def temp_step(svfl='.\\Results\\', svnm='test'):
-    skynet = Learner()
-    skynet.set_learner(learner='randomforest')
-    skynet.load_nh3_catalysts()
-    skynet.create_master_dataset()
-
-    for temp in [250, 300, 350, 400, 450]:
-        svnm_temp = '{s}-{t}C'.format(s=svnm, t=temp)
-        skynet.filter_master_dataset(filter='3ele', temperature=temp, svfl=svfl, svnm=svnm_temp)
-        skynet.train_data()
-        skynet.extract_important_features()
-        skynet.predict_crossvalidate()
-        skynet.visualize_tree()
-        skynet.plot_predictions_basic()
-        skynet.plot_predictions()
-        skynet.plot_averaged()
-
-
 if __name__ == '__main__':
-    # Properties
-    nm = 'v7_stats'
-    dattype = 'avg' # avg or all
-    filter = 'All' # 3ele, bi, or mono
-    temp = None
-    group = 'blind'
-
-    # Create Names
-    svfl = '.\\Results\\{}'.format('{}-avg'.format(nm) if dattype == 'avg' else nm)
-    svnm = '{a}{avg}-{b}-{c}{d}'.format(
-        a=filter,
-        avg='-avg' if dattype=='avg' else '',
-        b=nm,
-        c=group,
-        d='-{}'.format(temp) if temp is not None else ''
-    )
-    print(svnm)
-
     # Begin Machine Learning
     skynet = Learner(
-        import_file='AllData_Condensed' if dattype=='avg' else 'AllData',
-        svfl=svfl,
-        svnm='{}'.format(svnm)
+        import_type='avg',
+        n_ele_filter=3,
+        temp_filter=None,
+        group='byID',
+        nm='v8',
+        feature_generator=0 # 0 is elemental, 1 is statistics
     )
 
     skynet.set_learner(learner='randomforest')
     skynet.load_nh3_catalysts()
-    skynet.filter_master_dataset(filter=filter, temperature=temp, group=group)
-    # skynet.hyperparameter_tuning()
-    # exit()
-
-    skynet.create_test_dataset(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
+    skynet.filter_master_dataset()
+    # skynet.create_test_dataset(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
     skynet.train_data()
-    skynet.predict_testdata()
-    exit()
+    # skynet.predict_testdata()
     skynet.extract_important_features()
     skynet.predict_crossvalidate()
     skynet.evaluate_learner()
+    skynet.preplotcessing()
+    exit()
+    # skynet.visualize_tree(svnm='{}-tree'.format(sv))
+    skynet.plot_predictions()
+    skynet.plot_averaged(whiskers=True)
+    skynet.plot_predictions_basic()
+
 
     # for tp in [250, 300, 350]:
     #     # cols = ['NdValence_1', "IonizationEnergies_2_1", 'Column_1']
@@ -811,10 +766,3 @@ if __name__ == '__main__':
     #             yaxis='Measured', ylabel='Measured Activity', yrng=Range1d(0,1)
     #         )
     # skynet.save_predictions()
-
-
-    # skynet.visualize_tree(svnm='{}-tree'.format(sv))
-    skynet.plot_predictions()
-    skynet.plot_averaged(whiskers=True)
-    skynet.plot_predictions_basic()
-
