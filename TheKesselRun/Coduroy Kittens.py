@@ -33,7 +33,7 @@ import time
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, import_file='AllData', svfl='.\\Results', svnm='Test'):
+    def __init__(self, import_file='AllData', svfl='.\\Results', svnm='Test', feature_type=0):
         self.catalyst_dictionary = dict()
 
         self.master_dataset = pd.DataFrame()
@@ -49,6 +49,7 @@ class Learner():
         self.machina = None
         self.machina_tuning_parameters = None
 
+        self.feature_type = feature_type
         self.filter = None
         self.groups = None
 
@@ -95,8 +96,13 @@ class Learner():
             cat.activity = row['Concentration']
 
             cat.feature_add_n_elements()
-            cat.feature_add_elemental_properties()
-            # cat.feature_add_statistics()
+
+            feature_generator = {
+                0: cat.feature_add_elemental_properties,
+                1: cat.feature_add_statistics
+            }
+            feature_generator.get(self.feature_type, lambda: print('No Feature Generator Selected'))()
+
 
             self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
 
@@ -135,6 +141,8 @@ class Learner():
 
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
         self.master_dataset.fillna(value=0, inplace=True)
+
+        print(self.master_dataset)
 
     def filter_master_dataset(self, filter=None, temperature=None, group=None, features=None):
         """ Filters Data from import file for partitioned model training
