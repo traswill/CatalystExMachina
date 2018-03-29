@@ -6,6 +6,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import rgb2hex, BoundaryNorm
 
 from sklearn import preprocessing, tree
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
@@ -16,6 +17,7 @@ from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSpli
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.utils import shuffle
 from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error
+from sklearn.feature_selection import SelectKBest
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker
 from bokeh.plotting import figure, show, output_file, save
@@ -106,9 +108,12 @@ class Learner():
             cat.input_temperature(row['Temperature'])
             cat.input_space_velocity(row['Space Velocity'])
             cat.input_ammonia_concentration(row['NH3'])
+            if self.impfl == 'avg':
+                cat.input_standard_error(row['Standard Error'])
+                cat.input_n_averaged_samples(row['nAveraged'])
             cat.activity = row['Concentration']
-
             cat.feature_add_n_elements()
+            cat.feature_add_M1M2_ratio()
 
             feature_generator = {
                 0: cat.feature_add_elemental_properties,
@@ -155,28 +160,15 @@ class Learner():
         self.master_dataset.fillna(value=0, inplace=True)
 
     def filter_master_dataset(self, features_filter=None):
-        """ Filters Data from import file for partitioned model training
-
-        :: filter :: (string)
-            mono - only predict with monometallics
-            bi - only pridict with bimetallics
-            3ele - only predict with Ru-X-K catalysts
-        :: temperature :: (int)
-            Partition to only predict with catalysts at designated temperature
-        :: group :: (string)
-            Determines how data is partitioned into 10-fold validation groups.
-            blind - Catalyst ID cannot be in both test and training set
-            semiblind - Catalyst ID_Temp cannot be in both test and training set
-        :: features ::
-            Not Yet Implemented
-        """
+        """ Filters data from import file for partitioned model training """
         filter_dict_neles = {
             1: self.master_dataset[self.master_dataset['n_elements'] == 1].index,
             2: self.master_dataset[self.master_dataset['n_elements'] == 2].index,
             3: self.master_dataset[self.master_dataset['n_elements'] == 3].index
         }
 
-        n_ele_slice = filter_dict_neles.get(self.n_ele_filter, pd.DataFrame().index)  # TODO: Allow for list to be passed
+        # TODO: Allow for list to be passed
+        n_ele_slice = filter_dict_neles.get(self.n_ele_filter, pd.DataFrame().index)
 
         if self.temp_filter is None:
             temp_slice = self.master_dataset.index
@@ -184,24 +176,42 @@ class Learner():
             temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temp_filter].index
 
         remove_tungston_slice = self.master_dataset[self.master_dataset['W Loading'] == 0].index
+        # in_slice = self.master_dataset[self.master_dataset['In Loading'] == 0].index
+        # cu_slice = self.master_dataset[self.master_dataset['Cu Loading'] == 0].index
 
         def filter_features(feats):
             # Not implemented
             return []
 
-        filt = n_ele_slice.join(temp_slice, how='inner').join(remove_tungston_slice, how='inner')
+        filt = n_ele_slice.join(temp_slice, how='inner').join(remove_tungston_slice, how='inner')\
+            # .join(in_slice, how='inner').join(cu_slice, how='inner')
 
         # Filter master to slave, shuffle slave
         self.slave_dataset = self.master_dataset.loc[filt].copy()
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
+        # Remove Useless Features (features that never change)
+        tempdict = self.slave_dataset['Element Dictionary']
+        self.slave_dataset.drop(columns='Element Dictionary', inplace=True)
+        self.slave_dataset = self.slave_dataset.loc[:, self.slave_dataset.nunique() != 1]
+        self.slave_dataset['Element Dictionary'] = tempdict
+
         self.set_training_data()
         self.group_for_training()
 
     def set_training_data(self):
         # Set all other DFs from slave
-        self.features_df = self.slave_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1)
+
+        if self.impfl == 'avg':
+            self.features_df = self.slave_dataset.drop(
+                labels=['Measured Activity', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
+            )
+        else:
+            self.features_df = self.slave_dataset.drop(
+                labels=['Measured Activity', 'Element Dictionary'], axis=1
+            )
+
         self.labels_df = self.slave_dataset['Measured Activity'].copy()
 
         # Set Features and Labels
@@ -217,23 +227,6 @@ class Learner():
         }
 
         self.groups = group_dict.get(self.group, None)
-
-    def create_test_dataset(self, catids):
-        # Create Temporary indexer to slice slave dataset
-        ind = [int(idtag.split('_')[0]) for idtag in self.slave_dataset.index]
-        self.slave_dataset['temp_ind'] = ind
-
-        # Slice the dataset, copying all values of catids
-        self.test_dataset = self.slave_dataset[self.slave_dataset['temp_ind'].isin(catids)].copy()
-
-        # Drop the temporary indexer
-        self.slave_dataset.drop(columns=['temp_ind'], inplace=True)
-        self.test_dataset.drop(columns=['temp_ind'], inplace=True)
-
-        # Remove test dataset from slave dataset to prepare for training
-        self.slave_dataset.drop(labels=self.test_dataset.index, inplace=True)
-
-        self.set_training_data()
 
     def hyperparameter_tuning(self):
         """ Comment """
@@ -255,14 +248,15 @@ class Learner():
         }
 
         param_selector = {
-            'default': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
-                        'max_features':'auto', 'bootstrap':True},
+            'default': {'n_estimators':100, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
+                        'max_features':'auto', 'bootstrap':True, 'n_jobs':4, 'criterion':'mse'},
+
             'v1': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2},
             'v2': {'n_estimators': 50, 'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2,
                         'max_features': 'auto', 'bootstrap': True},
             'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
                         'max_features': 'sqrt', 'bootstrap': False},
-
+            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000}
         }
 
         self.machina = learn_selector.get(learner, lambda: 'Error')()
@@ -280,7 +274,27 @@ class Learner():
         """ Comment """
         self.machina = self.machina.fit(self.features, self.labels)
 
-    def predict_testdata(self):
+    def create_test_dataset(self, catids):
+        # Create Temporary indexer to slice slave dataset
+        ind = [int(idtag.split('_')[0]) for idtag in self.slave_dataset.index]
+        self.slave_dataset['temp_ind'] = ind
+
+        # Slice the dataset, copying all values of catids
+        self.test_dataset = self.slave_dataset[self.slave_dataset['temp_ind'].isin(catids)].copy()
+
+        # Drop the temporary indexer
+        self.slave_dataset.drop(columns=['temp_ind'], inplace=True)
+        self.test_dataset.drop(columns=['temp_ind'], inplace=True)
+
+        # Remove test dataset from slave dataset to prepare for training
+        self.slave_dataset.drop(labels=self.test_dataset.index, inplace=True)
+
+        self.set_training_data()
+
+    def predict_testdata(self, catids):
+        self.create_test_dataset(catids)
+        self.train_data()
+
         """ Comment - Work in Progress """
         data = self.test_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).values
         predvals = self.machina.predict(data)
@@ -298,8 +312,6 @@ class Learner():
         plt.ylim(0,1)
         plt.show()
 
-        exit()
-
     def predict_crossvalidate(self):
         """ Comment """
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
@@ -314,127 +326,150 @@ class Learner():
         else:
             print('No predictions to save...')
 
+    def extract_important_features(self, svnm=None):
+        """ Save all feature importance, print top 10 """
+
+        df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
+                          columns=['Feature Importance'])
+
+        print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+
+        if svnm is None:
+            return df
+        else:
+            df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
+
+
+    def evaluate_learner(self):
+        """ Comment """
+        mask = self.labels != 0
+        err = abs(np.array(self.predictions[mask]) - np.array(self.labels[mask]))
+        mean_ave_err = np.mean(err / np.array(self.labels[mask]))
+        acc = 1 - mean_ave_err
+
+        mean_abs_err = mean_absolute_error(self.labels, self.predictions)
+        r2 = r2_score(self.labels, self.predictions)
+
+        print('\n----- Model {} -----'.format(self.svnm))
+        print('R2: {:0.3f}'.format(r2))
+        print('Average Error: {:0.3f}'.format(mean_abs_err))
+        print('Accuracy: {:0.3f}'.format(acc))
+        print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
+        print('\n')
+
+        pd.DataFrame([r2, mean_abs_err, acc, time.time() - self.start_time],
+                     index=['R2','Mean Abs Error','Accuracy','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
+
     def preplotcessing(self):
+        if self.predictions is None:
+            self.predict_crossvalidate()
+
         self.plot_df = self.slave_dataset.copy()
         self.plot_df['Predicted Activity'] = self.predictions
-
-        unique_temps = np.unique(self.slave_dataset.loc[:, 'temperature'].values)
-        n_temps = len(unique_temps)
-        max_temp = np.max(unique_temps)
-        min_temp = np.min(unique_temps)
-
-        palette = sns.color_palette('viridis', n_colors=n_temps+1)
-        self.plot_df['temp_hues'] = [
-            str(palette[i]) for i in [int(n_temps * (float(x) - min_temp) / (max_temp - min_temp))
-                                      for x in self.slave_dataset.loc[:, 'temperature'].values]
+        self.plot_df['Name'] = [
+            ''.join('{}({})'.format(key, str(int(val)))
+                    for key, val in x) for x in self.plot_df['Element Dictionary']
         ]
+        self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
 
-        print(self.plot_df['temp_hues'])
+        self.plot_df.drop(columns='Element Dictionary', inplace=True)
 
-        pass
+        def create_feature_hues(self, feature):
+            unique_feature = np.unique(self.slave_dataset.loc[:, feature].values)
+            n_feature = len(unique_feature)
+            max_feature = np.max(unique_feature)
+            min_feature = np.min(unique_feature)
 
-    def plot_predictions_basic(self, avg=False):
+            if max_feature == min_feature:
+                pass # TODO write this
+            else:
+                palette = sns.color_palette('plasma', n_colors=n_feature+1)
+                self.plot_df['{}_hues'.format(feature)] = [
+                    palette[i] for i in [int(n_feature * (float(x) - min_feature) / (max_feature - min_feature))
+                                              for x in self.slave_dataset.loc[:, feature].values]
+                ]
+
+        create_feature_hues(self, 'temperature')
+
+        if self.feature_generator == 0:
+            create_feature_hues(self, 'NdValence_1')
+            create_feature_hues(self, 'IonizationEnergies_2_1')
+            create_feature_hues(self, 'Column_1')
+        elif self.feature_generator == 1:
+            create_feature_hues(self, 'FusionEnthalpy_mean')
+            create_feature_hues(self, 'IonizationEnergies_2_mad')
+            create_feature_hues(self, 'HeatFusion_mean')
+            create_feature_hues(self, 'ZungerPP-r_d_mean')
+
+        return self.plot_df
+
+    def plot_basic(self, feature='temperature'):
         """ Comment """
-        if self.predictions is None:
-            self.predict_crossvalidate()
+        df = pd.DataFrame([self.predictions,
+                           self.labels,
+                           self.plot_df['{}_hues'.format(feature)].values,
+                           self.plot_df['{}'.format(feature)].values],
+                          index=['pred','meas','clr','feat']).T
 
-        tempertures = self.slave_dataset.loc[:, 'temperature'].values
+        for feat in np.unique(df['feat']):
+            plt.scatter(x=df.loc[df['feat'] == feat, 'pred'],
+                        y=df.loc[df['feat'] == feat, 'meas'],
+                        c=df.loc[df['feat'] == feat, 'clr'],
+                        label=int(feat),
+                        edgecolors='k')
 
-        unique_temps = np.unique(tempertures)
-        n_temps = len(unique_temps)
-        max_temp = np.max(unique_temps)
-        min_temp = np.min(unique_temps)
-
-        if max_temp == min_temp:
-            clr = 'r'
-
-            mask = [int(max_temp) == np.array(tempertures, dtype=int)]
-
-            plt.scatter(self.predictions[mask],
-                        self.labels[mask],
-                        color=clr,
-                        edgecolors='k',
-                        label='{} C'.format(int(max_temp)))
-        else:
-            pal = pals.viridis(n_temps + 1)
-            clr = [str(pal[i]) for i in [int(n_temps * (float(x) - min_temp) / (max_temp - min_temp))
-                                     for x in tempertures]]
-
-            for temp in unique_temps:
-                mask = [int(temp) == np.array(tempertures, dtype=int)]
-
-                plt.scatter(self.predictions[mask],
-                            self.labels[mask],
-                            color=np.array(clr)[mask],
-                            edgecolors='k',
-                            label='{} C'.format(int(temp)))
-
-        # if avg:
-        #     final_df = pd.DataFrame()
-        #
-        #     for nm in unique_names:
-        #         nmdf = df.loc[df.loc[:, 'Name'] == nm]
-        #         unique_temp = np.unique(nmdf.loc[:, 'Temperature'].values)
-        #
-        #         for temperature in unique_temp:
-        #             tdf = nmdf.loc[nmdf.loc[:, 'Temperature'] == temperature]
-        #             add_df = tdf.iloc[0, :].copy()
-        #             add_df['Measured'] = tdf['Measured'].mean()
-        #             add_df['Measured Standard Error'] = tdf['Measured'].sem()
-        #             add_df['Upper'] = tdf['Measured'].mean() + tdf['Measured'].sem()
-        #             add_df['Lower'] = tdf['Measured'].mean() - tdf['Measured'].sem()
-        #             add_df['n Samples'] = tdf['Measured'].count()
-        #
-        #             final_df = pd.concat([final_df, add_df], axis=1)
-        #
-        #     df = final_df.transpose()
-
-        plt.xlabel('Predicted')
-        plt.ylabel('Measured')
+        plt.xlabel('Predicted Activity')
+        plt.ylabel('Measured Activity')
         plt.xlim(0,1)
         plt.ylim(0,1)
-        # plt.title(self.svnm)
-        plt.legend()
+        plt.title(self.svnm)
+        plt.legend(title=feature)
         plt.tight_layout()
-        plt.savefig('{}//{}.png'.format(self.svfl, self.svnm), dpi=400)
+        plt.savefig('{}//{}-{}.png'.format(self.svfl, self.svnm, feature), dpi=400)
         plt.close()
 
-    def plot_predictions(self, svnm='ML_Statistics'):
+    def plot_features(self, x_feature, c_feature):
+        uniqvals = np.unique(self.plot_df[c_feature].values)
+        for cval in uniqvals:
+            slice = self.plot_df[c_feature] == cval
+            plt.scatter(x=self.plot_df.loc[slice, x_feature], y=self.plot_df.loc[slice, 'Measured Activity'],
+                        c=self.plot_df.loc[slice, '{}_hues'.format(c_feature)], label=cval, s=30, edgecolors='k')
+        plt.xlabel(x_feature)
+        plt.ylabel('Measured Activity')
+        plt.ylim(0, 1)
+        plt.legend(loc=1)
+        plt.tight_layout()
+        plt.savefig('{}//{}-x{}-c{}.png'.format(self.svfl, self.svnm, x_feature, c_feature), dpi=400)
+        plt.close()
+
+    def plot_important_features(self):
+        """ Comment """
+        featdf = self.extract_important_features()
+        top5feats = featdf.nlargest(5, 'Feature Importance').index.values.tolist()
+        feats = self.slave_dataset.loc[:, top5feats+['Measured Activity']]
+        feats['hue'] = np.ceil(feats['Measured Activity'].values * 5)
+
+        # feats = feats[feats['temperature'] == 300.0]
+
+        # sns.pairplot(feats, hue='temperature', y_vars=['Measured Activity'], x_vars=top5feats)
+        sns.pairplot(feats, hue='temperature', diag_kind='kde')
+        plt.tight_layout()
+        plt.savefig('{}\\{}-featrels.png'.format(self.svfl, self.svnm))
+        plt.close()
+
+    def bokeh_predictions(self):
         """ Comment """
         if self.predictions is None:
             self.predict_crossvalidate()
-
-        df = pd.DataFrame(np.array([
-            [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
-            self.predictions,
-            self.labels,
-            self.slave_dataset.loc[:, 'temperature'].values]).T,
-                          columns=['ID', 'Predicted', 'Measured', 'Temperature'])
-
-        cat_eles = self.slave_dataset.loc[:, 'Element Dictionary']
-        vals = [''.join('{}({})'.format(key, str(int(val))) for key, val in x) for x in cat_eles]
-        df['Name'] = vals
 
         tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
         hover = HoverTool(tooltips=[
             ('Name', '@Name'),
             ("ID", "@ID"),
-            ('T', '@Temperature')
+            ('T', '@temperature')
         ])
 
         tools.append(hover)
-
-        unique_temps = len(df['Temperature'].unique())
-        max_temp = df['Temperature'].max()
-        min_temp = df['Temperature'].min()
-
-        if max_temp == min_temp:
-            df['color'] = pals.plasma(5)[4]
-        else:
-            pal = pals.plasma(unique_temps+1)
-            df['color'] = [pal[i]
-                           for i in [int(unique_temps*(float(x)-min_temp)/(max_temp-min_temp))
-                                     for x in df['Temperature']]]
 
         p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
         p.x_range = Range1d(0,1)
@@ -444,15 +479,16 @@ class Learner():
         p.yaxis.axis_label = "Measured Activity"
         p.grid.grid_line_color = "white"
 
-        source = ColumnDataSource(df)
+        self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
+        source = ColumnDataSource(self.plot_df)
 
-        p.circle("Predicted", "Measured", size=12, source=source,
-                 color='color', line_color="black", fill_alpha=0.8)
+        p.circle("Predicted Activity", "Measured Activity", size=12, source=source,
+                 color='bokeh_color', line_color="black", fill_alpha=0.8)
 
         output_file("{}\\{}.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
 
-    def plot_averaged(self, whiskers=False):
+    def bokeh_averaged(self, whiskers=False):
         """ Comment """
         if self.predictions is None:
             self.predict_crossvalidate()
@@ -530,82 +566,11 @@ class Learner():
         output_file("{}\\{}_avg.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
 
-    def visualize_tree(self, n=1):
-        """ Comment """
-        if n == 1:
-            gv = tree.export_graphviz(self.machina.estimators_[0],
-                                      filled=True,
-                                      out_file='{}//Trees//{}.dot'.format(self.svfl, self.svnm),
-                                      feature_names=self.features_df.columns,
-                                      rounded=True)
-
-            os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}_singtree.png'.format(fl=self.svfl,
-                                                                                                 nm=self.svnm))
-
-        else:
-            for index, forest in enumerate(self.machina.estimators_):
-                gv = tree.export_graphviz(forest,
-                                          filled=True,
-                                          out_file='{}//Trees//{}.dot'.format(self.svfl, self.svnm),
-                                          feature_names=self.features_df.columns,
-                                          rounded=True)
-
-                os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}-{ind}.png'.format(fl=self.svfl,
-                                                                                                  nm=self.svnm,
-                                                                                                  ind=index))
-
-    def extract_important_features(self, svnm=None):
-        """ Save all feature importance, print top 10 """
-
-        df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
-                          columns=['Feature Importance'])
-
-        print(df.sort_values(by='Feature Importance', ascending=False).head(10))
-
-        if svnm is None:
-            return df
-        else:
-            df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
 
 
-    def evaluate_learner(self):
-        """ Comment """
-        mask = self.labels != 0
-        err = abs(np.array(self.predictions[mask]) - np.array(self.labels[mask]))
-        mean_ave_err = np.mean(err / np.array(self.labels[mask]))
-        acc = 1 - mean_ave_err
-
-        mean_abs_err = mean_absolute_error(self.labels, self.predictions)
-        r2 = r2_score(self.labels, self.predictions)
-
-        print('\n----- Model {} -----'.format(self.svnm))
-        print('R2: {:0.3f}'.format(r2))
-        print('Average Error: {:0.3f}'.format(mean_abs_err))
-        print('Accuracy: {:0.3f}'.format(acc))
-        print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
-        print('\n')
-
-        pd.DataFrame([r2, mean_abs_err, acc, time.time() - self.start_time],
-                     index=['R2','Mean Abs Error','Accuracy','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
-
-    def plot_important_features(self):
-        """ Comment """
-        featdf = self.extract_important_features()
-        top5feats = featdf.nlargest(5, 'Feature Importance').index.values.tolist()
-        feats = self.slave_dataset.loc[:, top5feats+['Measured Activity']]
-        feats['hue'] = np.ceil(feats['Measured Activity'].values * 5)
-
-        # feats = feats[feats['temperature'] == 300.0]
-
-        # sns.pairplot(feats, hue='temperature', y_vars=['Measured Activity'], x_vars=top5feats)
-        sns.pairplot(feats, hue='temperature', diag_kind='kde')
-        plt.tight_layout()
-        plt.savefig('{}\\{}-featrels.png'.format(self.svfl, self.svnm))
-        plt.close()
-
-    def plot_important_features_bokeh(self, temp_slice=None, xaxis='Measured', yaxis='Predicted',
-                                      xlabel='Measured Activity', ylabel='Predicted Activity',
-                                      svtag='', yrng=None, xrng=None):
+    def bokeh_important_features(self, temp_slice=None, xaxis='Measured', yaxis='Predicted',
+                                 xlabel='Measured Activity', ylabel='Predicted Activity',
+                                 svtag='', yrng=None, xrng=None):
         """ Comment """
 
         featdf = pd.DataFrame(self.slave_dataset.copy())
@@ -660,6 +625,29 @@ class Learner():
         output_file("{}\\{}-{}.html".format(self.svfl, self.svnm, svtag), title="stats.py")
         save(p)
 
+    def visualize_tree(self, n=1):
+        """ Comment """
+        if n == 1:
+            gv = tree.export_graphviz(self.machina.estimators_[0],
+                                      filled=True,
+                                      out_file='{}//Trees//{}.dot'.format(self.svfl, self.svnm),
+                                      feature_names=self.features_df.columns,
+                                      rounded=True)
+
+            os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}_singtree.png'.format(fl=self.svfl,
+                                                                                                 nm=self.svnm))
+
+        else:
+            for index, forest in enumerate(self.machina.estimators_):
+                gv = tree.export_graphviz(forest,
+                                          filled=True,
+                                          out_file='{}//Trees//{}.dot'.format(self.svfl, self.svnm),
+                                          feature_names=self.features_df.columns,
+                                          rounded=True)
+
+                os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}-{ind}.png'.format(fl=self.svfl,
+                                                                                                  nm=self.svnm,
+                                                                                                  ind=index))
 
 class Catalyst():
     """Catalyst will contain each individual training set"""
@@ -686,6 +674,12 @@ class Catalyst():
 
     def input_ammonia_concentration(self, ammonia_concentration):
         self.input_dict['ammonia_concentration'] = ammonia_concentration
+
+    def input_standard_error(self, error):
+        self.input_dict['standard error'] = error
+
+    def input_n_averaged_samples(self, n_avg):
+        self.input_dict['n_averaged'] = n_avg
 
     def feature_add(self, key, value):
         self.feature_dict[key] = value
@@ -722,6 +716,13 @@ class Catalyst():
 
         self.feature_add('n_elements',n_eles)
 
+    def feature_add_M1M2_ratio(self):
+        if len(list(self.elements.values())) >= 2:
+            ratio = list(self.elements.values())[0] / list(self.elements.values())[1] * 100
+        else:
+            ratio = 0
+        self.feature_add('M1M2_ratio', ratio)
+
 
 if __name__ == '__main__':
     # Begin Machine Learning
@@ -734,22 +735,22 @@ if __name__ == '__main__':
         feature_generator=0 # 0 is elemental, 1 is statistics
     )
 
-    skynet.set_learner(learner='randomforest')
+    skynet.set_learner(learner='randomforest', params='default')
     skynet.load_nh3_catalysts()
     skynet.filter_master_dataset()
-    # skynet.create_test_dataset(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
+    # skynet.predict_testdata(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
     skynet.train_data()
-    # skynet.predict_testdata()
     skynet.extract_important_features()
     skynet.predict_crossvalidate()
     skynet.evaluate_learner()
-    skynet.preplotcessing()
-    exit()
-    # skynet.visualize_tree(svnm='{}-tree'.format(sv))
-    skynet.plot_predictions()
-    skynet.plot_averaged(whiskers=True)
-    skynet.plot_predictions_basic()
+    pltdf = skynet.preplotcessing()
 
+
+    # exit()
+    skynet.visualize_tree(n=1)
+    skynet.plot_basic()
+    # skynet.plot_features(x_feature='Column_1', c_feature='temperature')
+    skynet.bokeh_predictions()
 
     # for tp in [250, 300, 350]:
     #     # cols = ['NdValence_1', "IonizationEnergies_2_1", 'Column_1']
