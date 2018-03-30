@@ -76,6 +76,17 @@ class Learner():
 
         self.start_time = time.time()
 
+    def set_temp_filter(self, temp_filter):
+        self.temp_filter = temp_filter
+
+        self.svnm = '{nm}-{nele}ele-{temp}-{grp}-f{feat}'.format(
+            nm=self.nm,
+            nele=self.n_ele_filter,
+            temp='{}C'.format(temp_filter) if temp_filter is not None else 'All',
+            grp=self.group,
+            feat=self.feature_generator
+        )
+
     def add_catalyst(self, index, catalyst):
         """ Add Catalysts to self.catalyst_dictionary.  This is the primary input function for the model. """
         base_index = index
@@ -161,42 +172,55 @@ class Learner():
 
     def filter_master_dataset(self, features_filter=None):
         """ Filters data from import file for partitioned model training """
+        filt = None
+
+        # 1. Filter Based on Number of Elements
         filter_dict_neles = {
             1: self.master_dataset[self.master_dataset['n_elements'] == 1].index,
             2: self.master_dataset[self.master_dataset['n_elements'] == 2].index,
             3: self.master_dataset[self.master_dataset['n_elements'] == 3].index
         }
 
-        # TODO: Allow for list to be passed
-        n_ele_slice = filter_dict_neles.get(self.n_ele_filter, pd.DataFrame().index)
+        if self.n_ele_filter is list():
+            n_ele_slice = filter_dict_neles.get(self.n_ele_filter, self.master_dataset.index)
+        else:
+            n_ele_slice = filter_dict_neles.get(self.n_ele_filter, self.master_dataset.index)
 
+        # 2. Filter based on temperature
         if self.temp_filter is None:
             temp_slice = self.master_dataset.index
         else:
             temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temp_filter].index
 
-        remove_tungston_slice = self.master_dataset[self.master_dataset['W Loading'] == 0].index
-        # in_slice = self.master_dataset[self.master_dataset['In Loading'] == 0].index
-        # cu_slice = self.master_dataset[self.master_dataset['Cu Loading'] == 0].index
+        # 3. Create the filter (filter is used to slice the master file)
+        def join_all_indecies(ind_list):
+            start_filter = ind_list.pop(0)
+            for ind_obj in ind_list:
+                start_filter = list(set(start_filter) & set(ind_obj))
+            return start_filter
 
-        def filter_features(feats):
-            # Not implemented
-            return []
+        filt = join_all_indecies([n_ele_slice, temp_slice])
 
-        filt = n_ele_slice.join(temp_slice, how='inner').join(remove_tungston_slice, how='inner')\
-            # .join(in_slice, how='inner').join(cu_slice, how='inner')
+        # 4. Need to write a method to remove other features
+        def drop_element(ele, filt):
+            slice = self.master_dataset[self.master_dataset['{} Loading'.format(ele)] == 0].index
+            return join_all_indecies([filt, slice])
 
-        # Filter master to slave, shuffle slave
+        # 5. Drop Tungston Data because it's always bad
+        filt = drop_element('W', filt)
+
+        # 6. Apply filter, master to slave, shuffle slave
         self.slave_dataset = self.master_dataset.loc[filt].copy()
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
-        # Remove Useless Features (features that never change)
-        tempdict = self.slave_dataset['Element Dictionary']
-        self.slave_dataset.drop(columns='Element Dictionary', inplace=True)
-        self.slave_dataset = self.slave_dataset.loc[:, self.slave_dataset.nunique() != 1]
-        self.slave_dataset['Element Dictionary'] = tempdict
+        # 7. Remove Useless Features (features that never change)
+        # tempdict = self.slave_dataset[['Element Dictionary', 'temperature']]
+        # self.slave_dataset.drop(columns=['Element Dictionary', 'temperature'], inplace=True)
+        # self.slave_dataset = self.slave_dataset.loc[:, self.slave_dataset.nunique() != 1]
+        # self.slave_dataset[['Element Dictionary', 'temperature']] = tempdict
 
+        # 8. Set up training data and apply grouping
         self.set_training_data()
         self.group_for_training()
 
@@ -256,7 +280,8 @@ class Learner():
                         'max_features': 'auto', 'bootstrap': True},
             'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
                         'max_features': 'sqrt', 'bootstrap': False},
-            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000}
+            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
+            'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'}
         }
 
         self.machina = learn_selector.get(learner, lambda: 'Error')()
@@ -277,14 +302,14 @@ class Learner():
     def create_test_dataset(self, catids):
         # Create Temporary indexer to slice slave dataset
         ind = [int(idtag.split('_')[0]) for idtag in self.slave_dataset.index]
-        self.slave_dataset['temp_ind'] = ind
+        self.slave_dataset['temporary_ind'] = ind
 
         # Slice the dataset, copying all values of catids
-        self.test_dataset = self.slave_dataset[self.slave_dataset['temp_ind'].isin(catids)].copy()
+        self.test_dataset = self.slave_dataset[self.slave_dataset['temporary_ind'].isin(catids)].copy()
 
         # Drop the temporary indexer
-        self.slave_dataset.drop(columns=['temp_ind'], inplace=True)
-        self.test_dataset.drop(columns=['temp_ind'], inplace=True)
+        self.slave_dataset.drop(columns=['temporary_ind'], inplace=True)
+        self.test_dataset.drop(columns=['temporary_ind'], inplace=True)
 
         # Remove test dataset from slave dataset to prepare for training
         self.slave_dataset.drop(labels=self.test_dataset.index, inplace=True)
@@ -296,7 +321,15 @@ class Learner():
         self.train_data()
 
         """ Comment - Work in Progress """
-        data = self.test_dataset.drop(labels=['Measured Activity', 'Element Dictionary'], axis=1).values
+        if self.impfl == 'avg':
+            data = self.test_dataset.drop(
+                labels=['Measured Activity', 'Element Dictionary', 'standard error', 'n_averaged'],
+                axis=1).values
+        else:
+            data = self.test_dataset.drop(
+                labels=['Measured Activity', 'Element Dictionary'],
+                axis=1).values
+
         predvals = self.machina.predict(data)
 
         original_test_df = self.master_dataset.loc[self.test_dataset.index].copy()
@@ -310,7 +343,8 @@ class Learner():
         comparison_df.plot(x='Predicted Activity', y='Measured Activity', kind='scatter')
         plt.xlim(0,1)
         plt.ylim(0,1)
-        plt.show()
+        plt.savefig('.\\Results\\Predictions\\ss3-7_predict_ss8.png', dpi=400)
+        plt.close()
 
     def predict_crossvalidate(self):
         """ Comment """
@@ -338,7 +372,6 @@ class Learner():
             return df
         else:
             df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
-
 
     def evaluate_learner(self):
         """ Comment """
@@ -375,13 +408,18 @@ class Learner():
         self.plot_df.drop(columns='Element Dictionary', inplace=True)
 
         def create_feature_hues(self, feature):
-            unique_feature = np.unique(self.slave_dataset.loc[:, feature].values)
+            try:
+                unique_feature = np.unique(self.slave_dataset.loc[:, feature].values)
+            except KeyError:
+                print('KeyError: {} not found'.format(feature))
+                return
+
             n_feature = len(unique_feature)
             max_feature = np.max(unique_feature)
             min_feature = np.min(unique_feature)
 
             if max_feature == min_feature:
-                pass # TODO write this
+                self.plot_df['{}_hues'.format(feature)] = "#3498db" # Blue!
             else:
                 palette = sns.color_palette('plasma', n_colors=n_feature+1)
                 self.plot_df['{}_hues'.format(feature)] = [
@@ -405,11 +443,12 @@ class Learner():
 
     def plot_basic(self, feature='temperature'):
         """ Comment """
+
         df = pd.DataFrame([self.predictions,
                            self.labels,
                            self.plot_df['{}_hues'.format(feature)].values,
                            self.plot_df['{}'.format(feature)].values],
-                          index=['pred','meas','clr','feat']).T
+                          index=['pred', 'meas', 'clr', 'feat']).T
 
         for feat in np.unique(df['feat']):
             plt.scatter(x=df.loc[df['feat'] == feat, 'pred'],
@@ -425,7 +464,8 @@ class Learner():
         plt.title(self.svnm)
         plt.legend(title=feature)
         plt.tight_layout()
-        plt.savefig('{}//{}-{}.png'.format(self.svfl, self.svnm, feature), dpi=400)
+        plt.savefig('{}//{}{}.png'.format(self.svfl, self.svnm, '-{}'.format(feature) if feature is not None else ''),
+                    dpi=400)
         plt.close()
 
     def plot_features(self, x_feature, c_feature):
@@ -457,6 +497,49 @@ class Learner():
         plt.savefig('{}\\{}-featrels.png'.format(self.svfl, self.svnm))
         plt.close()
 
+    def plot_visualize_error(self):
+        df = pd.DataFrame([self.predictions,
+                           self.labels,
+                           self.plot_df['{}_hues'.format('temperature')].values,
+                           self.plot_df['{}'.format('temperature')].values],
+                          index=['pred', 'meas', 'clr', 'feat']).T
+
+        rats = np.divide(self.predictions, self.labels, out=np.zeros_like(self.predictions), where=self.labels != 0)
+        rat_count = rats.size
+        wi5 = ((0.95 < rats) & (rats < 1.05)).sum()
+        wi10 = ((0.9 < rats) & (rats < 1.1)).sum()
+        wi20 = ((0.8 < rats) & (rats < 1.2)).sum()
+
+        fig, ax = plt.subplots()
+
+        for feat in np.unique(df['feat']):
+            ax.scatter(x=df.loc[df['feat'] == feat, 'pred'],
+                        y=df.loc[df['feat'] == feat, 'meas'],
+                        c=df.loc[df['feat'] == feat, 'clr'],
+                        label=int(feat),
+                        edgecolors='k')
+
+        x = np.array([0, 0.5, 1])
+        y = np.array([0, 0.5, 1])
+
+        ax.plot(x, y, lw=2, c='k')
+        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
+        ax.fill_between(x, y + 0.2, y - 0.2, alpha=0.1, color='y')
+        ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+            five=wi5/rat_count, ten=wi10/rat_count, twenty=wi20/rat_count))
+
+
+        plt.xlabel('Predicted Activity')
+        plt.ylabel('Measured Activity')
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.title('{}-{}'.format(self.svnm, 'err'))
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig('{}//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
+                    dpi=400)
+        plt.close()
+
     def bokeh_predictions(self):
         """ Comment """
         if self.predictions is None:
@@ -479,7 +562,11 @@ class Learner():
         p.yaxis.axis_label = "Measured Activity"
         p.grid.grid_line_color = "white"
 
-        self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
+        try:
+            self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
+        except KeyError:
+            self.plot_df['bokeh_color'] = 'blue'
+
         source = ColumnDataSource(self.plot_df)
 
         p.circle("Predicted Activity", "Measured Activity", size=12, source=source,
@@ -565,8 +652,6 @@ class Learner():
 
         output_file("{}\\{}_avg.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
-
-
 
     def bokeh_important_features(self, temp_slice=None, xaxis='Measured', yaxis='Predicted',
                                  xlabel='Measured Activity', ylabel='Predicted Activity',
@@ -703,10 +788,13 @@ class Catalyst():
         eledf = eledf.loc[list(self.elements.keys())]
 
         for feature_name, feature_values in eledf.T.iterrows():
+            # HACK: Add only one feature
+            # if feature_name != 'IonizationEnergies_2':
+            #     continue
+
             for index, _ in enumerate(self.elements):
                 self.feature_add('{nm}_{index}'.format(nm=feature_name, index=index),
                                  feature_values.values[index])
-
 
     def feature_add_n_elements(self):
         n_eles = 0
@@ -731,26 +819,42 @@ if __name__ == '__main__':
         n_ele_filter=3,
         temp_filter=None,
         group='byID',
-        nm='v8',
+        nm='v9',
         feature_generator=0 # 0 is elemental, 1 is statistics
     )
 
+    # Setup Learner
     skynet.set_learner(learner='randomforest', params='default')
     skynet.load_nh3_catalysts()
+
+    # for tp in [250, 300, 350, 400, 450]:
+    #     skynet.set_temp_filter(tp)
+    #     skynet.filter_master_dataset()
+    #     skynet.train_data()
+    #     skynet.extract_important_features(svnm=skynet.svnm)
+    #     skynet.predict_crossvalidate()
+    #     skynet.evaluate_learner()
+    #     skynet.preplotcessing()
+    #     skynet.plot_basic()
+
+    # exit()
+
+    skynet.temp_filter = None
     skynet.filter_master_dataset()
     # skynet.predict_testdata(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
+    # exit()
     skynet.train_data()
     skynet.extract_important_features()
     skynet.predict_crossvalidate()
     skynet.evaluate_learner()
     pltdf = skynet.preplotcessing()
 
-
+    skynet.plot_visualize_error()
     # exit()
     skynet.visualize_tree(n=1)
     skynet.plot_basic()
     # skynet.plot_features(x_feature='Column_1', c_feature='temperature')
-    skynet.bokeh_predictions()
+    # skynet.bokeh_predictions()
 
     # for tp in [250, 300, 350]:
     #     # cols = ['NdValence_1', "IonizationEnergies_2_1", 'Column_1']
