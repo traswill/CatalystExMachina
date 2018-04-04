@@ -6,7 +6,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import rgb2hex, BoundaryNorm
+from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex
 
 from sklearn import preprocessing, tree
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
@@ -19,10 +19,16 @@ from sklearn.utils import shuffle
 from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error
 from sklearn.feature_selection import SelectKBest
 
-from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker
-from bokeh.plotting import figure, show, output_file, save
+from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJS, Slider, Select
+from bokeh.plotting import figure, show, output_file, save, curdoc
 import bokeh.palettes as pals
 from bokeh.models import Range1d, DataRange1d
+from bokeh.layouts import column
+from bokeh.layouts import row, widgetbox
+from bokeh.palettes import Plasma
+from bokeh.sampledata.autompg import autompg_clean
+
+import re
 
 import seaborn as sns
 import ast
@@ -125,6 +131,7 @@ class Learner():
             cat.activity = row['Concentration']
             cat.feature_add_n_elements()
             cat.feature_add_M1M2_ratio()
+            cat.feature_add_oxidation_states()
 
             feature_generator = {
                 0: cat.feature_add_elemental_properties,
@@ -214,11 +221,7 @@ class Learner():
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
-        # 7. Remove Useless Features (features that never change)
-        # tempdict = self.slave_dataset[['Element Dictionary', 'temperature']]
-        # self.slave_dataset.drop(columns=['Element Dictionary', 'temperature'], inplace=True)
-        # self.slave_dataset = self.slave_dataset.loc[:, self.slave_dataset.nunique() != 1]
-        # self.slave_dataset[['Element Dictionary', 'temperature']] = tempdict
+        # X. Use SelectKBest to filter out features
 
         # 8. Set up training data and apply grouping
         self.set_training_data()
@@ -360,7 +363,7 @@ class Learner():
         else:
             print('No predictions to save...')
 
-    def extract_important_features(self, svnm=None):
+    def extract_important_features(self, sv=False):
         """ Save all feature importance, print top 10 """
 
         df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
@@ -368,10 +371,10 @@ class Learner():
 
         print(df.sort_values(by='Feature Importance', ascending=False).head(10))
 
-        if svnm is None:
-            return df
-        else:
+        if sv:
             df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
+        else:
+            return df
 
     def evaluate_learner(self):
         """ Comment """
@@ -419,7 +422,7 @@ class Learner():
             min_feature = np.min(unique_feature)
 
             if max_feature == min_feature:
-                self.plot_df['{}_hues'.format(feature)] = "#3498db" # Blue!
+                self.plot_df['{}_hues'.format(feature)] = "#3498db"  # Blue!
             else:
                 palette = sns.color_palette('plasma', n_colors=n_feature+1)
                 self.plot_df['{}_hues'.format(feature)] = [
@@ -653,33 +656,34 @@ class Learner():
         output_file("{}\\{}_avg.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
 
-    def bokeh_important_features(self, temp_slice=None, xaxis='Measured', yaxis='Predicted',
-                                 xlabel='Measured Activity', ylabel='Predicted Activity',
-                                 svtag='', yrng=None, xrng=None):
+    def bokeh_important_features(self, svtag='IonEn',
+                                 xaxis='Measured Activity', xlabel='Measured Activity', xrng=None,
+                                 yaxis='Predicted Activity', ylabel='Predicted Activity', yrng=None,
+                                 caxis='temperature'
+                                 ):
         """ Comment """
 
-        featdf = pd.DataFrame(self.slave_dataset.copy())
-        featdf['Name'] = [''.join('{}({})'.format(key, str(int(val))) for key, val in x)
-                         for x in self.slave_dataset.loc[:, 'Element Dictionary']]
-        featdf['ID'] = [x.split('_')[0] for x in featdf.index.values]
-        featdf.drop(columns='Element Dictionary', inplace=True)
-        featdf['Predicted'] = self.predictions
-        featdf['Measured'] = self.labels
-        unique_temps = len(featdf['temperature'].unique())
-        max_temp = featdf['temperature'].max()
-        min_temp = featdf['temperature'].min()
+        # uniqvals = np.unique(self.plot_df[caxis].values)
+        # for cval in uniqvals:
+        #     slice = self.plot_df[caxis] == cval
+        #     plt.scatter(x=self.plot_df.loc[slice, xaxis], y=self.plot_df.loc[slice, yaxis],
+        #                 c=self.plot_df.loc[slice, '{}_hues'.format(caxis)], label=cval, s=30, edgecolors='k')
 
-        if max_temp == min_temp:
-            featdf['color'] = pals.plasma(5)[4]
-        else:
-            pal = pals.plasma(unique_temps + 1)
-            featdf['color'] = [pal[i]
-                           for i in [int(unique_temps * (float(x) - min_temp) / (max_temp - min_temp))
-                                     for x in featdf['temperature']]]
-
-        if temp_slice is not None:
-            featdf = featdf[featdf['temperature'] == temp_slice]
-
+        # unique_temps = len(featdf['temperature'].unique())
+        # max_temp = featdf['temperature'].max()
+        # min_temp = featdf['temperature'].min()
+        #
+        # if max_temp == min_temp:
+        #     featdf['color'] = pals.plasma(5)[4]
+        # else:
+        #     pal = pals.plasma(unique_temps + 1)
+        #     featdf['color'] = [pal[i]
+        #                    for i in [int(unique_temps * (float(x) - min_temp) / (max_temp - min_temp))
+        #                              for x in featdf['temperature']]]
+        #
+        # if temp_slice is not None:
+        #     featdf = featdf[featdf['temperature'] == temp_slice]
+        #
         if xrng is None:
             xrng = DataRange1d()
         if yrng is None:
@@ -689,7 +693,7 @@ class Learner():
         hover = HoverTool(tooltips=[
             ('Name', '@Name'),
             ("ID", "@ID"),
-            ('T', '@temperature')
+            ('IonEn', '@IonizationEnergies_2_1')
         ])
 
         tools.append(hover)
@@ -702,13 +706,89 @@ class Learner():
         p.yaxis.axis_label = ylabel
         p.grid.grid_line_color = "white"
 
-        source = ColumnDataSource(featdf)
+        try:
+            self.plot_df['bokeh_color'] = self.plot_df['{}_hues'.format(caxis)].apply(rgb2hex)
+        except KeyError:
+            self.plot_df['bokeh_color'] = 'blue'
 
+        source = ColumnDataSource(self.plot_df)
         p.circle(xaxis, yaxis, size=12, source=source,
-                 color='color', line_color="black", fill_alpha=0.8)
+                 color='bokeh_color', line_color="black", fill_alpha=0.8)
 
-        output_file("{}\\{}-{}.html".format(self.svfl, self.svnm, svtag), title="stats.py")
+        output_file("{}\\{}{}.html".format(self.svfl, self.svnm, '-{}'.format(svtag) if svtag is not '' else ''), title="stats.py")
         save(p)
+
+    def bokeh_test(self):
+        ''' goal: get interactive plots working '''
+        df = autompg_clean.copy()
+
+        SIZES = list(range(6, 22, 3))
+        COLORS = Plasma
+
+        # data cleanup
+        df.cyl = df.cyl.astype(str)
+        df.yr = df.yr.astype(str)
+        del df['name']
+
+        columns = sorted(df.columns)
+        discrete = [x for x in columns if df[x].dtype == object]
+        continuous = [x for x in columns if x not in discrete]
+        quantileable = [x for x in continuous if len(df[x].unique()) > 20]
+
+        def create_figure():
+            xs = df[x.value].values
+            ys = df[y.value].values
+            x_title = x.value.title()
+            y_title = y.value.title()
+
+            kw = dict()
+            if x.value in discrete:
+                kw['x_range'] = sorted(set(xs))
+            if y.value in discrete:
+                kw['y_range'] = sorted(set(ys))
+            kw['title'] = "%s vs %s" % (x_title, y_title)
+
+            p = figure(plot_height=600, plot_width=800, tools='pan,box_zoom,reset', **kw)
+            p.xaxis.axis_label = x_title
+            p.yaxis.axis_label = y_title
+
+            if x.value in discrete:
+                p.xaxis.major_label_orientation = pd.np.pi / 4
+
+            sz = 9
+            if size.value != 'None':
+                groups = pd.qcut(df[size.value].values, len(SIZES))
+                sz = [SIZES[xx] for xx in groups.codes]
+
+            c = "#31AADE"
+            if color.value != 'None':
+                groups = pd.qcut(df[color.value].values, len(COLORS))
+                c = [COLORS[xx] for xx in groups.codes]
+
+            p.circle(x=xs, y=ys, color=c, size=sz, line_color="white", alpha=0.6, hover_color='white', hover_alpha=0.5)
+
+            return p
+
+        def update(attr, old, new):
+            layout.children[1] = create_figure()
+
+        x = Select(title='X-Axis', value='mpg', options=columns)
+        x.on_change('value', update)
+
+        y = Select(title='Y-Axis', value='hp', options=columns)
+        y.on_change('value', update)
+
+        size = Select(title='Size', value='None', options=['None'] + quantileable)
+        size.on_change('value', update)
+
+        color = Select(title='Color', value='None', options=['None'] + quantileable)
+        color.on_change('value', update)
+
+        controls = widgetbox([x, y, color, size], width=200)
+        layout = row(controls, create_figure())
+
+        curdoc().add_root(layout)
+        curdoc().title = "Crossfilter"
 
     def visualize_tree(self, n=1):
         """ Comment """
@@ -811,6 +891,24 @@ class Catalyst():
             ratio = 0
         self.feature_add('M1M2_ratio', ratio)
 
+    def feature_add_oxidation_states(self):
+        eledf = pd.read_csv(r'./Data/Elements.csv', index_col=0, usecols=['Abbreviation','OxidationStates'])
+        eledf.dropna(inplace=True)
+        eledf = eledf.loc[list(self.elements.keys())]
+
+        for indx, val in eledf.iterrows():
+            for ox_state in val.values[0].split(' '):
+                eledf.loc[indx, 'OxState {}'.format(ox_state)] = 1
+
+        eledf.fillna(0, inplace=True)
+        eledf.drop(columns='OxidationStates', inplace=True)
+
+        for feature_name, feature_values in eledf.T.iterrows():
+            for index, _ in enumerate(self.elements):
+                self.feature_add('{nm}_{index}'.format(nm=feature_name, index=index),
+                                 feature_values.values[index])
+
+
 
 if __name__ == '__main__':
     # Begin Machine Learning
@@ -819,41 +917,36 @@ if __name__ == '__main__':
         n_ele_filter=3,
         temp_filter=None,
         group='byID',
-        nm='v9',
-        feature_generator=0 # 0 is elemental, 1 is statistics
+        nm='v8',
+        feature_generator=0 # 0 is elemental, 1 is statistics,  2 is statmech
     )
 
     # Setup Learner
     skynet.set_learner(learner='randomforest', params='default')
     skynet.load_nh3_catalysts()
 
-    # for tp in [250, 300, 350, 400, 450]:
-    #     skynet.set_temp_filter(tp)
-    #     skynet.filter_master_dataset()
-    #     skynet.train_data()
-    #     skynet.extract_important_features(svnm=skynet.svnm)
-    #     skynet.predict_crossvalidate()
-    #     skynet.evaluate_learner()
-    #     skynet.preplotcessing()
-    #     skynet.plot_basic()
+    # for t in [250, 300, 350, 400, 450]:
+    #     skynet.temp_filter = t
 
-    # exit()
-
-    skynet.temp_filter = None
     skynet.filter_master_dataset()
     # skynet.predict_testdata(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
-    # exit()
     skynet.train_data()
-    skynet.extract_important_features()
+    skynet.extract_important_features(sv=True)
     skynet.predict_crossvalidate()
     skynet.evaluate_learner()
     pltdf = skynet.preplotcessing()
 
-    skynet.plot_visualize_error()
+    # skynet.plot_visualize_error()
     # exit()
-    skynet.visualize_tree(n=1)
-    skynet.plot_basic()
-    # skynet.plot_features(x_feature='Column_1', c_feature='temperature')
+    # skynet.visualize_tree(n=1)
+    # skynet.plot_basic()
+    # skynet.plot_features(x_feature='Ru Loading', c_feature='temperature')
+
+    skynet.bokeh_test()
+    # skynet.bokeh_important_features(svtag='IonEn_{}'.format(skynet.temp_filter),
+    #                                 xaxis='Measured Activity', xlabel='Measured Activity', xrng=None,
+    #                                 yaxis='Predicted Activity', ylabel='Predicted Activity', yrng=None,
+    #                                 caxis='IonizationEnergies_2_1')
     # skynet.bokeh_predictions()
 
     # for tp in [250, 300, 350]:
