@@ -23,8 +23,7 @@ from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJ
 from bokeh.plotting import figure, show, output_file, save, curdoc
 import bokeh.palettes as pals
 from bokeh.models import Range1d, DataRange1d
-from bokeh.layouts import column
-from bokeh.layouts import row, widgetbox
+from bokeh.layouts import row, widgetbox, column, layout
 from bokeh.palettes import Plasma
 from bokeh.sampledata.autompg import autompg_clean
 
@@ -719,76 +718,25 @@ class Learner():
         save(p)
 
     def bokeh_test(self):
-        ''' goal: get interactive plots working '''
-        df = autompg_clean.copy()
+        output_file("callback.html")
 
-        SIZES = list(range(6, 22, 3))
-        COLORS = Plasma
+        self.plot_df['x'] = self.plot_df['Predicted Activity'].values
+        source = ColumnDataSource(self.plot_df)
+        p = figure(plot_width=400, plot_height=400)
+        p.circle('x', 'Measured Activity', source=source)
 
-        # data cleanup
-        df.cyl = df.cyl.astype(str)
-        df.yr = df.yr.astype(str)
-        del df['name']
+        def callback(src=source, window=None):
+            data = src.data
+            data['x'] = data[cb.obj.value].values
+            source.change.emit()
 
-        columns = sorted(df.columns)
-        discrete = [x for x in columns if df[x].dtype == object]
-        continuous = [x for x in columns if x not in discrete]
-        quantileable = [x for x in continuous if len(df[x].unique()) > 20]
+        x = Select(options=self.plot_df.columns.tolist(), title='X Axis', callback=CustomJS.from_py_func(callback))
+        y = Select(options=self.plot_df.columns.tolist(), title='Y Axis')
+        c = Select(options=self.plot_df.columns.tolist(), title='Color')
+        # s = Select(options=self.plot_df.values.tolist())
+        ly = layout(p, x, y, c)
 
-        def create_figure():
-            xs = df[x.value].values
-            ys = df[y.value].values
-            x_title = x.value.title()
-            y_title = y.value.title()
-
-            kw = dict()
-            if x.value in discrete:
-                kw['x_range'] = sorted(set(xs))
-            if y.value in discrete:
-                kw['y_range'] = sorted(set(ys))
-            kw['title'] = "%s vs %s" % (x_title, y_title)
-
-            p = figure(plot_height=600, plot_width=800, tools='pan,box_zoom,reset', **kw)
-            p.xaxis.axis_label = x_title
-            p.yaxis.axis_label = y_title
-
-            if x.value in discrete:
-                p.xaxis.major_label_orientation = pd.np.pi / 4
-
-            sz = 9
-            if size.value != 'None':
-                groups = pd.qcut(df[size.value].values, len(SIZES))
-                sz = [SIZES[xx] for xx in groups.codes]
-
-            c = "#31AADE"
-            if color.value != 'None':
-                groups = pd.qcut(df[color.value].values, len(COLORS))
-                c = [COLORS[xx] for xx in groups.codes]
-
-            p.circle(x=xs, y=ys, color=c, size=sz, line_color="white", alpha=0.6, hover_color='white', hover_alpha=0.5)
-
-            return p
-
-        def update(attr, old, new):
-            layout.children[1] = create_figure()
-
-        x = Select(title='X-Axis', value='mpg', options=columns)
-        x.on_change('value', update)
-
-        y = Select(title='Y-Axis', value='hp', options=columns)
-        y.on_change('value', update)
-
-        size = Select(title='Size', value='None', options=['None'] + quantileable)
-        size.on_change('value', update)
-
-        color = Select(title='Color', value='None', options=['None'] + quantileable)
-        color.on_change('value', update)
-
-        controls = widgetbox([x, y, color, size], width=200)
-        layout = row(controls, create_figure())
-
-        curdoc().add_root(layout)
-        curdoc().title = "Crossfilter"
+        show(ly)
 
     def visualize_tree(self, n=1):
         """ Comment """
@@ -921,6 +869,7 @@ if __name__ == '__main__':
         feature_generator=0 # 0 is elemental, 1 is statistics,  2 is statmech
     )
 
+
     # Setup Learner
     skynet.set_learner(learner='randomforest', params='default')
     skynet.load_nh3_catalysts()
@@ -936,13 +885,14 @@ if __name__ == '__main__':
     skynet.evaluate_learner()
     pltdf = skynet.preplotcessing()
 
+    # skynet.bokeh_test()
     # skynet.plot_visualize_error()
     # exit()
     # skynet.visualize_tree(n=1)
     # skynet.plot_basic()
     # skynet.plot_features(x_feature='Ru Loading', c_feature='temperature')
 
-    skynet.bokeh_test()
+
     # skynet.bokeh_important_features(svtag='IonEn_{}'.format(skynet.temp_filter),
     #                                 xaxis='Measured Activity', xlabel='Measured Activity', xrng=None,
     #                                 yaxis='Predicted Activity', ylabel='Predicted Activity', yrng=None,
