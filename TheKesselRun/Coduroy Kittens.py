@@ -40,13 +40,20 @@ import time
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, import_type='avg', n_ele_filter=3, temp_filter=None, group='byID', nm='v00', feature_generator=0):
+    def __init__(self, average_data=True, element_filter=3, temperature_filter=None, group_style='byID', version='v00',
+                 feature_generator=0, regression=True):
+        """ Put Words Here """
+
+        '''Initialize dictionary to hold import data'''
         self.catalyst_dictionary = dict()
 
+        '''Initialize DataFrames for unchanging data (master) and sorting/filtering (slave)'''
         self.master_dataset = pd.DataFrame()
         self.slave_dataset = pd.DataFrame()
         self.test_dataset = pd.DataFrame()
 
+        '''Initialize sub-functions from the slave dataset.'''
+        # TODO are all of these really necessary?
         self.features_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
         self.features = list()
@@ -54,23 +61,28 @@ class Learner():
         self.cls_labels = list()
         self.predictions = list()
 
+        '''Initialize ML algorithm and tuning parameters'''
+        # TODO kill tuning parameters?
         self.machina = None
         self.machina_tuning_parameters = None
 
-        # Options
-        self.impfl = import_type
-        self.n_ele_filter = n_ele_filter
-        self.temp_filter = temp_filter
-        self.group = group
-        self.nm = nm
+        '''Initialize all options for the algorithm.  These are used in naming files.'''
+        self.average_data = average_data
+        self.element_filter = element_filter
+        self.temperature_filter = temperature_filter
+        self.group_style = group_style
+        self.version = version
         self.feature_generator = feature_generator
+        self.regression = regression
 
-        self.svfl = './/Results//{}'.format(nm)
-        self.svnm = '{nm}-{nele}ele-{temp}-{grp}-f{feat}'.format(
-            nm=nm,
-            nele=n_ele_filter,
-            temp='{}C'.format(temp_filter) if temp_filter is not None else 'All',
-            grp=group,
+        '''Create path, folder, and filename'''
+        self.svfl = './/Results//{version}_{type}'.format(version=version, type='r' if regression else 'c')
+        self.svnm = '{nm}_{type}-{nele}-{temp}-{grp}-{feat}'.format(
+            nm=version,
+            type = 'r' if regression else 'c',
+            nele=element_filter,
+            temp='{}C'.format(temperature_filter) if temperature_filter is not None else 'All',
+            grp=group_style,
             feat=feature_generator
         )
 
@@ -80,18 +92,24 @@ class Learner():
             os.makedirs('{}\\{}'.format(self.svfl, 'figures'))
             os.makedirs('{}\\{}'.format(self.svfl, 'htmls'))
 
+        '''Initialize Time for run-length statistics'''
         self.start_time = time.time()
 
-    def set_temp_filter(self, temp_filter):
-        self.temp_filter = temp_filter
-
-        self.svnm = '{nm}-{nele}ele-{temp}-{grp}-f{feat}'.format(
-            nm=self.nm,
-            nele=self.n_ele_filter,
-            temp='{}C'.format(temp_filter) if temp_filter is not None else 'All',
-            grp=self.group,
+    def set_name_paths(self):
+        self.svfl = './/Results//{version}_{type}'.format(version=self.version, type='r' if self.regression else 'c')
+        self.svnm = '{nm}_{type}-{nele}-{temp}-{grp}-{feat}'.format(
+            nm=self.version,
+            type='r' if self.regression else 'c',
+            nele=self.element_filter,
+            temp='{}C'.format(self.temperature_filter) if self.temperature_filter is not None else 'All',
+            grp=self.group_style,
             feat=self.feature_generator
         )
+
+    def set_temp_filter(self, temp_filter):
+        """ Set Temperature Filter to allow multiple slices without reloading the data """
+        self.temperature_filter = temp_filter
+        self.set_name_paths()
 
     def add_catalyst(self, index, catalyst):
         """ Add Catalysts to self.catalyst_dictionary.  This is the primary input function for the model. """
@@ -110,7 +128,8 @@ class Learner():
 
     def load_nh3_catalysts(self):
         """ Import NH3 data from Katie's HiTp dataset(cleaned). """
-        if self.impfl == 'avg':
+
+        if self.average_data:
             df = pd.read_csv(r".\Data\Processed\AllData_Condensed.csv", index_col=0)
         else:
             df = pd.read_csv(r".\Data\Processed\AllData.csv", index_col=0)
@@ -125,17 +144,17 @@ class Learner():
             cat.input_temperature(row['Temperature'])
             cat.input_space_velocity(row['Space Velocity'])
             cat.input_ammonia_concentration(row['NH3'])
-            if self.impfl == 'avg':
+            if self.average_data:
                 cat.input_standard_error(row['Standard Error'])
                 cat.input_n_averaged_samples(row['nAveraged'])
             cat.activity = row['Concentration']
             cat.feature_add_n_elements()
-            cat.feature_add_M1M2_ratio()
-            cat.feature_add_oxidation_states()
+            # cat.feature_add_oxidation_states()
 
             feature_generator = {
                 0: cat.feature_add_elemental_properties,
-                1: cat.feature_add_statistics
+                1: cat.feature_add_statistics,
+                2: cat.feature_add_weighted_average
             }
             feature_generator.get(self.feature_generator, lambda: print('No Feature Generator Selected'))()
 
@@ -177,7 +196,7 @@ class Learner():
         self.master_dataset.dropna(how='all', axis=1, inplace=True)
         self.master_dataset.fillna(value=0, inplace=True)
 
-    def filter_master_dataset(self, features_filter=None):
+    def filter_master_dataset(self):
         """ Filters data from import file for partitioned model training """
         filt = None
 
@@ -188,16 +207,16 @@ class Learner():
             3: self.master_dataset[self.master_dataset['n_elements'] == 3].index
         }
 
-        if self.n_ele_filter is list():
-            n_ele_slice = filter_dict_neles.get(self.n_ele_filter, self.master_dataset.index)
+        if self.element_filter is list():
+            n_ele_slice = filter_dict_neles.get(self.element_filter, self.master_dataset.index)
         else:
-            n_ele_slice = filter_dict_neles.get(self.n_ele_filter, self.master_dataset.index)
+            n_ele_slice = filter_dict_neles.get(self.element_filter, self.master_dataset.index)
 
         # 2. Filter based on temperature
-        if self.temp_filter is None:
+        if self.temperature_filter is None:
             temp_slice = self.master_dataset.index
         else:
-            temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temp_filter].index
+            temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temperature_filter].index
 
         # 3. Create the filter (filter is used to slice the master file)
         def join_all_indecies(ind_list):
@@ -221,16 +240,14 @@ class Learner():
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
-        # X. Use SelectKBest to filter out features
-
-        # 8. Set up training data and apply grouping
+        # 7. Set up training data and apply grouping
         self.set_training_data()
         self.group_for_training()
 
     def set_training_data(self):
         # Set all other DFs from slave
 
-        if self.impfl == 'avg':
+        if self.average_data:
             self.features_df = self.slave_dataset.drop(
                 labels=['Measured Activity', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
             )
@@ -253,7 +270,7 @@ class Learner():
             'byID_Temp': ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
         }
 
-        self.groups = group_dict.get(self.group, None)
+        self.groups = group_dict.get(self.group_style, None)
 
     def hyperparameter_tuning(self):
         """ Comment """
@@ -324,7 +341,7 @@ class Learner():
         self.train_data()
 
         """ Comment - Work in Progress """
-        if self.impfl == 'avg':
+        if self.average_data:
             data = self.test_dataset.drop(
                 labels=['Measured Activity', 'Element Dictionary', 'standard error', 'n_averaged'],
                 axis=1).values
@@ -809,6 +826,22 @@ class Catalyst():
             self.feature_add('{}_mean'.format(prop), eledf.loc[:, prop].mean())
             self.feature_add('{}_mad'.format(prop), eledf.loc[:, prop].mad())
 
+    def feature_add_weighted_average(self):
+        # Load Elements.csv as DataFrame
+        eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
+
+        # Slice Elements.csv based on elements present
+        eledf = eledf.loc[list(self.elements.keys())]
+
+        def calc_weighted_average(a, b):
+            num = np.sum(a * b)
+            den = np.sum(b)
+            return num/den
+
+        for feature_name, feature_values in eledf.T.iterrows():
+            feat = calc_weighted_average(feature_values.values, np.fromiter(self.elements.values(), dtype=float))
+            self.feature_add('{nm}_wtavg'.format(nm=feature_name), feat)
+
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame
         eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
@@ -862,14 +895,13 @@ class Catalyst():
 if __name__ == '__main__':
     # Begin Machine Learning
     skynet = Learner(
-        import_type='avg',
-        n_ele_filter=3,
-        temp_filter=None,
-        group='byID',
-        nm='v8',
-        feature_generator=0 # 0 is elemental, 1 is statistics,  2 is statmech
+        average_data='avg',
+        element_filter=3,
+        temperature_filter=None,
+        group_style='byID',
+        version='v9',
+        feature_generator=2 # 0 is elemental, 1 is statistics,  2 is statmech
     )
-
 
     # Setup Learner
     skynet.set_learner(learner='randomforest', params='default')
