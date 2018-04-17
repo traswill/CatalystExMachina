@@ -40,7 +40,7 @@ import time
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, import_type='avg', n_ele_filter=3, temp_filter=None, group='byID', nm='v7', feature_generator=0):
+    def __init__(self, import_type='avg', n_ele_filter=3, temp_filter=None, group='byID', nm='v00', feature_generator=0):
         self.catalyst_dictionary = dict()
 
         self.master_dataset = pd.DataFrame()
@@ -50,7 +50,8 @@ class Learner():
         self.features_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
         self.features = list()
-        self.labels = list()
+        self.reg_labels = list()
+        self.cls_labels = list()
         self.predictions = list()
 
         self.machina = None
@@ -242,7 +243,7 @@ class Learner():
 
         # Set Features and Labels
         self.features = self.features_df.values
-        self.labels = self.labels_df.values
+        self.reg_labels = self.labels_df.values
 
     def group_for_training(self):
         """ Comment """
@@ -259,7 +260,7 @@ class Learner():
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
         gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(10),
                                 return_train_score=True, n_iter=500)
-        gs.fit(self.features, self.labels, groups=self.groups)
+        gs.fit(self.features, self.reg_labels, groups=self.groups)
         pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner, params='default'):
@@ -299,7 +300,7 @@ class Learner():
 
     def train_data(self):
         """ Comment """
-        self.machina = self.machina.fit(self.features, self.labels)
+        self.machina = self.machina.fit(self.features, self.reg_labels)
 
     def create_test_dataset(self, catids):
         # Create Temporary indexer to slice slave dataset
@@ -350,13 +351,13 @@ class Learner():
 
     def predict_crossvalidate(self):
         """ Comment """
-        self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+        self.predictions = cross_val_predict(self.machina, self.features, self.reg_labels,
                                              groups=self.groups, cv=GroupKFold(10))
 
     def save_predictions(self):
         """ Comment """
         if self.predictions is not None:
-            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels]).T,
+            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.reg_labels]).T,
                               columns=['ID', 'Predicted Activity', 'Measured Activity'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
@@ -377,13 +378,13 @@ class Learner():
 
     def evaluate_learner(self):
         """ Comment """
-        mask = self.labels != 0
-        err = abs(np.array(self.predictions[mask]) - np.array(self.labels[mask]))
-        mean_ave_err = np.mean(err / np.array(self.labels[mask]))
+        mask = self.reg_labels != 0
+        err = abs(np.array(self.predictions[mask]) - np.array(self.reg_labels[mask]))
+        mean_ave_err = np.mean(err / np.array(self.reg_labels[mask]))
         acc = 1 - mean_ave_err
 
-        mean_abs_err = mean_absolute_error(self.labels, self.predictions)
-        r2 = r2_score(self.labels, self.predictions)
+        mean_abs_err = mean_absolute_error(self.reg_labels, self.predictions)
+        r2 = r2_score(self.reg_labels, self.predictions)
 
         print('\n----- Model {} -----'.format(self.svnm))
         print('R2: {:0.3f}'.format(r2))
@@ -447,7 +448,7 @@ class Learner():
         """ Comment """
 
         df = pd.DataFrame([self.predictions,
-                           self.labels,
+                           self.reg_labels,
                            self.plot_df['{}_hues'.format(feature)].values,
                            self.plot_df['{}'.format(feature)].values],
                           index=['pred', 'meas', 'clr', 'feat']).T
@@ -501,12 +502,12 @@ class Learner():
 
     def plot_visualize_error(self):
         df = pd.DataFrame([self.predictions,
-                           self.labels,
+                           self.reg_labels,
                            self.plot_df['{}_hues'.format('temperature')].values,
                            self.plot_df['{}'.format('temperature')].values],
                           index=['pred', 'meas', 'clr', 'feat']).T
 
-        rats = np.divide(self.predictions, self.labels, out=np.zeros_like(self.predictions), where=self.labels != 0)
+        rats = np.divide(self.predictions, self.reg_labels, out=np.zeros_like(self.predictions), where=self.reg_labels != 0)
         rat_count = rats.size
         wi5 = ((0.95 < rats) & (rats < 1.05)).sum()
         wi10 = ((0.9 < rats) & (rats < 1.1)).sum()
@@ -585,7 +586,7 @@ class Learner():
         df = pd.DataFrame(np.array([
             [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
             self.predictions,
-            self.labels,
+            self.reg_labels,
             self.slave_dataset.loc[:, 'temperature'].values]).T,
                           columns=['ID', 'Predicted', 'Measured', 'Temperature'])
 
@@ -888,8 +889,8 @@ if __name__ == '__main__':
     # skynet.bokeh_test()
     # skynet.plot_visualize_error()
     # exit()
-    # skynet.visualize_tree(n=1)
-    # skynet.plot_basic()
+    skynet.visualize_tree(n=1)
+    skynet.plot_basic()
     # skynet.plot_features(x_feature='Ru Loading', c_feature='temperature')
 
 
