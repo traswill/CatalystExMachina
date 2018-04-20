@@ -9,14 +9,14 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex
 
 from sklearn import preprocessing, tree
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier
 from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.svm import SVR
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict, GroupKFold
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.utils import shuffle
-from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error
+from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error, roc_curve, recall_score, precision_score
 from sklearn.feature_selection import SelectKBest
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJS, Slider, Select
@@ -40,7 +40,7 @@ import time
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, average_data=True, element_filter=3, temperature_filter=None, group_style='byID', version='v00',
+    def __init__(self, average_data=True, element_filter=3, temperature_filter=None, group_style='blind', version='v00',
                  feature_generator=0, regression=True):
         """ Put Words Here """
 
@@ -53,18 +53,13 @@ class Learner():
         self.test_dataset = pd.DataFrame()
 
         '''Initialize sub-functions from the slave dataset.'''
-        # TODO are all of these really necessary?
         self.features_df = pd.DataFrame()
+        self.labels_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
-        self.features = list()
-        self.reg_labels = list()
-        self.cls_labels = list()
         self.predictions = list()
 
         '''Initialize ML algorithm and tuning parameters'''
-        # TODO kill tuning parameters?
         self.machina = None
-        self.machina_tuning_parameters = None
 
         '''Initialize all options for the algorithm.  These are used in naming files.'''
         self.average_data = average_data
@@ -245,7 +240,7 @@ class Learner():
         self.group_for_training()
 
     def set_training_data(self):
-        # Set all other DFs from slave
+        ''' Use the slave dataframe to set other dataframe properties '''
 
         if self.average_data:
             self.features_df = self.slave_dataset.drop(
@@ -256,18 +251,19 @@ class Learner():
                 labels=['Measured Activity', 'Element Dictionary'], axis=1
             )
 
-        self.labels_df = self.slave_dataset['Measured Activity'].copy()
-
-        # Set Features and Labels
-        self.features = self.features_df.values
-        self.reg_labels = self.labels_df.values
+        if self.regression:
+            self.labels_df = self.slave_dataset['Measured Activity'].copy()
+        else:
+            self.labels_df = self.slave_dataset['Measured Activity'].copy()
+            self.labels_df[self.labels_df >= 0.8] = 1
+            self.labels_df[self.labels_df < 0.8] = 0
 
     def group_for_training(self):
         """ Comment """
 
         group_dict = {
-            'byID': [x.split('_')[0] for x in self.slave_dataset.index.values],
-            'byID_Temp': ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
+            'blind': [x.split('_')[0] for x in self.slave_dataset.index.values],
+            'semiblind': ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
         }
 
         self.groups = group_dict.get(self.group_style, None)
@@ -277,13 +273,14 @@ class Learner():
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
         gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(10),
                                 return_train_score=True, n_iter=500)
-        gs.fit(self.features, self.reg_labels, groups=self.groups)
+        gs.fit(self.features_df.values, self.labels_df.values, groups=self.groups)
         pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner, params='default'):
         """ Comment """
         learn_selector = {
-            'randomforest': RandomForestRegressor,
+            'rfr': RandomForestRegressor,
+            'rfc': RandomForestClassifier,
             'adaboost': AdaBoostRegressor,
             'tree': tree.DecisionTreeRegressor,
             'SGD': None,
@@ -291,35 +288,33 @@ class Learner():
             'svm': SVR
         }
 
-        param_selector = {
-            'default': {'n_estimators':100, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
-                        'max_features':'auto', 'bootstrap':True, 'n_jobs':4, 'criterion':'mse'},
-
-            'v1': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2},
-            'v2': {'n_estimators': 50, 'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2,
-                        'max_features': 'auto', 'bootstrap': True},
-            'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
-                        'max_features': 'sqrt', 'bootstrap': False},
-            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
-            'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'}
-        }
+        if self.regression:
+            param_selector = {
+                'default': {'n_estimators':100, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
+                            'max_features':'auto', 'bootstrap':True, 'n_jobs':4, 'criterion':'mse'},
+                'v1': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2},
+                'v2': {'n_estimators': 50, 'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2,
+                            'max_features': 'auto', 'bootstrap': True},
+                'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
+                            'max_features': 'sqrt', 'bootstrap': False},
+                'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
+                'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'}
+            }
+        else:
+            param_selector = {
+                'default': {'n_estimators':100, 'n_jobs':4}
+            }
 
         self.machina = learn_selector.get(learner, lambda: 'Error')()
         self.machina.set_params(**param_selector.get(params))
-        self.machina_tuning_parameters = {
-                'n_estimators': [10, 50, 100, 250, 500, 1000, 2000, 5000],
-                'max_features': ['auto', 'sqrt', 10],
-                'max_depth': [None, 3, 5],
-                'min_samples_split': [2, 5, 10],
-                'min_samples_leaf': [1, 2, 4],
-                'bootstrap':[True, False]
-            }
 
     def train_data(self):
         """ Comment """
-        self.machina = self.machina.fit(self.features, self.reg_labels)
+        self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
 
     def create_test_dataset(self, catids):
+        """ Description """
+
         # Create Temporary indexer to slice slave dataset
         ind = [int(idtag.split('_')[0]) for idtag in self.slave_dataset.index]
         self.slave_dataset['temporary_ind'] = ind
@@ -337,6 +332,7 @@ class Learner():
         self.set_training_data()
 
     def predict_testdata(self, catids):
+        """ Descr """
         self.create_test_dataset(catids)
         self.train_data()
 
@@ -368,40 +364,41 @@ class Learner():
 
     def predict_crossvalidate(self):
         """ Comment """
-        self.predictions = cross_val_predict(self.machina, self.features, self.reg_labels,
+        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(10))
 
     def save_predictions(self):
         """ Comment """
         if self.predictions is not None:
-            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.reg_labels]).T,
+            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels_df.values]).T,
                               columns=['ID', 'Predicted Activity', 'Measured Activity'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
 
-    def extract_important_features(self, sv=False):
+    def extract_important_features(self, sv=False, prnt=False):
         """ Save all feature importance, print top 10 """
 
         df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
                           columns=['Feature Importance'])
 
-        print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+        if prnt:
+            print(df.sort_values(by='Feature Importance', ascending=False).head(10))
 
         if sv:
             df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
         else:
             return df
 
-    def evaluate_learner(self):
+    def evaluate_regression_learner(self):
         """ Comment """
-        mask = self.reg_labels != 0
-        err = abs(np.array(self.predictions[mask]) - np.array(self.reg_labels[mask]))
-        mean_ave_err = np.mean(err / np.array(self.reg_labels[mask]))
+        mask = self.labels_df.values != 0
+        err = abs(np.array(self.predictions[mask]) - np.array(self.labels_df.values[mask]))
+        mean_ave_err = np.mean(err / np.array(self.labels_df.values[mask]))
         acc = 1 - mean_ave_err
 
-        mean_abs_err = mean_absolute_error(self.reg_labels, self.predictions)
-        r2 = r2_score(self.reg_labels, self.predictions)
+        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
+        r2 = r2_score(self.labels_df.values, self.predictions)
 
         print('\n----- Model {} -----'.format(self.svnm))
         print('R2: {:0.3f}'.format(r2))
@@ -413,10 +410,22 @@ class Learner():
         pd.DataFrame([r2, mean_abs_err, acc, time.time() - self.start_time],
                      index=['R2','Mean Abs Error','Accuracy','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
 
+    def evaluate_classification_learner(self):
+        print(self.predictions)
+        fpr, tpr, thershold = roc_curve(self.labels_df.values, self.predictions)
+        print(fpr, tpr)
+
+        plt.plot(fpr, tpr)
+        plt.show()
+
     def preplotcessing(self):
+        """ Prepare all data for plotting """
+
+        # Ensure Predictions Exist
         if self.predictions is None:
             self.predict_crossvalidate()
 
+        # Set up the plot dataframe for easy plotting (specifically for Bokeh)
         self.plot_df = self.slave_dataset.copy()
         self.plot_df['Predicted Activity'] = self.predictions
         self.plot_df['Name'] = [
@@ -424,9 +433,9 @@ class Learner():
                     for key, val in x) for x in self.plot_df['Element Dictionary']
         ]
         self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
-
         self.plot_df.drop(columns='Element Dictionary', inplace=True)
 
+        # Create hues for heatmaps
         def create_feature_hues(self, feature):
             try:
                 unique_feature = np.unique(self.slave_dataset.loc[:, feature].values)
@@ -447,33 +456,30 @@ class Learner():
                                               for x in self.slave_dataset.loc[:, feature].values]
                 ]
 
-        create_feature_hues(self, 'temperature')
+        self.plot_df['temperature_hues'] = 0
 
-        if self.feature_generator == 0:
-            create_feature_hues(self, 'NdValence_1')
-            create_feature_hues(self, 'IonizationEnergies_2_1')
-            create_feature_hues(self, 'Column_1')
-        elif self.feature_generator == 1:
-            create_feature_hues(self, 'FusionEnthalpy_mean')
-            create_feature_hues(self, 'IonizationEnergies_2_mad')
-            create_feature_hues(self, 'HeatFusion_mean')
-            create_feature_hues(self, 'ZungerPP-r_d_mean')
+        # Grab top 10 features, add hues to plotdf
+        feature_rank = self.extract_important_features()
+        for feat in feature_rank.sort_values(by='Feature Importance', ascending=False).head(10).index.values:
+            create_feature_hues(self, feat)
 
         return self.plot_df
 
-    def plot_basic(self, feature='temperature'):
-        """ Comment """
+    def plot_basic(self):
+        """ Creates a basic plot with a temperature heatmap (or constant color if single temp slice) """
 
         df = pd.DataFrame([self.predictions,
-                           self.reg_labels,
-                           self.plot_df['{}_hues'.format(feature)].values,
-                           self.plot_df['{}'.format(feature)].values],
-                          index=['pred', 'meas', 'clr', 'feat']).T
+                           self.labels_df.values,
+                           self.plot_df['{}_hues'.format('temperature')].values,
+                           self.plot_df['{}'.format('temperature')].values],
+                          index=['pred', 'meas', 'clr', 'temperature']).T
 
-        for feat in np.unique(df['feat']):
-            plt.scatter(x=df.loc[df['feat'] == feat, 'pred'],
-                        y=df.loc[df['feat'] == feat, 'meas'],
-                        c=df.loc[df['feat'] == feat, 'clr'],
+        uniq_temps = np.unique(df['temperature'])
+
+        for feat in uniq_temps:
+            plt.scatter(x=df.loc[df['temperature'] == feat, 'pred'],
+                        y=df.loc[df['temperature'] == feat, 'meas'],
+                        c=df.loc[df['temperature'] == feat, 'clr'],
                         label=int(feat),
                         edgecolors='k')
 
@@ -481,10 +487,77 @@ class Learner():
         plt.ylabel('Measured Activity')
         plt.xlim(0,1)
         plt.ylim(0,1)
-        plt.title(self.svnm)
-        plt.legend(title=feature)
+        plt.legend(title='Temperature')
         plt.tight_layout()
-        plt.savefig('{}//{}{}.png'.format(self.svfl, self.svnm, '-{}'.format(feature) if feature is not None else ''),
+
+        if len(uniq_temps) == 1:
+            plt.savefig('{}//figures//{}-basic-{}C.png'.format(self.svfl, self.svnm, uniq_temps[0]),
+                        dpi=400)
+        else:
+            plt.savefig('{}//figures//{}-basic.png'.format(self.svfl, self.svnm),
+                    dpi=400)
+        plt.close()
+
+    def plot_error(self):
+        df = pd.DataFrame([self.predictions,
+                           self.labels_df.values,
+                           self.plot_df['{}_hues'.format('temperature')].values,
+                           self.plot_df['{}'.format('temperature')].values],
+                          index=['pred', 'meas', 'clr', 'feat']).T
+
+        rats = np.abs(np.subtract(self.predictions, self.labels_df.values, out=np.zeros_like(self.predictions),
+                         where=self.labels_df.values != 0))
+
+        rat_count = rats.size
+        wi5 = (rats < 0.05).sum()
+        wi10 = (rats < 0.10).sum()
+        wi20 = (rats < 0.20).sum()
+
+        fig, ax = plt.subplots()
+
+        uniq_features = np.unique(df['feat'])
+
+        color_selector = {
+            250: 'purple',
+            300: 'darkgreen',
+            350: 'xkcd:coral',
+            400: 'darkblue',
+            450: 'xkcd:salmon'
+        }
+
+        if len(uniq_features) == 1:
+
+
+            ax.scatter(x=df.loc[df['feat'] == uniq_features[0], 'pred'],
+                       y=df.loc[df['feat'] == uniq_features[0], 'meas'],
+                       c=color_selector.get(uniq_features[0]),
+                       label=int(uniq_features[0]),
+                       edgecolors='k')
+        else:
+            for feat in uniq_features:
+                ax.scatter(x=df.loc[df['feat'] == feat, 'pred'],
+                           y=df.loc[df['feat'] == feat, 'meas'],
+                           c=color_selector.get(feat),  #df.loc[df['feat'] == feat, 'clr'],
+                           label=int(feat),
+                           edgecolors='k')
+
+        x = np.array([0, 0.5, 1])
+        y = np.array([0, 0.5, 1])
+
+        ax.plot(x, y, lw=2, c='k')
+        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
+        ax.fill_between(x, y + 0.2, y - 0.2, alpha=0.1, color='y')
+        ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
+
+        plt.xlabel('Predicted Activity')
+        plt.ylabel('Measured Activity')
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.title('{}-{}'.format(self.svnm, 'err'))
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig('{}//figures//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
                     dpi=400)
         plt.close()
 
@@ -499,7 +572,7 @@ class Learner():
         plt.ylim(0, 1)
         plt.legend(loc=1)
         plt.tight_layout()
-        plt.savefig('{}//{}-x{}-c{}.png'.format(self.svfl, self.svnm, x_feature, c_feature), dpi=400)
+        plt.savefig('{}//figures//{}-x{}-c{}.png'.format(self.svfl, self.svnm, x_feature, c_feature), dpi=400)
         plt.close()
 
     def plot_important_features(self):
@@ -508,56 +581,9 @@ class Learner():
         top5feats = featdf.nlargest(5, 'Feature Importance').index.values.tolist()
         feats = self.slave_dataset.loc[:, top5feats+['Measured Activity']]
         feats['hue'] = np.ceil(feats['Measured Activity'].values * 5)
-
-        # feats = feats[feats['temperature'] == 300.0]
-
-        # sns.pairplot(feats, hue='temperature', y_vars=['Measured Activity'], x_vars=top5feats)
         sns.pairplot(feats, hue='temperature', diag_kind='kde')
         plt.tight_layout()
-        plt.savefig('{}\\{}-featrels.png'.format(self.svfl, self.svnm))
-        plt.close()
-
-    def plot_visualize_error(self):
-        df = pd.DataFrame([self.predictions,
-                           self.reg_labels,
-                           self.plot_df['{}_hues'.format('temperature')].values,
-                           self.plot_df['{}'.format('temperature')].values],
-                          index=['pred', 'meas', 'clr', 'feat']).T
-
-        rats = np.divide(self.predictions, self.reg_labels, out=np.zeros_like(self.predictions), where=self.reg_labels != 0)
-        rat_count = rats.size
-        wi5 = ((0.95 < rats) & (rats < 1.05)).sum()
-        wi10 = ((0.9 < rats) & (rats < 1.1)).sum()
-        wi20 = ((0.8 < rats) & (rats < 1.2)).sum()
-
-        fig, ax = plt.subplots()
-
-        for feat in np.unique(df['feat']):
-            ax.scatter(x=df.loc[df['feat'] == feat, 'pred'],
-                        y=df.loc[df['feat'] == feat, 'meas'],
-                        c=df.loc[df['feat'] == feat, 'clr'],
-                        label=int(feat),
-                        edgecolors='k')
-
-        x = np.array([0, 0.5, 1])
-        y = np.array([0, 0.5, 1])
-
-        ax.plot(x, y, lw=2, c='k')
-        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
-        ax.fill_between(x, y + 0.2, y - 0.2, alpha=0.1, color='y')
-        ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
-            five=wi5/rat_count, ten=wi10/rat_count, twenty=wi20/rat_count))
-
-
-        plt.xlabel('Predicted Activity')
-        plt.ylabel('Measured Activity')
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.title('{}-{}'.format(self.svnm, 'err'))
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig('{}//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
-                    dpi=400)
+        plt.savefig('{}//figures//{}-featrels.png'.format(self.svfl, self.svnm))
         plt.close()
 
     def bokeh_predictions(self):
@@ -603,7 +629,7 @@ class Learner():
         df = pd.DataFrame(np.array([
             [int(nm.split('_')[0]) for nm in self.slave_dataset.index.values],
             self.predictions,
-            self.reg_labels,
+            self.labels_df.values,
             self.slave_dataset.loc[:, 'temperature'].values]).T,
                           columns=['ID', 'Predicted', 'Measured', 'Temperature'])
 
@@ -891,37 +917,65 @@ class Catalyst():
                                  feature_values.values[index])
 
 
+def standard_pipeline(learner):
+    learner.filter_master_dataset()
+    learner.train_data()
+    learner.extract_important_features(sv=True, prnt=True)
+    learner.predict_crossvalidate()
+    if learner.regression:
+        learner.evaluate_regression_learner()
+    else:
+        learner.evaluate_classification_learner()
+    learner.preplotcessing()
+    learner.plot_basic()
+    learner.plot_error()
+
+def temperature_slice(learner):
+    for t in [250, 300, 350, 400, 450]:
+        learner.temp_filter = t
+        learner.filter_master_dataset()
+        learner.train_data()
+        learner.extract_important_features(sv=True, prnt=True)
+        learner.predict_crossvalidate()
+        learner.evaluate_regression_learner()
+        learner.preplotcessing()
+        learner.plot_basic()
+        learner.plot_error()
 
 if __name__ == '__main__':
     # Begin Machine Learning
     skynet = Learner(
-        average_data='avg',
+        average_data=True,
         element_filter=3,
-        temperature_filter=None,
-        group_style='byID',
+        temperature_filter=400,
+        group_style='blind', # blind groups by catalyst ID, semiblind groups by temperaures within catalyst ID
         version='v9',
-        feature_generator=2 # 0 is elemental, 1 is statistics,  2 is statmech
+        feature_generator=0, # 0 is elemental, 1 is statistics,  2 is statmech
+        regression=True
     )
+    if skynet.regression:
+        skynet.set_learner(learner='rfr', params='default')
+    else:
+        skynet.set_learner(learner='rfc', params='default')
 
-    # Setup Learner
-    skynet.set_learner(learner='randomforest', params='default')
     skynet.load_nh3_catalysts()
+    standard_pipeline(learner=skynet)
+    exit()
 
-    # for t in [250, 300, 350, 400, 450]:
-    #     skynet.temp_filter = t
-
+    skynet.set_learner(learner='rfr', params='default')
+    skynet.load_nh3_catalysts()
     skynet.filter_master_dataset()
     # skynet.predict_testdata(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
     skynet.train_data()
     skynet.extract_important_features(sv=True)
     skynet.predict_crossvalidate()
-    skynet.evaluate_learner()
+    skynet.evaluate_regression_learner()
     pltdf = skynet.preplotcessing()
 
     # skynet.bokeh_test()
     # skynet.plot_visualize_error()
     # exit()
-    skynet.visualize_tree(n=1)
+    # skynet.visualize_tree(n=1)
     skynet.plot_basic()
     # skynet.plot_features(x_feature='Ru Loading', c_feature='temperature')
 
