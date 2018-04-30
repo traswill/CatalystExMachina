@@ -124,7 +124,7 @@ def read_v1_data():
         catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
         df = merge_activity_catalysts(actdf, catdf)
-        df.to_csv('..//Processed//SS3.csv')
+        df.to_csv('.//Processed//SS3.csv')
 
     def read_spreadsheet_4():
         referencedata_df = load_info_sheet(r'.//NH3_v1_data_4.xlsx', thresh=10)
@@ -134,7 +134,7 @@ def read_v1_data():
         catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
         df = merge_activity_catalysts(actdf, catdf)
-        df.to_csv('..//Processed//SS4.csv')
+        df.to_csv('.//Processed//SS4.csv')
 
     def read_spreadsheet_5():
         referencedata_df = load_info_sheet(r'.//NH3_v1_data_5.xlsx', thresh=10, skip_footer=26)
@@ -144,7 +144,7 @@ def read_v1_data():
         catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
         df = merge_activity_catalysts(actdf, catdf)
-        df.to_csv('..//Processed//SS5.csv')
+        df.to_csv('.//Processed//SS5.csv')
 
     def read_spreadsheet_6():
         referencedata_df = load_info_sheet(r'.//NH3rxn6.xlsx', sheetname='Sheet1', thresh=10, skip_footer=26, skiprow=0)
@@ -156,7 +156,7 @@ def read_v1_data():
         catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
         df = merge_activity_catalysts(actdf, catdf, nh3scale=1)
-        df.to_csv('..//Processed//SS6.csv')
+        df.to_csv('.//Processed//SS6.csv')
 
     def read_spreadsheet_7():
         referencedata_df = load_info_sheet(r'.//NH3rxn7.xlsx', sheetname='Info', thresh=10, skip_footer=10, skiprow=1)
@@ -166,7 +166,7 @@ def read_v1_data():
         catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
         df = merge_activity_catalysts(actdf, catdf, nh3scale=1)
-        df.to_csv('..//Processed//SS7.csv')
+        df.to_csv('.//Processed//SS7.csv')
 
     read_spreadsheet_3()
     read_spreadsheet_4()
@@ -212,7 +212,7 @@ def read_v4_data():
         catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
         df = merge_activity_catalysts(actdf, catdf, nh3scale=nh3scale)
-        df.to_csv('..//Processed//SS{}.csv'.format(num))
+        df.to_csv('.//Processed//SS{}.csv'.format(num))
 
 def read_v4_data_8():
     datpth = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\RAW\NH3_v4_data_8.xlsx'
@@ -227,19 +227,56 @@ def read_v4_data_8():
     catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
     df = merge_activity_catalysts(actdf, catdf, nh3scale=100)
-    df.to_csv('..//Processed//SS8.csv')
+    df.to_csv('.//Processed//SS8.csv')
+
+def read_data_9():
+    datpth = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\RAW\NH3_v9_data_9.xlsx'
+    referencedata_df = load_info_sheet(datpth, sheetname='Info', thresh=12, skip_footer=0, skiprow=1)
+    activitydata_df = load_activity_sheet(datpth, sheet='Data', cols='A,D')
+
+    actdf = extract_activity_information(activitydata_df)
+
+    # Katie said to drop the down ramp because they were exposed to a higher concentration of NH3
+    actdf.drop(actdf[actdf.loc[:, 'Ramp Direction'] == 'down'].index, inplace=True)
+
+    catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
+
+    df = merge_activity_catalysts(actdf, catdf, nh3scale=1)
+    df.to_csv('.//Processed//SS9.csv')
 
 
 def create_super_monster_file():
-    pths = glob.glob('..//Processed//SS*.csv')
+    pths = glob.glob('.//Processed//SS*.csv')
 
     df = pd.concat([pd.read_csv(pth, index_col=0) for pth in pths], ignore_index=True)
-    df.to_csv('..//Processed//AllData.csv')
+    df.to_csv('.//Processed//AllData.csv')
+
+    uniid = np.unique(df.loc[:, 'ID'].values)
+    final_df = pd.DataFrame()
+
+    for id in uniid:
+        iddf = df.loc[df.loc[:, 'ID'] == id]
+        unitemps = np.unique(iddf.loc[:, 'Temperature'].values)
+        for temp in unitemps:
+            tempdf = iddf.loc[iddf.loc[:, 'Temperature'] == temp]
+
+            add_df = tempdf.iloc[0, :].copy()
+            add_df['Concentration'] = tempdf['Concentration'].mean()
+            add_df['Standard Error'] = tempdf['Concentration'].sem()
+            add_df['nAveraged'] = tempdf['Concentration'].count()
+            add_df.drop(index=['Ramp Direction', 'Pred Value'], inplace=True)
+
+            final_df = pd.concat([final_df, add_df], axis=1)
+
+    final_df = final_df.transpose()[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3', 'Reactor', 'NH3',
+                                     'Space Velocity', 'Temperature', 'Concentration', 'Standard Error', 'nAveraged']]
+
+    final_df.to_csv('.//Processed//AllData_Condensed.csv')
 
 
 if __name__ == '__main__':
     # read_v4_data()
     # read_v4_data_8()
-
+    read_data_9()
 
     create_super_monster_file()

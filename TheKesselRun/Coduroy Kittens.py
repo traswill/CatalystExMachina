@@ -6,11 +6,13 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex
+from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex, Normalize
+from matplotlib.cm import get_cmap
 
 from sklearn import preprocessing, tree
 from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier
 from sklearn.neural_network import MLPRegressor
+from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.svm import SVR
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict, GroupKFold
@@ -138,7 +140,7 @@ class Learner():
             cat.input_reactor_number(int(row['Reactor']))
             cat.input_temperature(row['Temperature'])
             cat.input_space_velocity(row['Space Velocity'])
-            cat.input_ammonia_concentration(row['NH3'])
+            # cat.input_ammonia_concentration(row['NH3'])
             if self.average_data:
                 cat.input_standard_error(row['Standard Error'])
                 cat.input_n_averaged_samples(row['nAveraged'])
@@ -228,7 +230,7 @@ class Learner():
             return join_all_indecies([filt, slice])
 
         # 5. Drop Tungston Data because it's always bad
-        filt = drop_element('W', filt)
+        # filt = drop_element('W', filt)
 
         # 6. Apply filter, master to slave, shuffle slave
         self.slave_dataset = self.master_dataset.loc[filt].copy()
@@ -285,7 +287,8 @@ class Learner():
             'tree': tree.DecisionTreeRegressor,
             'SGD': None,
             'neuralnet': MLPRegressor,
-            'svm': SVR
+            'svr': SVR,
+            'knnr': KNeighborsRegressor
         }
 
         if self.regression:
@@ -298,7 +301,9 @@ class Learner():
                 'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
                             'max_features': 'sqrt', 'bootstrap': False},
                 'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
-                'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'}
+                'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'},
+                'knnr': {'n_neighbors': 3, 'weights': 'distance'},
+                'svr': {}
             }
         else:
             param_selector = {
@@ -517,12 +522,24 @@ class Learner():
 
         uniq_features = np.unique(df['feat'])
 
+        # Katie's Colors
+        # color_selector = {
+        #     250: 'purple',
+        #     300: 'darkgreen',
+        #     350: 'xkcd:coral',
+        #     400: 'darkblue',
+        #     450: 'xkcd:salmon'
+        # }
+
+        cmap = get_cmap('plasma')
+        norm = Normalize(vmin=250, vmax=450)
+
         color_selector = {
-            250: 'purple',
-            300: 'darkgreen',
-            350: 'xkcd:coral',
-            400: 'darkblue',
-            450: 'xkcd:salmon'
+            250: cmap(norm(250)),
+            300: cmap(norm(300)),
+            350: cmap(norm(350)),
+            400: cmap(norm(400)),
+            450: cmap(norm(450))
         }
 
         if len(uniq_features) == 1:
@@ -546,7 +563,8 @@ class Learner():
 
         ax.plot(x, y, lw=2, c='k')
         ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
-        ax.fill_between(x, y + 0.2, y - 0.2, alpha=0.1, color='y')
+        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='r')
+        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='r')
         ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
             five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
 
@@ -806,6 +824,7 @@ class Learner():
                                                                                                   nm=self.svnm,
                                                                                                   ind=index))
 
+
 class Catalyst():
     """Catalyst will contain each individual training set"""
     def __init__(self):
@@ -930,14 +949,18 @@ def standard_pipeline(learner):
     learner.plot_basic()
     learner.plot_error()
 
+
 def temperature_slice(learner):
-    for t in [250, 300, 350, 400, 450]:
-        learner.temp_filter = t
+    for t in [250, 300, 350, 400, 450, None]:
+        learner.set_temp_filter(t)
         learner.filter_master_dataset()
         learner.train_data()
         learner.extract_important_features(sv=True, prnt=True)
         learner.predict_crossvalidate()
-        learner.evaluate_regression_learner()
+        if learner.regression:
+            learner.evaluate_regression_learner()
+        else:
+            learner.evaluate_classification_learner()
         learner.preplotcessing()
         learner.plot_basic()
         learner.plot_error()
@@ -947,10 +970,10 @@ if __name__ == '__main__':
     skynet = Learner(
         average_data=True,
         element_filter=3,
-        temperature_filter=400,
+        temperature_filter=None,
         group_style='blind', # blind groups by catalyst ID, semiblind groups by temperaures within catalyst ID
-        version='v9',
-        feature_generator=0, # 0 is elemental, 1 is statistics,  2 is statmech
+        version='v12',
+        feature_generator=2, # 0 is elemental, 1 is statistics,  2 is statmech
         regression=True
     )
     if skynet.regression:
@@ -959,7 +982,8 @@ if __name__ == '__main__':
         skynet.set_learner(learner='rfc', params='default')
 
     skynet.load_nh3_catalysts()
-    standard_pipeline(learner=skynet)
+    temperature_slice(learner=skynet)
+    # standard_pipeline(learner=skynet)
     exit()
 
     skynet.set_learner(learner='rfr', params='default')
@@ -977,6 +1001,7 @@ if __name__ == '__main__':
     # exit()
     # skynet.visualize_tree(n=1)
     skynet.plot_basic()
+    skynet.plot_error()
     # skynet.plot_features(x_feature='Ru Loading', c_feature='temperature')
 
 
