@@ -626,9 +626,9 @@ class Learner():
         p.yaxis.axis_label = "Measured Activity"
         p.grid.grid_line_color = "white"
 
-        try:
+        if self.plot_df['temperature_hues'].all() != 0:
             self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
-        except KeyError:
+        else:
             self.plot_df['bokeh_color'] = 'blue'
 
         source = ColumnDataSource(self.plot_df)
@@ -636,7 +636,7 @@ class Learner():
         p.circle("Predicted Activity", "Measured Activity", size=12, source=source,
                  color='bokeh_color', line_color="black", fill_alpha=0.8)
 
-        output_file("{}\\{}.html".format(self.svfl, self.svnm), title="stats.py")
+        output_file("{}\\htmls\\{}.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
 
     def bokeh_averaged(self, whiskers=False):
@@ -964,6 +964,7 @@ def temperature_slice(learner):
         learner.preplotcessing()
         learner.plot_basic()
         learner.plot_error()
+        learner.bokeh_predictions()
 
 if __name__ == '__main__':
     # Begin Machine Learning
