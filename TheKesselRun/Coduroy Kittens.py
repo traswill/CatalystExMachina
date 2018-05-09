@@ -20,6 +20,7 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.utils import shuffle
 from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error, roc_curve, recall_score, precision_score
 from sklearn.feature_selection import SelectKBest
+from sklearn.kernel_ridge import KernelRidge
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJS, Slider, Select
 from bokeh.plotting import figure, show, output_file, save, curdoc
@@ -140,7 +141,7 @@ class Learner():
             cat.input_reactor_number(int(row['Reactor']))
             cat.input_temperature(row['Temperature'])
             cat.input_space_velocity(row['Space Velocity'])
-            # cat.input_ammonia_concentration(row['NH3'])
+            cat.input_ammonia_concentration(row['NH3'])
             if self.average_data:
                 cat.input_standard_error(row['Standard Error'])
                 cat.input_n_averaged_samples(row['nAveraged'])
@@ -181,7 +182,7 @@ class Learner():
             featdf.index = [catid]
 
             # Create DF from activity
-            actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Measured Activity'])
+            actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Measured Conversion'])
 
             # Create element dictionary
             eldictdf = pd.DataFrame(catobj.elements.items(), index=[catid], columns=['Element Dictionary'])
@@ -246,17 +247,17 @@ class Learner():
 
         if self.average_data:
             self.features_df = self.slave_dataset.drop(
-                labels=['Measured Activity', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
+                labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
             )
         else:
             self.features_df = self.slave_dataset.drop(
-                labels=['Measured Activity', 'Element Dictionary'], axis=1
+                labels=['Measured Conversion', 'Element Dictionary'], axis=1
             )
 
         if self.regression:
-            self.labels_df = self.slave_dataset['Measured Activity'].copy()
+            self.labels_df = self.slave_dataset['Measured Conversion'].copy()
         else:
-            self.labels_df = self.slave_dataset['Measured Activity'].copy()
+            self.labels_df = self.slave_dataset['Measured Conversion'].copy()
             self.labels_df[self.labels_df >= 0.8] = 1
             self.labels_df[self.labels_df < 0.8] = 0
 
@@ -288,7 +289,8 @@ class Learner():
             'SGD': None,
             'neuralnet': MLPRegressor,
             'svr': SVR,
-            'knnr': KNeighborsRegressor
+            'knnr': KNeighborsRegressor,
+            'krr': KernelRidge
         }
 
         if self.regression:
@@ -303,7 +305,8 @@ class Learner():
                 'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
                 'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'},
                 'knnr': {'n_neighbors': 3, 'weights': 'distance'},
-                'svr': {}
+                'svr': {},
+                'krr': {}
             }
         else:
             param_selector = {
@@ -344,24 +347,24 @@ class Learner():
         """ Comment - Work in Progress """
         if self.average_data:
             data = self.test_dataset.drop(
-                labels=['Measured Activity', 'Element Dictionary', 'standard error', 'n_averaged'],
+                labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'],
                 axis=1).values
         else:
             data = self.test_dataset.drop(
-                labels=['Measured Activity', 'Element Dictionary'],
+                labels=['Measured Conversion', 'Element Dictionary'],
                 axis=1).values
 
         predvals = self.machina.predict(data)
 
         original_test_df = self.master_dataset.loc[self.test_dataset.index].copy()
-        measvals = original_test_df.loc[:, 'Measured Activity'].values
+        measvals = original_test_df.loc[:, 'Measured Conversion'].values
 
         comparison_df = pd.DataFrame([predvals, measvals],
-                           index=['Predicted Activity','Measured Activity'],
+                           index=['Predicted Conversion','Measured Conversion'],
                            columns=original_test_df.index).T
 
         comparison_df.to_csv('.\\Results\\Predictions\\ss3-7_predict_ss8.csv')
-        comparison_df.plot(x='Predicted Activity', y='Measured Activity', kind='scatter')
+        comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter')
         plt.xlim(0,1)
         plt.ylim(0,1)
         plt.savefig('.\\Results\\Predictions\\ss3-7_predict_ss8.png', dpi=400)
@@ -376,7 +379,7 @@ class Learner():
         """ Comment """
         if self.predictions is not None:
             df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels_df.values]).T,
-                              columns=['ID', 'Predicted Activity', 'Measured Activity'])
+                              columns=['ID', 'Predicted Conversion', 'Measured Conversion'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
@@ -384,8 +387,11 @@ class Learner():
     def extract_important_features(self, sv=False, prnt=False):
         """ Save all feature importance, print top 10 """
 
-        df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
+        try:
+            df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
                           columns=['Feature Importance'])
+        except AttributeError:
+            return
 
         if prnt:
             print(df.sort_values(by='Feature Importance', ascending=False).head(10))
@@ -432,12 +438,30 @@ class Learner():
 
         # Set up the plot dataframe for easy plotting (specifically for Bokeh)
         self.plot_df = self.slave_dataset.copy()
-        self.plot_df['Predicted Activity'] = self.predictions
+        self.plot_df['Predicted Conversion'] = self.predictions
+
+        # Full descriptive name X(#)Y(#)Z(#)
         self.plot_df['Name'] = [
             ''.join('{}({})'.format(key, str(int(val)))
                     for key, val in x) for x in self.plot_df['Element Dictionary']
         ]
+
+        # Second Element Name
+        self.plot_df['Ele2'] = [
+            ''.join('{}'.format(key) if (key != 'Ru') & (key != 'K') else ''
+                    for key, val in x) for x in self.plot_df['Element Dictionary']
+        ]
+
+        # Second Element Weight Loading
+        self.plot_df['Load2'] = [
+            ''.join('{}'.format(val) if (key != 'Ru') & (key != 'K') else ''
+                    for key, val in x) for x in self.plot_df['Element Dictionary']
+        ]
+
+        # Catalyst ID
         self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
+
+        # Remove Dictionary to avoid problems down the line
         self.plot_df.drop(columns='Element Dictionary', inplace=True)
 
         # Create hues for heatmaps
@@ -464,9 +488,20 @@ class Learner():
         self.plot_df['temperature_hues'] = 0
 
         # Grab top 10 features, add hues to plotdf
-        feature_rank = self.extract_important_features()
-        for feat in feature_rank.sort_values(by='Feature Importance', ascending=False).head(10).index.values:
-            create_feature_hues(self, feat)
+        try:
+            feature_rank = self.extract_important_features()
+            for feat in feature_rank.sort_values(by='Feature Importance', ascending=False).head(10).index.values:
+                create_feature_hues(self, feat)
+        except AttributeError:
+            print('Learner does not support feature extraction.')
+
+        # Process Second Element Colors
+        uniq_eles = np.unique(self.plot_df['Ele2'])
+        n_uniq = len(uniq_eles)
+        palette = sns.color_palette('tab20', n_colors=n_uniq + 1)
+        self.plot_df['Ele2_hues'] = [
+            palette[np.where(uniq_eles == i)[0][0]] for i in self.plot_df['Ele2']
+        ]
 
         return self.plot_df
 
@@ -485,11 +520,11 @@ class Learner():
             plt.scatter(x=df.loc[df['temperature'] == feat, 'pred'],
                         y=df.loc[df['temperature'] == feat, 'meas'],
                         c=df.loc[df['temperature'] == feat, 'clr'],
-                        label=int(feat),
+                        label='{}{}C'.format(int(feat), u'\N{DEGREE SIGN}'),
                         edgecolors='k')
 
-        plt.xlabel('Predicted Activity')
-        plt.ylabel('Measured Activity')
+        plt.xlabel('Predicted Conversion')
+        plt.ylabel('Measured Conversion')
         plt.xlim(0,1)
         plt.ylim(0,1)
         plt.legend(title='Temperature')
@@ -548,14 +583,14 @@ class Learner():
             ax.scatter(x=df.loc[df['feat'] == uniq_features[0], 'pred'],
                        y=df.loc[df['feat'] == uniq_features[0], 'meas'],
                        c=color_selector.get(uniq_features[0]),
-                       label=int(uniq_features[0]),
+                       label='{}{}C'.format(int(uniq_features[0]), u'\N{DEGREE SIGN}'),
                        edgecolors='k')
         else:
             for feat in uniq_features:
                 ax.scatter(x=df.loc[df['feat'] == feat, 'pred'],
                            y=df.loc[df['feat'] == feat, 'meas'],
                            c=color_selector.get(feat),  #df.loc[df['feat'] == feat, 'clr'],
-                           label=int(feat),
+                           label='{}{}C'.format(int(feat), u'\N{DEGREE SIGN}'),
                            edgecolors='k')
 
         x = np.array([0, 0.5, 1])
@@ -563,17 +598,18 @@ class Learner():
 
         ax.plot(x, y, lw=2, c='k')
         ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
-        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='r')
-        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='r')
+        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
+        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
         ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
             five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
 
-        plt.xlabel('Predicted Activity')
-        plt.ylabel('Measured Activity')
+        plt.xlabel('Predicted Conversion')
+        plt.ylabel('Measured Conversion')
+        plt.legend(title='Temperature')
         plt.xlim(0, 1)
         plt.ylim(0, 1)
-        plt.title('{}-{}'.format(self.svnm, 'err'))
-        plt.legend()
+        # plt.title('{}-{}'.format(self.svnm, 'err'))
+        plt.legend(title='Temperature')
         plt.tight_layout()
         plt.savefig('{}//figures//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
                     dpi=400)
@@ -583,22 +619,34 @@ class Learner():
         uniqvals = np.unique(self.plot_df[c_feature].values)
         for cval in uniqvals:
             slice = self.plot_df[c_feature] == cval
-            plt.scatter(x=self.plot_df.loc[slice, x_feature], y=self.plot_df.loc[slice, 'Measured Activity'],
+            plt.scatter(x=self.plot_df.loc[slice, x_feature], y=self.plot_df.loc[slice, 'Measured Conversion'],
                         c=self.plot_df.loc[slice, '{}_hues'.format(c_feature)], label=cval, s=30, edgecolors='k')
         plt.xlabel(x_feature)
-        plt.ylabel('Measured Activity')
+        plt.ylabel('Measured Conversion')
         plt.ylim(0, 1)
         plt.legend(loc=1)
         plt.tight_layout()
-        plt.savefig('{}//figures//{}-x{}-c{}.png'.format(self.svfl, self.svnm, x_feature, c_feature), dpi=400)
+        plt.savefig('{}//figures//{}-x({})-c({}).png'.format(self.svfl, self.svnm, x_feature, c_feature), dpi=400)
+        plt.close()
+
+    def plot_features_colorbar(self, x_feature, c_feature):
+        plt.scatter(x=self.plot_df.loc[:, x_feature], y=self.plot_df.loc[:, 'Measured Conversion'],
+                    c=self.plot_df.loc[:, '{}'.format(c_feature)], cmap='viridis', s=30, edgecolors='k')
+        plt.xlabel(x_feature)
+        plt.ylabel('Measured Conversion')
+        plt.ylim(0, 1)
+        cbar = plt.colorbar()
+        cbar.set_label(c_feature)
+        plt.tight_layout()
+        plt.savefig('{}//figures//{}-x({})-c({}).png'.format(self.svfl, self.svnm, x_feature, c_feature), dpi=400)
         plt.close()
 
     def plot_important_features(self):
         """ Comment """
         featdf = self.extract_important_features()
         top5feats = featdf.nlargest(5, 'Feature Importance').index.values.tolist()
-        feats = self.slave_dataset.loc[:, top5feats+['Measured Activity']]
-        feats['hue'] = np.ceil(feats['Measured Activity'].values * 5)
+        feats = self.slave_dataset.loc[:, top5feats+['Measured Conversion']]
+        feats['hue'] = np.ceil(feats['Measured Conversion'].values * 5)
         sns.pairplot(feats, hue='temperature', diag_kind='kde')
         plt.tight_layout()
         plt.savefig('{}//figures//{}-featrels.png'.format(self.svfl, self.svnm))
@@ -622,8 +670,8 @@ class Learner():
         p.x_range = Range1d(0,1)
         p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
-        p.xaxis.axis_label = "Predicted Activity"
-        p.yaxis.axis_label = "Measured Activity"
+        p.xaxis.axis_label = "Predicted Conversion"
+        p.yaxis.axis_label = "Measured Conversion"
         p.grid.grid_line_color = "white"
 
         if self.plot_df['temperature_hues'].all() != 0:
@@ -633,10 +681,42 @@ class Learner():
 
         source = ColumnDataSource(self.plot_df)
 
-        p.circle("Predicted Activity", "Measured Activity", size=12, source=source,
+        p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
                  color='bokeh_color', line_color="black", fill_alpha=0.8)
 
         output_file("{}\\htmls\\{}.html".format(self.svfl, self.svnm), title="stats.py")
+        save(p)
+
+    def bokeh_by_elements(self):
+        """ HTML with overview with colorscheme that is per-element """
+        if self.predictions is None:
+            self.predict_crossvalidate()
+
+        tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
+        hover = HoverTool(tooltips=[
+            ('Name', '@Name'),
+            ("ID", "@ID"),
+            ('T', '@temperature')
+        ])
+
+        tools.append(hover)
+
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
+        p.x_range = Range1d(0,1)
+        p.y_range = Range1d(0,1)
+        p.background_fill_color = "#dddddd"
+        p.xaxis.axis_label = "Predicted Conversion"
+        p.yaxis.axis_label = "Measured Conversion"
+        p.grid.grid_line_color = "white"
+
+        self.plot_df['bokeh_color'] = self.plot_df['Ele2_hues'].apply(rgb2hex)
+
+        source = ColumnDataSource(self.plot_df)
+
+        p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
+                 color='bokeh_color', line_color="black", fill_alpha=0.8)
+
+        output_file("{}\\htmls\\{}_byeles.html".format(self.svfl, self.svnm), title="stats.py")
         save(p)
 
     def bokeh_averaged(self, whiskers=False):
@@ -700,8 +780,8 @@ class Learner():
         p.x_range = Range1d(0,1)
         p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
-        p.xaxis.axis_label = "Predicted Activity"
-        p.yaxis.axis_label = "Measured Activity"
+        p.xaxis.axis_label = "Predicted Conversion"
+        p.yaxis.axis_label = "Measured Conversion"
         p.grid.grid_line_color = "white"
 
         source = ColumnDataSource(df)
@@ -718,8 +798,8 @@ class Learner():
         save(p)
 
     def bokeh_important_features(self, svtag='IonEn',
-                                 xaxis='Measured Activity', xlabel='Measured Activity', xrng=None,
-                                 yaxis='Predicted Activity', ylabel='Predicted Activity', yrng=None,
+                                 xaxis='Measured Conversion', xlabel='Measured Conversion', xrng=None,
+                                 yaxis='Predicted Conversion', ylabel='Predicted Conversion', yrng=None,
                                  caxis='temperature'
                                  ):
         """ Comment """
@@ -782,10 +862,10 @@ class Learner():
     def bokeh_test(self):
         output_file("callback.html")
 
-        self.plot_df['x'] = self.plot_df['Predicted Activity'].values
+        self.plot_df['x'] = self.plot_df['Predicted Conversion'].values
         source = ColumnDataSource(self.plot_df)
         p = figure(plot_width=400, plot_height=400)
-        p.circle('x', 'Measured Activity', source=source)
+        p.circle('x', 'Measured Conversion', source=source)
 
         def callback(src=source, window=None):
             data = src.data
@@ -888,20 +968,88 @@ class Catalyst():
             self.feature_add('{nm}_wtavg'.format(nm=feature_name), feat)
 
     def feature_add_elemental_properties(self):
-        # Load Elements.csv as DataFrame
+        # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
         eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
-
-        # Slice Elements.csv based on elements present
         eledf = eledf.loc[list(self.elements.keys())]
 
-        for feature_name, feature_values in eledf.T.iterrows():
-            # HACK: Add only one feature
-            # if feature_name != 'IonizationEnergies_2':
-            #     continue
+        # Methods of processing different features
+        def calc_weighted_average(self, values, weights, feature_name):
+            numor = np.sum(values * weights)
+            denom = np.sum(weights)
+            self.feature_add('{nm}_wtavg'.format(nm=feature_name), numor/denom)
 
-            for index, _ in enumerate(self.elements):
-                self.feature_add('{nm}_{index}'.format(nm=feature_name, index=index),
-                                 feature_values.values[index])
+        def calc_statistics(self, values, weights, feature_name):
+            self.feature_add('{}_mean'.format(feature_name), np.mean(values))
+            self.feature_add('{}_mad'.format(feature_name), np.mean(np.abs(values-np.mean(values))))
+            # self.feature_add('{}_med'.format(feature_name), np.median(values))
+            # self.feature_add('{}_min'.format(feature_name), np.max(values))
+            # self.feature_add('{}_max'.format(feature_name), np.min(values))
+            # self.feature_add('{}_rng'.format(feature_name), np.max(values)-np.min(values))
+
+        # Create Dictionary to process each feature differently
+        process_dict = {
+            'Atomic Number': calc_statistics,
+            # 'Abbreviation': None,
+            'Atomic Volume': calc_weighted_average,
+            'Atomic Weight': calc_weighted_average,
+            'Boiling Temperature': calc_weighted_average,
+            'Periodic Table Column': calc_statistics,
+            'Covalent Radius': calc_weighted_average,
+            'Density': calc_weighted_average,
+            'Dipole Polarizability': calc_weighted_average,
+            'Electron Affinity': calc_weighted_average,
+            'Electronegativity': calc_statistics,
+            'Fusion Enthalpy': calc_weighted_average,
+            'GS Bandgap': calc_statistics,
+            'GS Energy': calc_statistics,
+            'Heat Capacity (Mass)': calc_weighted_average,
+            'Heat Capacity (Molar)': calc_weighted_average,
+            'Heat Fusion': calc_weighted_average,
+            'First Ionization Energy': calc_statistics,
+            'Second Ionization Energy': calc_statistics,
+            'Third Ionization Energy': calc_statistics,
+            'Fourth Ionization Energy': calc_statistics,
+            'Fifth Ionization Energy': calc_statistics,
+            'Sixth Ionization Energy': calc_statistics,
+            'Seventh Ionization Energy': calc_statistics,
+            'Eighth Ionization Energy': calc_statistics,
+            'IsAlkali': calc_statistics,
+            'IsDBlock': calc_statistics,
+            'IsFBlock': calc_statistics,
+            'IsMetal': calc_statistics,
+            'IsMetalloid': calc_statistics,
+            'IsNonmetal': calc_statistics,
+            'Melting Temperature': calc_weighted_average,
+            'Mendeleev Number': calc_statistics,
+            'Number d-shell Unfilled Electrons': calc_statistics,
+            'Number d-shell Valance Electrons': calc_statistics,
+            'Number f-shell Unfilled Electrons': calc_statistics,
+            'Number f-shell Valance Electrons': calc_statistics,
+            'Number p-shell Unfilled Electrons': calc_statistics,
+            'Number p-shell Valance Electrons': calc_statistics,
+            'Number s-shell Unfilled Electrons': calc_statistics,
+            'Number s-shell Valance Electrons': calc_statistics,
+            'Number Unfilled Electrons': calc_statistics,
+            'Number Valence Electrons': calc_statistics,
+            'Polarizability': calc_statistics,
+            'Periodic Table Row': calc_statistics,
+            'Zunger Pseudopotential (d)': calc_statistics,
+            'Zunger Pseudopotential (p)': calc_statistics,
+            'Zunger Pseudopotential (pi)': calc_statistics,
+            'Zunger Pseudopotential (s)': calc_statistics,
+            'Zunger Pseudopotential (sigma)': calc_statistics,
+            'phi': calc_statistics,
+            'Conductivity': calc_statistics
+        }
+
+        for feature_name, feature_values in eledf.T.iterrows():
+            process_dict.get(feature_name,
+                             lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
+                self,
+                feature_values,
+                np.fromiter(self.elements.values(), dtype=float),
+                feature_name
+            )
 
     def feature_add_n_elements(self):
         n_eles = 0
@@ -964,7 +1112,9 @@ def temperature_slice(learner):
         learner.preplotcessing()
         learner.plot_basic()
         learner.plot_error()
+        learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
         learner.bokeh_predictions()
+        learner.bokeh_by_elements()
 
 if __name__ == '__main__':
     # Begin Machine Learning
@@ -972,9 +1122,9 @@ if __name__ == '__main__':
         average_data=True,
         element_filter=3,
         temperature_filter=None,
-        group_style='blind', # blind groups by catalyst ID, semiblind groups by temperaures within catalyst ID
-        version='v12',
-        feature_generator=2, # 0 is elemental, 1 is statistics,  2 is statmech
+        group_style='blind', # blind groups by catalyst ID, semiblind groups by temperatures within catalyst ID
+        version='v13',
+        feature_generator=0, # 0 is elemental, 1 is statistics,  2 is statmech
         regression=True
     )
     if skynet.regression:
@@ -1007,8 +1157,8 @@ if __name__ == '__main__':
 
 
     # skynet.bokeh_important_features(svtag='IonEn_{}'.format(skynet.temp_filter),
-    #                                 xaxis='Measured Activity', xlabel='Measured Activity', xrng=None,
-    #                                 yaxis='Predicted Activity', ylabel='Predicted Activity', yrng=None,
+    #                                 xaxis='Measured Conversion', xlabel='Measured Conversion', xrng=None,
+    #                                 yaxis='Predicted Conversion', ylabel='Predicted Conversion', yrng=None,
     #                                 caxis='IonizationEnergies_2_1')
     # skynet.bokeh_predictions()
 
@@ -1024,6 +1174,6 @@ if __name__ == '__main__':
     #         skynet.plot_important_features_bokeh(
     #             temp_slice=tp, svtag='{}-{}'.format(ftr, tp),
     #             xaxis=ftr, xlabel=nm, xrng=DataRange1d(),
-    #             yaxis='Measured', ylabel='Measured Activity', yrng=Range1d(0,1)
+    #             yaxis='Measured', ylabel='Measured Conversion', yrng=Range1d(0,1)
     #         )
     # skynet.save_predictions()
