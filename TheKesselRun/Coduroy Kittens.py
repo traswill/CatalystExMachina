@@ -10,7 +10,7 @@ from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex, Normalize
 from matplotlib.cm import get_cmap
 
 from sklearn import preprocessing, tree
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier, ExtraTreesRegressor, GradientBoostingRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
@@ -18,7 +18,8 @@ from sklearn.svm import SVR
 from sklearn.model_selection import cross_val_score, learning_curve, ShuffleSplit, cross_val_predict, GroupKFold
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.utils import shuffle
-from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error, roc_curve, recall_score, precision_score
+from sklearn.metrics import r2_score, explained_variance_score, mean_absolute_error, \
+    roc_curve, recall_score, precision_score, mean_squared_error
 from sklearn.feature_selection import SelectKBest
 from sklearn.kernel_ridge import KernelRidge
 
@@ -31,6 +32,7 @@ from bokeh.palettes import Plasma
 from bokeh.sampledata.autompg import autompg_clean
 
 import re
+import itertools
 
 import seaborn as sns
 import ast
@@ -212,7 +214,14 @@ class Learner():
 
         # 2. Filter based on temperature
         if self.temperature_filter is None:
-            temp_slice = self.master_dataset.index
+            temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] != 150].index
+        elif isinstance(self.temperature_filter, str):
+            temp_dict = {
+                'not450': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 450) &
+                                              (self.master_dataset.loc[:, 'temperature'] != 150)].index
+            }
+
+            temp_slice = temp_dict.get(self.temperature_filter)
         else:
             temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temperature_filter].index
 
@@ -235,6 +244,7 @@ class Learner():
 
         # 6. Apply filter, master to slave, shuffle slave
         self.slave_dataset = self.master_dataset.loc[filt].copy()
+        self.slave_dataset = self.slave_dataset[self.slave_dataset.index.str.contains('Predict') == False]
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('.\\SlaveTest.csv')
 
@@ -290,7 +300,9 @@ class Learner():
             'neuralnet': MLPRegressor,
             'svr': SVR,
             'knnr': KNeighborsRegressor,
-            'krr': KernelRidge
+            'krr': KernelRidge,
+            'etr': ExtraTreesRegressor,
+            'gbr': GradientBoostingRegressor
         }
 
         if self.regression:
@@ -306,7 +318,9 @@ class Learner():
                 'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'},
                 'knnr': {'n_neighbors': 3, 'weights': 'distance'},
                 'svr': {},
-                'krr': {}
+                'empty': {},
+                'test': {'n_estimators':250, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
+                            'max_features':'auto', 'bootstrap':True, 'n_jobs':4, 'criterion':'mae'},
             }
         else:
             param_selector = {
@@ -319,6 +333,15 @@ class Learner():
     def train_data(self):
         """ Comment """
         self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
+
+    def predict_dataset(self):
+        data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
+        data = data.drop(
+            labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
+        )
+        predvals = self.machina.predict(data.values)
+        data['Predictions'] = predvals
+        data.to_csv(r'./BinaryPredictions-v13.csv')
 
     def create_test_dataset(self, catids):
         """ Description """
@@ -339,7 +362,7 @@ class Learner():
 
         self.set_training_data()
 
-    def predict_testdata(self, catids):
+    def predict_from_masterfile(self, catids, svnm='data'):
         """ Descr """
         self.create_test_dataset(catids)
         self.train_data()
@@ -363,11 +386,30 @@ class Learner():
                            index=['Predicted Conversion','Measured Conversion'],
                            columns=original_test_df.index).T
 
-        comparison_df.to_csv('.\\Results\\Predictions\\ss3-7_predict_ss8.csv')
-        comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter')
+        rats = np.abs(np.subtract(predvals, measvals, out=np.zeros_like(predvals),
+                                  where=measvals != 0))
+
+        rat_count = rats.size
+        wi5 = (rats < 0.05).sum()
+        wi10 = (rats < 0.10).sum()
+        wi20 = (rats < 0.20).sum()
+
+        x = np.array([0, 0.5, 1])
+        y = np.array([0, 0.5, 1])
+
+        fig, ax = plt.subplots()
+        ax.plot(x, y, lw=2, c='k')
+        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
+        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
+        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
+        ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
+
+        comparison_df.to_csv('.\\Results\\Predictions\\predict_{}.csv'.format(svnm))
+        comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter', ax=ax)
         plt.xlim(0,1)
         plt.ylim(0,1)
-        plt.savefig('.\\Results\\Predictions\\ss3-7_predict_ss8.png', dpi=400)
+        plt.savefig('.\\Results\\Predictions\\predict_{}.png'.format(svnm), dpi=400)
         plt.close()
 
     def predict_crossvalidate(self):
@@ -403,23 +445,19 @@ class Learner():
 
     def evaluate_regression_learner(self):
         """ Comment """
-        mask = self.labels_df.values != 0
-        err = abs(np.array(self.predictions[mask]) - np.array(self.labels_df.values[mask]))
-        mean_ave_err = np.mean(err / np.array(self.labels_df.values[mask]))
-        acc = 1 - mean_ave_err
-
-        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
         r2 = r2_score(self.labels_df.values, self.predictions)
+        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
+        rmse = np.sqrt(mean_squared_error(self.labels_df.values, self.predictions))
 
         print('\n----- Model {} -----'.format(self.svnm))
         print('R2: {:0.3f}'.format(r2))
-        print('Average Error: {:0.3f}'.format(mean_abs_err))
-        print('Accuracy: {:0.3f}'.format(acc))
+        print('Mean Absolute Error: {:0.3f}'.format(mean_abs_err))
+        print('Mean Squared Error: {:0.3f}'.format(rmse))
         print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
         print('\n')
 
-        pd.DataFrame([r2, mean_abs_err, acc, time.time() - self.start_time],
-                     index=['R2','Mean Abs Error','Accuracy','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
+        pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
+                     index=['R2','Mean Abs Error','RMSE','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
 
     def evaluate_classification_learner(self):
         print(self.predictions)
@@ -1099,7 +1137,7 @@ def standard_pipeline(learner):
 
 
 def temperature_slice(learner):
-    for t in [250, 300, 350, 400, 450, None]:
+    for t in [250, 300, 350, 400, 450, None, 'not450']:
         learner.set_temp_filter(t)
         learner.filter_master_dataset()
         learner.train_data()
@@ -1109,6 +1147,7 @@ def temperature_slice(learner):
             learner.evaluate_regression_learner()
         else:
             learner.evaluate_classification_learner()
+        learner.save_predictions()
         learner.preplotcessing()
         learner.plot_basic()
         learner.plot_error()
@@ -1116,14 +1155,81 @@ def temperature_slice(learner):
         learner.bokeh_predictions()
         learner.bokeh_by_elements()
 
+def predict_all_binaries():
+    def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
+        cat = Catalyst()
+        cat.ID = 'A'
+        cat.add_element(e1, w1)
+        cat.add_element(e2, w2)
+        cat.add_element(e3, w3)
+        cat.input_reactor_number(reactnum)
+        cat.input_temperature(tmp)
+        cat.input_space_velocity(space_vel)
+        cat.input_ammonia_concentration(ammonia_conc)
+        cat.feature_add_n_elements()
+
+        feature_generator = {
+            0: cat.feature_add_elemental_properties,
+            1: cat.feature_add_statistics,
+            2: cat.feature_add_weighted_average
+        }
+        feature_generator.get(0, lambda: print('No Feature Generator Selected'))()
+
+        return cat
+
+    skynet = Learner(
+        average_data=True,
+        element_filter=0,
+        temperature_filter=None,
+        group_style='blind',  # blind groups by catalyst ID, semiblind groups by temperatures within catalyst ID
+        version='v13-pred',
+        feature_generator=0,  # 0 is elemental, 1 is statistics,  2 is statmech
+        regression=True
+    )
+    if skynet.regression:
+        skynet.set_learner(learner='rfr', params='default')
+    else:
+        skynet.set_learner(learner='rfc', params='default')
+
+    eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
+    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + list(range(44, 51)) + list(range(74, 80)) + [56,72,82,83]
+    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
+    eles = ele_df.index.values
+    combos = list(itertools.combinations(eles, r=2))
+
+    final_list = list()
+    for vals in combos:
+        tmp=300
+
+        cat1 = create_catalyst(e1=vals[0], w1=3, e2=vals[1], w2=1, e3='K', w3=12,
+                               tmp=tmp, reactnum=8, space_vel=2000, ammonia_conc=0.01)
+        skynet.add_catalyst('Predict', cat1)
+
+        cat2 = create_catalyst(e1=vals[0], w1=2, e2=vals[1], w2=2, e3='K', w3=12,
+                               tmp=tmp, reactnum=8, space_vel=2000, ammonia_conc=0.01)
+        skynet.add_catalyst('Predict', cat2)
+
+        cat3 = create_catalyst(e1=vals[0], w1=1, e2=vals[1], w2=3, e3='K', w3=12,
+                               tmp=tmp, reactnum=8, space_vel=2000, ammonia_conc=0.01)
+        skynet.add_catalyst('Predict', cat3)
+
+    skynet.load_nh3_catalysts()
+    skynet.filter_master_dataset()
+    skynet.train_data()
+    skynet.predict_dataset()
+
+
 if __name__ == '__main__':
+    # predict_all_binaries()
+    # exit()
+
     # Begin Machine Learning
     skynet = Learner(
         average_data=True,
         element_filter=3,
         temperature_filter=None,
         group_style='blind', # blind groups by catalyst ID, semiblind groups by temperatures within catalyst ID
-        version='v13',
+        version='v16-rfr',
         feature_generator=0, # 0 is elemental, 1 is statistics,  2 is statmech
         regression=True
     )
@@ -1133,14 +1239,14 @@ if __name__ == '__main__':
         skynet.set_learner(learner='rfc', params='default')
 
     skynet.load_nh3_catalysts()
-    temperature_slice(learner=skynet)
-    # standard_pipeline(learner=skynet)
-    exit()
+    # temperature_slice(learner=skynet)
+    # # # standard_pipeline(learner=skynet)
+    # exit()
 
-    skynet.set_learner(learner='rfr', params='default')
-    skynet.load_nh3_catalysts()
     skynet.filter_master_dataset()
-    # skynet.predict_testdata(catids=[65,66,67,68,69,73,74,75,76,77,78,82,83])
+    skynet.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
+    skynet.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+    exit()
     skynet.train_data()
     skynet.extract_important_features(sv=True)
     skynet.predict_crossvalidate()

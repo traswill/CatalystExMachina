@@ -16,7 +16,7 @@ data = np.fromfile(fid, dtype)
 fid.close()
 image = data[82176:].reshape(-1, 1920)
 print(pd.DataFrame(image))
-# pd.DataFrame(image).to_csv('test.csv')
+# pd.DataFrame(image).to_csv('BinaryPredictions-v13.csv')
 # exit()
 # # Display.
 # plt.imshow(image, cmap = "gray")
