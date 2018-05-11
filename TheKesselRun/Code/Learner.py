@@ -10,7 +10,8 @@ from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex, Normalize
 from matplotlib.cm import get_cmap
 
 from sklearn import preprocessing, tree
-from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestRegressor, AdaBoostRegressor, RandomForestClassifier, \
+    ExtraTreesRegressor, GradientBoostingRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
@@ -33,6 +34,7 @@ import os
 import time
 
 from TheKesselRun.Code.Catalyst import Catalyst
+
 
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
@@ -113,43 +115,6 @@ class Learner():
 
         # Add to dictionary
         self.catalyst_dictionary[index] = catalyst
-
-    def load_nh3_catalysts(self):
-        """ DEPRICATED Import NH3 data from Katie's HiTp dataset(cleaned). """
-        #TODO Remove this method
-
-        if self.average_data:
-            df = pd.read_csv(r".\Data\Processed\AllData_Condensed.csv", index_col=0)
-        else:
-            df = pd.read_csv(r".\Data\Processed\AllData.csv", index_col=0)
-
-        for index, row in df.iterrows():
-            cat = Catalyst()
-            cat.ID = row['ID']
-            cat.add_element(row['Ele1'], row['Wt1'])
-            cat.add_element(row['Ele2'], row['Wt2'])
-            cat.add_element(row['Ele3'], row['Wt3'])
-            cat.input_reactor_number(int(row['Reactor']))
-            cat.input_temperature(row['Temperature'])
-            cat.input_space_velocity(row['Space Velocity'])
-            cat.input_ammonia_concentration(row['NH3'])
-            if self.average_data:
-                cat.input_standard_error(row['Standard Error'])
-                cat.input_n_averaged_samples(row['nAveraged'])
-            cat.activity = row['Concentration']
-            cat.feature_add_n_elements()
-            # cat.feature_add_oxidation_states()
-
-            feature_generator = {
-                0: cat.feature_add_elemental_properties,
-                1: cat.feature_add_statistics,
-                2: cat.feature_add_weighted_average
-            }
-            feature_generator.get(self.feature_generator, lambda: print('No Feature Generator Selected'))()
-
-            self.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
-
-        self.create_master_dataset()
 
     def create_master_dataset(self):
         # Set up catalyst loading dictionary with loadings
@@ -281,7 +246,9 @@ class Learner():
             'neuralnet': MLPRegressor,
             'svr': SVR,
             'knnr': KNeighborsRegressor,
-            'krr': KernelRidge
+            'krr': KernelRidge,
+            'etr': ExtraTreesRegressor,
+            'gbr': GradientBoostingRegressor
         }
 
         if self.regression:
@@ -296,8 +263,7 @@ class Learner():
                 'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
                 'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'},
                 'knnr': {'n_neighbors': 3, 'weights': 'distance'},
-                'svr': {},
-                'krr': {}
+                'empty': {}
             }
         else:
             param_selector = {
@@ -351,15 +317,24 @@ class Learner():
         measvals = original_test_df.loc[:, 'Measured Conversion'].values
 
         comparison_df = pd.DataFrame([predvals, measvals],
-                           index=['Predicted Conversion','Measured Conversion'],
-                           columns=original_test_df.index).T
+                                     index=['Predicted Conversion', 'Measured Conversion'],
+                                     columns=original_test_df.index).T
 
         comparison_df.to_csv('..\\Results\\Predictions\\ss3-7_predict_ss8.csv')
         comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter')
-        plt.xlim(0,1)
-        plt.ylim(0,1)
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
         plt.savefig('..\\Results\\Predictions\\ss3-7_predict_ss8.png', dpi=400)
         plt.close()
+
+    def predict_from_masterfile(self):
+        data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
+        data = data.drop(
+            labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
+        )
+        predvals = self.machina.predict(data.values)
+        data['Predictions'] = predvals
+        data.to_csv(r'../Results/BinaryPredictions.csv')
 
     def predict_crossvalidate(self):
         """ Comment """
