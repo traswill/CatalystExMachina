@@ -41,7 +41,9 @@ def load_nh3_catalysts(learner, featgen=0):
 
     learner.create_master_dataset()
 
+
 def predict_all_binaries():
+    # TODO migrate into learner
     def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
         cat = Catalyst()
         cat.ID = 'A'
@@ -67,16 +69,16 @@ def predict_all_binaries():
         average_data=True,
         element_filter=0,
         temperature_filter=None,
-        version='v13-pred',
-        feature_generator=0,  # 0 is elemental, 1 is statistics,  2 is statmech
+        version='v15-pred',
         regression=True
     )
+
     if skynet.regression:
         skynet.set_learner(learner='rfr', params='default')
     else:
         skynet.set_learner(learner='rfc', params='default')
 
-    eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
+    eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
     ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
                list(range(44, 51)) + list(range(74, 80)) + [56, 72, 82, 83]
 
@@ -84,26 +86,83 @@ def predict_all_binaries():
     eles = ele_df.index.values
     combos = list(itertools.combinations(eles, r=2))
 
-    final_list = list()
     for vals in combos:
-        tmp = 300
+        tmp = 250
 
         cat1 = create_catalyst(e1=vals[0], w1=3, e2=vals[1], w2=1, e3='K', w3=12,
-                               tmp=tmp, reactnum=8, space_vel=2000, ammonia_conc=0.01)
+                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
         skynet.add_catalyst('Predict', cat1)
 
         cat2 = create_catalyst(e1=vals[0], w1=2, e2=vals[1], w2=2, e3='K', w3=12,
-                               tmp=tmp, reactnum=8, space_vel=2000, ammonia_conc=0.01)
+                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
         skynet.add_catalyst('Predict', cat2)
 
         cat3 = create_catalyst(e1=vals[0], w1=1, e2=vals[1], w2=3, e3='K', w3=12,
-                               tmp=tmp, reactnum=8, space_vel=2000, ammonia_conc=0.01)
+                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
         skynet.add_catalyst('Predict', cat3)
 
     load_nh3_catalysts(skynet, featgen=0)
     skynet.filter_master_dataset()
     skynet.train_data()
-    skynet.predict_from_masterfile()
+    skynet.predict_dataset()
+
+def predict_half_Ru_catalysts():
+    def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
+        cat = Catalyst()
+        cat.ID = 'A'
+        cat.add_element(e1, w1)
+        cat.add_element(e2, w2)
+        cat.add_element(e3, w3)
+        cat.input_reactor_number(reactnum)
+        cat.input_temperature(tmp)
+        cat.input_space_velocity(space_vel)
+        cat.input_ammonia_concentration(ammonia_conc)
+        cat.feature_add_n_elements()
+
+        feature_generator = {
+            0: cat.feature_add_elemental_properties,
+            1: cat.feature_add_statistics,
+            2: cat.feature_add_weighted_average
+        }
+        feature_generator.get(0, lambda: print('No Feature Generator Selected'))()
+
+        return cat
+
+    skynet = Learner(
+        average_data=True,
+        element_filter=0,
+        temperature_filter=None,
+        version='v15-pred',
+        regression=True
+    )
+
+    if skynet.regression:
+        skynet.set_learner(learner='rfr', params='default')
+    else:
+        skynet.set_learner(learner='rfc', params='default')
+
+    eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
+               list(range(44, 51)) + list(range(74, 80)) + [56, 72, 82, 83]
+
+    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
+    eles = ele_df.index.values
+
+    for val in eles:
+        tmp = 300
+
+        cat1 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=4, e3='K', w3=12,
+                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+        skynet.add_catalyst('Predict', cat1)
+
+        cat2 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=2, e3='K', w3=12,
+                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+        skynet.add_catalyst('Predict', cat2)
+
+    load_nh3_catalysts(skynet, featgen=0)
+    skynet.filter_master_dataset()
+    skynet.train_data()
+    skynet.predict_dataset()
 
 def prediction_pipeline(learner):
     learner.filter_master_dataset()
@@ -132,12 +191,18 @@ def temperature_slice(learner):
 
 
 if __name__ == '__main__':
+    # predict_all_binaries()
+    # predict_half_Ru_catalysts()
+    # exit()
+
     # Begin Machine Learning
     skynet = Learner(
         average_data=True,
-        element_filter=3,
+        element_filter=0,
         temperature_filter=None,
-        version='v14',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        version='v18',
         regression=True
     )
 
@@ -149,4 +214,4 @@ if __name__ == '__main__':
     load_nh3_catalysts(learner=skynet, featgen=0) # 0 is elemental, 1 is statistics,  2 is statmech
 
     temperature_slice(learner=skynet)
-    # prediction_pipeline(learner=skynet)
+    prediction_pipeline(learner=skynet)

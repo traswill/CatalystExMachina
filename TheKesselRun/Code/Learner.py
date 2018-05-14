@@ -39,8 +39,8 @@ from TheKesselRun.Code.Catalyst import Catalyst
 class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, average_data=True, element_filter=3, temperature_filter=None, version='v00',
-                 feature_generator=0, regression=True):
+    def __init__(self, element_filter=3, temperature_filter=None, ammonia_filter=None, space_vel_filter=None,
+                 version='v00', average_data=True, feature_generator=0, regression=True):
         """ Put Words Here """
 
         '''Initialize dictionary to hold import data'''
@@ -65,6 +65,8 @@ class Learner():
         self.average_data = average_data
         self.element_filter = element_filter
         self.temperature_filter = temperature_filter
+        self.ammonia_filter = ammonia_filter
+        self.sv_filter = space_vel_filter
         self.group_style = 'blind'
         self.version = version
         self.regression = regression
@@ -83,6 +85,8 @@ class Learner():
             os.makedirs('{}\\{}'.format(self.svfl, 'trees'))
             os.makedirs('{}\\{}'.format(self.svfl, 'figures'))
             os.makedirs('{}\\{}'.format(self.svfl, 'htmls'))
+            os.makedirs('{}\\{}'.format(self.svfl, 'features'))
+            os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
 
         '''Initialize Time for run-length statistics'''
         self.start_time = time.time()
@@ -100,6 +104,15 @@ class Learner():
         """ Set Temperature Filter to allow multiple slices without reloading the data """
         self.temperature_filter = temp_filter
         self.set_name_paths()
+
+    def set_ammonia_filter(self, ammonia_filter):
+        pass
+
+    def set_space_vel_filter(self, space_vel):
+        pass
+
+    def save_filter_config(self):
+        pass
 
     def add_catalyst(self, index, catalyst):
         """ Add Catalysts to self.catalyst_dictionary.  This is the primary input function for the model. """
@@ -154,47 +167,80 @@ class Learner():
         """ Filters data from import file for partitioned model training """
         filt = None
 
-        # 1. Filter Based on Number of Elements
-        filter_dict_neles = {
-            1: self.master_dataset[self.master_dataset['n_elements'] == 1].index,
-            2: self.master_dataset[self.master_dataset['n_elements'] == 2].index,
-            3: self.master_dataset[self.master_dataset['n_elements'] == 3].index
-        }
-
-        if self.element_filter is list():
-            n_ele_slice = filter_dict_neles.get(self.element_filter, self.master_dataset.index)
-        else:
-            n_ele_slice = filter_dict_neles.get(self.element_filter, self.master_dataset.index)
-
-        # 2. Filter based on temperature
-        if self.temperature_filter is None:
-            temp_slice = self.master_dataset.index
-        else:
-            temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == self.temperature_filter].index
-
-        # 3. Create the filter (filter is used to slice the master file)
         def join_all_indecies(ind_list):
             start_filter = ind_list.pop(0)
             for ind_obj in ind_list:
                 start_filter = list(set(start_filter) & set(ind_obj))
             return start_filter
 
-        filt = join_all_indecies([n_ele_slice, temp_slice])
+        def filter_elements(ele_filter):
+            filter_dict_neles = {
+                1: self.master_dataset[self.master_dataset['n_elements'] == 1].index,
+                2: self.master_dataset[self.master_dataset['n_elements'] == 2].index,
+                3: self.master_dataset[self.master_dataset['n_elements'] == 3].index,
+                23: self.master_dataset[(self.master_dataset['n_elements'] == 2) |
+                                        (self.master_dataset['n_elements'] == 3)].index,
+            }
 
-        # 4. Need to write a method to remove other features
+            if self.element_filter is list():
+                n_ele_slice = filter_dict_neles.get(ele_filter, self.master_dataset.index)
+            else:
+                n_ele_slice = filter_dict_neles.get(ele_filter, self.master_dataset.index)
+
+            return n_ele_slice
+
+        def filter_temperature(temp_filter):
+            if self.temperature_filter is None:
+                temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] != 150].index
+            elif isinstance(self.temperature_filter, str):
+                temp_dict = {
+                    'not450': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 450) &
+                                                  (self.master_dataset.loc[:, 'temperature'] != 150)].index
+                }
+
+                temp_slice = temp_dict.get(temp_filter)
+            else:
+                temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == temp_filter].index
+
+            return temp_slice
+
+        def filter_ammonia(ammo_filter):
+            filter_dict_ammonia = {
+                1: self.master_dataset[(self.master_dataset.loc[:, 'ammonia_concentration'] > 0.7) &
+                                       (self.master_dataset.loc[:, 'ammonia_concentration'] < 1.3)].index,
+                5: self.master_dataset[(self.master_dataset.loc[:, 'ammonia_concentration'] > 4.8) &
+                                       (self.master_dataset.loc[:, 'ammonia_concentration'] < 5.2)].index
+            }
+
+            ammo_slice = filter_dict_ammonia.get(ammo_filter, self.master_dataset.index)
+            return ammo_slice
+
+        def filter_space_velocity(sv_filter):
+            filter_dict_sv = {
+                2000: self.master_dataset[(self.master_dataset.loc[:, 'space_velocity'] > 1400) &
+                                       (self.master_dataset.loc[:, 'space_velocity'] < 2600)].index
+            }
+            sv_slice = filter_dict_sv.get(sv_filter, self.master_dataset.index)
+            return sv_slice
+
         def drop_element(ele, filt):
             slice = self.master_dataset[self.master_dataset['{} Loading'.format(ele)] == 0].index
             return join_all_indecies([filt, slice])
 
-        # 5. Drop Tungston Data because it's always bad
-        # filt = drop_element('W', filt)
+        filt = join_all_indecies([
+            filter_elements(self.element_filter),
+            filter_temperature(self.temperature_filter),
+            filter_ammonia(self.ammonia_filter),
+            filter_space_velocity(self.sv_filter)
+        ])
 
-        # 6. Apply filter, master to slave, shuffle slave
+        # Apply filter, master to slave, shuffle slave
         self.slave_dataset = self.master_dataset.loc[filt].copy()
+        self.slave_dataset = self.slave_dataset[self.slave_dataset.index.str.contains('Predict') == False]
         self.slave_dataset = shuffle(self.slave_dataset)
         # pd.DataFrame(self.slave_dataset).to_csv('..\\SlaveTest.csv')
 
-        # 7. Set up training data and apply grouping
+        # Set up training data and apply grouping
         self.set_training_data()
         self.group_for_training()
 
@@ -296,7 +342,7 @@ class Learner():
 
         self.set_training_data()
 
-    def predict_testdata(self, catids):
+    def predict_from_masterfile(self, catids, svnm='data'):
         """ Descr """
         self.create_test_dataset(catids)
         self.train_data()
@@ -317,24 +363,47 @@ class Learner():
         measvals = original_test_df.loc[:, 'Measured Conversion'].values
 
         comparison_df = pd.DataFrame([predvals, measvals],
-                                     index=['Predicted Conversion', 'Measured Conversion'],
-                                     columns=original_test_df.index).T
+                           index=['Predicted Conversion','Measured Conversion'],
+                           columns=original_test_df.index).T
 
-        comparison_df.to_csv('..\\Results\\Predictions\\ss3-7_predict_ss8.csv')
-        comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter')
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.savefig('..\\Results\\Predictions\\ss3-7_predict_ss8.png', dpi=400)
+        rats = np.abs(np.subtract(predvals, measvals, out=np.zeros_like(predvals),
+                                  where=measvals != 0))
+
+        rat_count = rats.size
+        wi5 = (rats < 0.05).sum()
+        wi10 = (rats < 0.10).sum()
+        wi20 = (rats < 0.20).sum()
+
+        x = np.array([0, 0.5, 1])
+        y = np.array([0, 0.5, 1])
+
+        fig, ax = plt.subplots()
+        ax.plot(x, y, lw=2, c='k')
+        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
+        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
+        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
+        # ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+        #     five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
+        plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
+                    horizontalalignment='right', fontsize=6)
+
+        comparison_df.to_csv('{}\\{}-predict_{}.csv'.format(self.svfl, self.version, svnm))
+        comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter', ax=ax)
+        plt.xlim(0,1)
+        plt.ylim(0,1)
+        plt.savefig('{}\\{}-predict_{}.png'.format(self.svfl, self.version, svnm), dpi=400)
         plt.close()
 
-    def predict_from_masterfile(self):
+    def predict_dataset(self):
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
         data = data.drop(
             labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
         )
+
         predvals = self.machina.predict(data.values)
         data['Predictions'] = predvals
-        data.to_csv(r'../Results/BinaryPredictions.csv')
+        data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
 
     def predict_crossvalidate(self):
         """ Comment """
@@ -363,7 +432,7 @@ class Learner():
             print(df.sort_values(by='Feature Importance', ascending=False).head(10))
 
         if sv:
-            df.to_csv('{}//feature_importance-{}.csv'.format(self.svfl, self.svnm))
+            df.to_csv('{}//features//feature_importance-{}.csv'.format(self.svfl, self.svnm))
         else:
             return df
 
@@ -381,7 +450,8 @@ class Learner():
         print('\n')
 
         pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
-                     index=['R2','Mean Abs Error','Root Mean Squared Error','Time']).to_csv('{}\\{}-eval.csv'.format(self.svfl, self.svnm))
+                     index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
+                     ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
 
     def evaluate_classification_learner(self):
         print(self.predictions)
@@ -562,8 +632,16 @@ class Learner():
         ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
         ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
         ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
-        ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
-            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
+
+        plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
+                    horizontalalignment='right', fontsize=6)
+
+        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
+        rmse = np.sqrt(mean_squared_error(self.labels_df.values, self.predictions))
+
+        plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
+                    horizontalalignment='left', fontsize=6)
 
         plt.xlabel('Predicted Conversion')
         plt.ylabel('Measured Conversion')

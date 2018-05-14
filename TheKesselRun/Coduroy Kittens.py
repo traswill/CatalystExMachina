@@ -335,7 +335,7 @@ class Learner():
         self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
 
     def predict_dataset(self):
-        data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
+        data = self.master_dataset[self.master_dataset.index.str.contains('Predict')].copy()
         data = data.drop(
             labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
         )
