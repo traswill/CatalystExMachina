@@ -22,6 +22,7 @@ from sklearn.metrics import r2_score, explained_variance_score, \
     mean_absolute_error, roc_curve, recall_score, precision_score, mean_squared_error
 from sklearn.feature_selection import SelectKBest
 from sklearn.kernel_ridge import KernelRidge
+from sklearn.linear_model import Ridge, Lasso, SGDRegressor
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJS, Slider, Select
 from bokeh.plotting import figure, show, output_file, save, curdoc
@@ -195,13 +196,16 @@ class Learner():
             elif isinstance(self.temperature_filter, str):
                 temp_dict = {
                     'not450': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 450) &
+                                                  (self.master_dataset.loc[:, 'temperature'] != 150)].index,
+                    'not400': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 400) &
+                                                  (self.master_dataset.loc[:, 'temperature'] != 150)].index,
+                    'not350': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 350) &
                                                   (self.master_dataset.loc[:, 'temperature'] != 150)].index
                 }
 
                 temp_slice = temp_dict.get(temp_filter)
             else:
                 temp_slice = self.master_dataset[self.master_dataset.loc[:, 'temperature'] == temp_filter].index
-
             return temp_slice
 
         def filter_ammonia(ammo_filter):
@@ -227,12 +231,28 @@ class Learner():
             slice = self.master_dataset[self.master_dataset['{} Loading'.format(ele)] == 0].index
             return join_all_indecies([filt, slice])
 
+        def drop_ID(ID, filt):
+            indx = ['{id}_{temp}'.format(id=x.split('_')[0], temp=x.split('_')[1]) != ID for x in self.master_dataset.index]
+            slice = self.master_dataset[indx].index
+            return join_all_indecies([filt, slice])
+
         filt = join_all_indecies([
             filter_elements(self.element_filter),
             filter_temperature(self.temperature_filter),
             filter_ammonia(self.ammonia_filter),
             filter_space_velocity(self.sv_filter)
         ])
+
+        # drop_element('Mo', filt)
+        # drop_element('Ir', filt)
+        # for ids in [51, 57, 85, 86, 90, 107, 17, 93, 50, 87, 108]:
+        #     for tempers in [350, 400, 450]:
+        #         filt = drop_ID('{id}_{t}'.format(id=ids, t=tempers), filt)
+
+        # ***** FILTER SS8 AND SS9 OUT *****
+        # for ids in [65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83, 38, 84, 85, 86, 87, 89, 90, 91, 93]:
+        #     for tempers in [250, 300, 350, 400, 450]:
+        #         filt = drop_ID('{id}_{t}'.format(id=ids, t=tempers), filt)
 
         # Apply filter, master to slave, shuffle slave
         self.slave_dataset = self.master_dataset.loc[filt].copy()
@@ -275,41 +295,84 @@ class Learner():
 
     def hyperparameter_tuning(self):
         """ Comment """
+        rfr_tuning_params = {
+            'n_estimators': [10, 25, 50, 100],
+            'max_features': ['auto', 'sqrt'],
+            'max_depth': [None, 3, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 3, 5],
+            'max_leaf_nodes': [None, 5, 20, 50],
+            'min_impurity_decrease': [0, 0.1, 0.4]
+        }
+
+        gbr_tuning_params = {
+            'loss': ['ls', 'lad', 'quantile', 'huber'],
+            'learning_rate': [0.05, 0.1, 0.2],
+            'subsample': [0.5, 1],
+            'n_estimators': [25, 100, 500],
+            'max_depth': [None, 3, 5, 10],
+            'criterion': ['friedman_mse', 'mae'],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 3, 5],
+            'max_features': ['auto', 'sqrt'],
+            'max_leaf_nodes': [None, 5, 20, 50],
+            'min_impurity_decrease': [0, 0.1, 0.4]
+        }
+
+        etr_tuning_params = {
+            'n_estimators': [10, 25, 50, 100],
+            'criterion': ['mae'],
+            'max_features': ['auto', 'sqrt'],
+            'max_depth': [None, 3, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 3, 5],
+            'max_leaf_nodes': [None, 5, 20, 50],
+            'min_impurity_decrease': [0, 0.1, 0.4]
+        }
+
         # gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
-        gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(10),
-                                return_train_score=True, n_iter=500)
+        gs = RandomizedSearchCV(self.machina, etr_tuning_params, cv=GroupKFold(3),
+                                return_train_score=True, n_iter=1000)
         gs.fit(self.features_df.values, self.labels_df.values, groups=self.groups)
-        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune_{}.csv'.format(self.svfl, self.svnm))
+        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune-gbr_{}.csv'.format(self.svfl, self.svnm))
 
     def set_learner(self, learner, params='default'):
         """ Comment """
         learn_selector = {
+            # Regression Models
             'rfr': RandomForestRegressor,
-            'rfc': RandomForestClassifier,
             'adaboost': AdaBoostRegressor,
             'tree': tree.DecisionTreeRegressor,
-            'SGD': None,
+            'SGD': SGDRegressor,
             'neuralnet': MLPRegressor,
             'svr': SVR,
             'knnr': KNeighborsRegressor,
             'krr': KernelRidge,
             'etr': ExtraTreesRegressor,
-            'gbr': GradientBoostingRegressor
+            'gbr': GradientBoostingRegressor,
+            'ridge': Ridge,
+            'lasso': Lasso,
+
+            # Classification Models
+            'rfc': RandomForestClassifier,
+
+            # Others
         }
 
         if self.regression:
             param_selector = {
-                'default': {'n_estimators':100, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2,
-                            'max_features':'auto', 'bootstrap':True, 'n_jobs':4, 'criterion':'mse'},
-                'v1': {'n_estimators':50, 'max_depth':None, 'min_samples_leaf':2, 'min_samples_split':2},
-                'v2': {'n_estimators': 50, 'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 2,
-                            'max_features': 'auto', 'bootstrap': True},
-                'v3': {'n_estimators': 250, 'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2,
-                            'max_features': 'sqrt', 'bootstrap': False},
+                'rfr': {'n_estimators':25, 'max_depth':10, 'max_leaf_nodes':50, 'min_samples_leaf':1,
+                            'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
+                            'criterion':'mae'},
+                'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                        'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
+                'gbr': {'subsample': 0.5, 'n_estimators': 500, 'min_samples_split': 10, 'min_samples_leaf': 3,
+                        'min_impurity_decrease': 0, 'max_leaf_nodes': 5, 'max_features': 'sqrt', 'max_depth': 5,
+                        'loss': 'ls', 'learning_rate': 0.05, 'criterion': 'mae'},
                 'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
-                'nnet': {'hidden_layer_sizes':100, 'solver':'sgd'},
-                'knnr': {'n_neighbors': 3, 'weights': 'distance'},
-                'empty': {}
+                'nnet': {'hidden_layer_sizes':1, 'solver':'lbfgs'},
+                'empty': {},
+                'SGD': {'alpha': 0.01, 'tol': 1e-4, 'max_iter': 1000}
             }
         else:
             param_selector = {
@@ -366,6 +429,13 @@ class Learner():
                            index=['Predicted Conversion','Measured Conversion'],
                            columns=original_test_df.index).T
 
+        comparison_df['ID'] = [x.split('_')[0] for x in comparison_df.index]
+        comparison_df['Name'] = [
+            ''.join('{}({})'.format(key, str(int(val)))
+                    for key, val in x) for x in self.test_dataset['Element Dictionary']
+        ]
+        comparison_df['temperature'] = original_test_df['temperature']
+
         rats = np.abs(np.subtract(predvals, measvals, out=np.zeros_like(predvals),
                                   where=measvals != 0))
 
@@ -388,12 +458,53 @@ class Learner():
             five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
                     horizontalalignment='right', fontsize=6)
 
+        mean_abs_err = mean_absolute_error(measvals, predvals)
+        rmse = np.sqrt(mean_squared_error(measvals, predvals))
+
+        plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
+                    horizontalalignment='left', fontsize=6)
+
+        plt.figtext(0.5, 0.01, 'E{} A{} S{}'.format(self.element_filter, self.ammonia_filter, self.sv_filter),
+                    horizontalalignment='center', fontsize=6)
+
         comparison_df.to_csv('{}\\{}-predict_{}.csv'.format(self.svfl, self.version, svnm))
         comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter', ax=ax)
         plt.xlim(0,1)
         plt.ylim(0,1)
+        plt.tight_layout()
         plt.savefig('{}\\{}-predict_{}.png'.format(self.svfl, self.version, svnm), dpi=400)
         plt.close()
+
+        # START BOKEH PLOT
+        tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
+        hover = HoverTool(tooltips=[
+            ('Name', '@Name'),
+            ("ID", "@ID"),
+            ('T', '@temperature')
+        ])
+
+        tools.append(hover)
+
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=svnm)
+        p.x_range = Range1d(0, 1)
+        p.y_range = Range1d(0, 1)
+        p.background_fill_color = "#dddddd"
+        p.xaxis.axis_label = "Predicted Conversion"
+        p.yaxis.axis_label = "Measured Conversion"
+        p.grid.grid_line_color = "white"
+
+        # if self.plot_df['temperature_hues'].all() != 0:
+        #     self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
+        # else:
+        #     self.plot_df['bokeh_color'] = 'blue'
+
+        source = ColumnDataSource(comparison_df)
+
+        p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
+                 line_color="black", fill_alpha=0.8) # color='bokeh_color',
+
+        output_file("{}\\{}-predict_{}.html".format(self.svfl, self.version, svnm), title="stats.py")
+        save(p)
 
     def predict_dataset(self):
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
@@ -405,10 +516,10 @@ class Learner():
         data['Predictions'] = predvals
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
 
-    def predict_crossvalidate(self):
+    def predict_crossvalidate(self, kfold=10):
         """ Comment """
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
-                                             groups=self.groups, cv=GroupKFold(10))
+                                             groups=self.groups, cv=GroupKFold(kfold))
 
     def save_predictions(self):
         """ Comment """
@@ -570,7 +681,7 @@ class Learner():
                     dpi=400)
         plt.close()
 
-    def plot_error(self):
+    def plot_error(self, metadata=True):
         df = pd.DataFrame([self.predictions,
                            self.labels_df.values,
                            self.plot_df['{}_hues'.format('temperature')].values,
@@ -633,15 +744,19 @@ class Learner():
         ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
         ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
 
-        plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
-            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
-                    horizontalalignment='right', fontsize=6)
+        if metadata:
+            plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+                five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
+                        horizontalalignment='right', fontsize=6)
 
-        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
-        rmse = np.sqrt(mean_squared_error(self.labels_df.values, self.predictions))
+            mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
+            rmse = np.sqrt(mean_squared_error(self.labels_df.values, self.predictions))
 
-        plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
-                    horizontalalignment='left', fontsize=6)
+            plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
+                        horizontalalignment='left', fontsize=6)
+
+            plt.figtext(0.5, 0.01, 'E{} A{} S{}'.format(self.element_filter, self.ammonia_filter, self.sv_filter),
+                        horizontalalignment='center', fontsize=6)
 
         plt.xlabel('Predicted Conversion')
         plt.ylabel('Measured Conversion')

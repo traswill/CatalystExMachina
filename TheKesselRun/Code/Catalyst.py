@@ -34,6 +34,9 @@ class Catalyst():
     def input_n_averaged_samples(self, n_avg):
         self.input_dict['n_averaged'] = n_avg
 
+    def input_n_Cl_atoms(self, Cl_atoms):
+        self.input_dict['n_Cl_atoms'] = Cl_atoms
+
     def feature_add(self, key, value):
         self.feature_dict[key] = value
 
@@ -91,25 +94,26 @@ class Catalyst():
             'Atomic Weight': calc_weighted_average,
             'Boiling Temperature': calc_weighted_average,
             'Periodic Table Column': calc_statistics,
+            'Conductivity': calc_weighted_average,
             'Covalent Radius': calc_weighted_average,
             'Density': calc_weighted_average,
             'Dipole Polarizability': calc_weighted_average,
             'Electron Affinity': calc_weighted_average,
-            'Electronegativity': calc_statistics,
+            'Electronegativity': calc_weighted_average,
             'Fusion Enthalpy': calc_weighted_average,
-            'GS Bandgap': calc_statistics,
-            'GS Energy': calc_statistics,
+            'GS Bandgap': calc_weighted_average,
+            'GS Energy': calc_weighted_average,
             'Heat Capacity (Mass)': calc_weighted_average,
             'Heat Capacity (Molar)': calc_weighted_average,
             'Heat Fusion': calc_weighted_average,
-            'First Ionization Energy': calc_statistics,
-            'Second Ionization Energy': calc_statistics,
-            'Third Ionization Energy': calc_statistics,
-            'Fourth Ionization Energy': calc_statistics,
-            'Fifth Ionization Energy': calc_statistics,
-            'Sixth Ionization Energy': calc_statistics,
-            'Seventh Ionization Energy': calc_statistics,
-            'Eighth Ionization Energy': calc_statistics,
+            'First Ionization Energy': calc_weighted_average,
+            'Second Ionization Energy': calc_weighted_average,
+            'Third Ionization Energy': calc_weighted_average,
+            'Fourth Ionization Energy': calc_weighted_average,
+            'Fifth Ionization Energy': calc_weighted_average,
+            'Sixth Ionization Energy': calc_weighted_average,
+            'Seventh Ionization Energy': calc_weighted_average,
+            'Eighth Ionization Energy': calc_weighted_average,
             'IsAlkali': calc_statistics,
             'IsDBlock': calc_statistics,
             'IsFBlock': calc_statistics,
@@ -128,15 +132,14 @@ class Catalyst():
             'Number s-shell Valance Electrons': calc_statistics,
             'Number Unfilled Electrons': calc_statistics,
             'Number Valence Electrons': calc_statistics,
-            'Polarizability': calc_statistics,
+            'Polarizability': calc_weighted_average,
             'Periodic Table Row': calc_statistics,
+            'phi': calc_statistics,
             'Zunger Pseudopotential (d)': calc_statistics,
             'Zunger Pseudopotential (p)': calc_statistics,
             'Zunger Pseudopotential (pi)': calc_statistics,
             'Zunger Pseudopotential (s)': calc_statistics,
             'Zunger Pseudopotential (sigma)': calc_statistics,
-            'phi': calc_statistics,
-            'Conductivity': calc_statistics
         }
 
         for feature_name, feature_values in eledf.T.iterrows():

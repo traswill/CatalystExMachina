@@ -53,6 +53,6 @@ def plot_heatmap():
     #             square=True, linewidths=.5, cbar_kws={"shrink": .5})
 
 if __name__ == '__main__':
-    # raw_to_processed(pth='../Results/v15-pred_r/v15-pred-BinaryPredictions-300C')
-    raw_to_processed(pth='../Results/v15-pred_r/v15-pred-HalfRu-300C')
+    raw_to_processed(pth='../Results/v20-pred_r/v20-pred-HalfRu')
+    # raw_to_processed(pth='../Results/v15-pred_r/v15-pred-HalfRu-300C')
 
