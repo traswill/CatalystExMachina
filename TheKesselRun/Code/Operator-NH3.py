@@ -1,5 +1,6 @@
 from TheKesselRun.Code.Learner import Learner
 from TheKesselRun.Code.Catalyst import Catalyst
+from TheKesselRun.Code.Plotter import Graphic
 
 import itertools
 import pandas as pd
@@ -51,6 +52,9 @@ def prediction_pipeline(learner):
     learner.filter_master_dataset()
     learner.train_data()
     learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
+
+    learner.filter_master_dataset()
+    learner.train_data()
     learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
 
 
@@ -66,22 +70,29 @@ def temperature_slice(learner):
             learner.evaluate_regression_learner()
         else:
             learner.evaluate_classification_learner()
-        learner.preplotcessing()
-        learner.plot_basic()
-        learner.plot_error(metadata=True)
-        # learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
-        learner.bokeh_predictions()
-        learner.bokeh_by_elements()
+        learner.preplot_processing()
+        g = Graphic(learner=learner)
+        g.plot_basic()
+        g.plot_err()
+
+        #
+        # learner.plot_basic()
+        # learner.plot_error(metadata=True)
+        # # learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
+        # learner.bokeh_predictions()
+        # learner.bokeh_by_elements()
+
+
 
 
 def unsuprevised_pipline(learner):
     learner.filter_master_dataset()
-    learner.unsupervised_data_segmentation(n_clusters=3)
+    learner.unsupervised_data_segmentation(n_clusters=2)
     learner.set_learner(learner='etr', params='etr')
     learner.train_data()
-    learner.predict_crossvalidate()
+    learner.predict_crossvalidate(kfold=3)
     learner.evaluate_regression_learner()
-    learner.preplotcessing()
+    learner.preplot_processing()
     learner.plot_error(metadata=True)
 
 
@@ -358,4 +369,4 @@ if __name__ == '__main__':
 
     # ***** General Opreation *****
     temperature_slice(learner=skynet)
-    prediction_pipeline(learner=skynet)
+    # prediction_pipeline(learner=skynet)

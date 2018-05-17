@@ -434,7 +434,7 @@ class Learner():
 
         self.set_training_data()
 
-    def predict_from_masterfile(self, catids, svnm='data'):
+    def predict_from_masterfile(self, catids, svnm='data', temp_slice=True):
         """ Descr """
         self.create_test_dataset(catids)
         self.train_data()
@@ -481,8 +481,7 @@ class Learner():
         ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
         ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
         ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
-        # ax.text(0.75, 0.05, s='Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
-        #     five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count))
+
         plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
             five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
                     horizontalalignment='right', fontsize=6)
@@ -497,9 +496,33 @@ class Learner():
                     horizontalalignment='center', fontsize=6)
 
         comparison_df.to_csv('{}\\{}-predict_{}.csv'.format(self.svfl, self.version, svnm))
-        comparison_df.plot(x='Predicted Conversion', y='Measured Conversion', kind='scatter', ax=ax)
+
+
+        uniq_features = np.unique(comparison_df['temperature'].values)
+
+        cmap = get_cmap('plasma')
+        norm = Normalize(vmin=250, vmax=450)
+
+        color_selector = {
+            150: cmap(norm(250)), # treat 150 as 250 for now
+            250: cmap(norm(250)),
+            300: cmap(norm(300)),
+            350: cmap(norm(350)),
+            400: cmap(norm(400)),
+            450: cmap(norm(450))
+        }
+
+        for feat in uniq_features:
+            slice = comparison_df['temperature'] == feat
+            ax.scatter(comparison_df.loc[slice, 'Predicted Conversion'], comparison_df.loc[slice, 'Measured Conversion'],
+                       c=color_selector.get(feat), label='{}{}C'.format(int(feat), u'\N{DEGREE SIGN}'),
+                       edgecolors='k')
+
         plt.xlim(0,1)
         plt.ylim(0,1)
+        plt.xlabel('Predicted Conversion')
+        plt.ylabel('Measured Conversion')
+        plt.legend(title='Temperature')
         plt.tight_layout()
         plt.savefig('{}\\{}-predict_{}.png'.format(self.svfl, self.version, svnm), dpi=400)
         plt.close()
@@ -627,81 +650,82 @@ class Learner():
         plt.plot(fpr, tpr)
         plt.show()
 
-    def preplotcessing(self):
+    def preplot_processing(self):
         """ Prepare all data for plotting """
 
         # Ensure Predictions Exist
         if self.predictions is None:
             self.predict_crossvalidate()
 
-        # Set up the plot dataframe for easy plotting (specifically for Bokeh)
+        # Set up the plot dataframe for easy plotting
         self.plot_df = self.slave_dataset.copy()
         self.plot_df['Predicted Conversion'] = self.predictions
 
-        # Full descriptive name X(#)Y(#)Z(#)
-        self.plot_df['Name'] = [
-            ''.join('{}({})'.format(key, str(int(val)))
-                    for key, val in x) for x in self.plot_df['Element Dictionary']
-        ]
-
-        # Second Element Name
-        self.plot_df['Ele2'] = [
-            ''.join('{}'.format(key) if (key != 'Ru') & (key != 'K') else ''
-                    for key, val in x) for x in self.plot_df['Element Dictionary']
-        ]
-
-        # Second Element Weight Loading
-        self.plot_df['Load2'] = [
-            ''.join('{}'.format(val) if (key != 'Ru') & (key != 'K') else ''
-                    for key, val in x) for x in self.plot_df['Element Dictionary']
-        ]
-
-        # Catalyst ID
-        self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
-
-        # Remove Dictionary to avoid problems down the line
-        self.plot_df.drop(columns='Element Dictionary', inplace=True)
-
-        # Create hues for heatmaps
-        def create_feature_hues(self, feature):
-            try:
-                unique_feature = np.unique(self.slave_dataset.loc[:, feature].values)
-            except KeyError:
-                print('KeyError: {} not found'.format(feature))
-                return
-
-            n_feature = len(unique_feature)
-            max_feature = np.max(unique_feature)
-            min_feature = np.min(unique_feature)
-
-            if max_feature == min_feature:
-                self.plot_df['{}_hues'.format(feature)] = "#3498db"  # Blue!
-            else:
-                palette = sns.color_palette('plasma', n_colors=n_feature+1)
-                self.plot_df['{}_hues'.format(feature)] = [
-                    palette[i] for i in [int(n_feature * (float(x) - min_feature) / (max_feature - min_feature))
-                                              for x in self.slave_dataset.loc[:, feature].values]
-                ]
-
-        self.plot_df['temperature_hues'] = 0
-
-        # Grab top 10 features, add hues to plotdf
-        try:
-            feature_rank = self.extract_important_features()
-            for feat in feature_rank.sort_values(by='Feature Importance', ascending=False).head(10).index.values:
-                create_feature_hues(self, feat)
-        except AttributeError:
-            print('Learner does not support feature extraction.')
-
-        # Process Second Element Colors
-        uniq_eles = np.unique(self.plot_df['Ele2'])
-        n_uniq = len(uniq_eles)
-        palette = sns.color_palette('tab20', n_colors=n_uniq + 1)
-        self.plot_df['Ele2_hues'] = [
-            palette[np.where(uniq_eles == i)[0][0]] for i in self.plot_df['Ele2']
-        ]
-
-        return self.plot_df
+        #
+        # # Full descriptive name X(#)Y(#)Z(#)
+        # self.plot_df['Name'] = [
+        #     ''.join('{}({})'.format(key, str(int(val)))
+        #             for key, val in x) for x in self.plot_df['Element Dictionary']
+        # ]
+        #
+        # # Second Element Name
+        # self.plot_df['Ele2'] = [
+        #     ''.join('{}'.format(key) if (key != 'Ru') & (key != 'K') else ''
+        #             for key, val in x) for x in self.plot_df['Element Dictionary']
+        # ]
+        #
+        # # Second Element Weight Loading
+        # self.plot_df['Load2'] = [
+        #     ''.join('{}'.format(val) if (key != 'Ru') & (key != 'K') else ''
+        #             for key, val in x) for x in self.plot_df['Element Dictionary']
+        # ]
+        #
+        # # Catalyst ID
+        # self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
+        #
+        # # Remove Dictionary to avoid problems down the line
+        # self.plot_df.drop(columns='Element Dictionary', inplace=True)
+        #
+        # # Create hues for heatmaps
+        # def create_feature_hues(self, feature):
+        #     try:
+        #         unique_feature = np.unique(self.slave_dataset.loc[:, feature].values)
+        #     except KeyError:
+        #         print('KeyError: {} not found'.format(feature))
+        #         return
+        #
+        #     n_feature = len(unique_feature)
+        #     max_feature = np.max(unique_feature)
+        #     min_feature = np.min(unique_feature)
+        #
+        #     if max_feature == min_feature:
+        #         self.plot_df['{}_hues'.format(feature)] = "#3498db"  # Blue!
+        #     else:
+        #         palette = sns.color_palette('plasma', n_colors=n_feature+1)
+        #         self.plot_df['{}_hues'.format(feature)] = [
+        #             palette[i] for i in [int(n_feature * (float(x) - min_feature) / (max_feature - min_feature))
+        #                                       for x in self.slave_dataset.loc[:, feature].values]
+        #         ]
+        #
+        # self.plot_df['temperature_hues'] = 0
+        #
+        # # Grab top 10 features, add hues to plotdf
+        # try:
+        #     feature_rank = self.extract_important_features()
+        #     for feat in feature_rank.sort_values(by='Feature Importance', ascending=False).head(10).index.values:
+        #         create_feature_hues(self, feat)
+        # except AttributeError:
+        #     print('Learner does not support feature extraction.')
+        #
+        # # Process Second Element Colors
+        # uniq_eles = np.unique(self.plot_df['Ele2'])
+        # n_uniq = len(uniq_eles)
+        # palette = sns.color_palette('tab20', n_colors=n_uniq + 1)
+        # self.plot_df['Ele2_hues'] = [
+        #     palette[np.where(uniq_eles == i)[0][0]] for i in self.plot_df['Ele2']
+        # ]
+        #
+        # return self.plot_df
 
     def plot_basic(self):
         """ Creates a basic plot with a temperature heatmap (or constant color if single temp slice) """

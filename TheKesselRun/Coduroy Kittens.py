@@ -1131,7 +1131,7 @@ def standard_pipeline(learner):
         learner.evaluate_regression_learner()
     else:
         learner.evaluate_classification_learner()
-    learner.preplotcessing()
+    learner.preplot_processing()
     learner.plot_basic()
     learner.plot_error()
 
@@ -1148,7 +1148,7 @@ def temperature_slice(learner):
         else:
             learner.evaluate_classification_learner()
         learner.save_predictions()
-        learner.preplotcessing()
+        learner.preplot_processing()
         learner.plot_basic()
         learner.plot_error()
         learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
