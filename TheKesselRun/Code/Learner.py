@@ -23,6 +23,7 @@ from sklearn.metrics import r2_score, explained_variance_score, \
 from sklearn.feature_selection import SelectKBest
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import Ridge, Lasso, SGDRegressor
+from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, FeatureAgglomeration
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJS, Slider, Select
 from bokeh.plotting import figure, show, output_file, save, curdoc
@@ -60,6 +61,10 @@ class Learner():
 
         '''Initialize ML algorithm and tuning parameters'''
         self.machina = None
+
+        self.clustered_machina_dictionary = dict()
+        self.n_clusters = None
+        self.cluster = None
         self.groups = None
 
         '''Initialize all options for the algorithm.  These are used in naming files.'''
@@ -382,9 +387,33 @@ class Learner():
         self.machina = learn_selector.get(learner, lambda: 'Error')()
         self.machina.set_params(**param_selector.get(params))
 
+    def unsupervised_data_segmentation(self, n_clusters=3):
+        """ Pre-Cluster Data to segregate chemically similar catalysts """
+        self.n_clusters = n_clusters
+        # self.cluster = KMeans(n_clusters=self.n_clusters)
+        self.cluster = AgglomerativeClustering(n_clusters=n_clusters)
+        feats = self.features_df.drop(columns=['temperature',
+                                               'space_velocity',
+                                               'reactor_number',
+                                               'ammonia_concentration']).values
+        self.slave_dataset['kmeans'] = self.cluster.fit_predict(feats)
+        print(self.cluster.labels_)
+        self.slave_dataset.to_csv('{}//{}-unsupervised-slave-dataset.csv'.format(self.svfl, self.version))
+
+
     def train_data(self):
         """ Comment """
-        self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
+
+        if self.cluster is None:
+            self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
+        else:
+            for n in range(self.n_clusters):
+                print(n)
+                idx = self.slave_dataset[self.slave_dataset['kmeans'] == n].index
+                self.clustered_machina_dictionary[n] = self.machina.fit(
+                    self.features_df.loc[idx].values,
+                    self.labels_df.loc[idx].values
+                )
 
     def create_test_dataset(self, catids):
         """ Description """
@@ -515,11 +544,37 @@ class Learner():
         predvals = self.machina.predict(data.values)
         data['Predictions'] = predvals
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
+        return data
 
     def predict_crossvalidate(self, kfold=10):
         """ Comment """
-        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+
+        if self.cluster is None:
+            self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(kfold))
+        else:
+            group_df = pd.DataFrame(self.groups, index=self.slave_dataset.index)
+            preddf = pd.DataFrame()
+
+            for n in range(self.n_clusters):
+                idx = self.slave_dataset[self.slave_dataset['kmeans'] == n].index
+
+                if group_df.loc[idx, 0].unique().size < kfold:
+                    k = group_df.loc[idx, 0].unique().size
+                else:
+                    k = kfold
+
+                pred = cross_val_predict(estimator=self.machina,
+                                  X=self.features_df.loc[idx].values,
+                                  y=self.labels_df.loc[idx].values,
+                                  groups=group_df.loc[idx].values,
+                                  cv=GroupKFold(k)
+                                  )
+
+                preddf = pd.concat([preddf, pd.DataFrame(pred, index=idx)])
+
+            self.slave_dataset['predictions'] = preddf
+            self.predictions = self.slave_dataset['predictions'].values
 
     def save_predictions(self):
         """ Comment """

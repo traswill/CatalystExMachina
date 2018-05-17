@@ -23,7 +23,7 @@ def load_nh3_catalysts(learner, featgen=0):
         cat.add_element(row['Ele1'], row['Wt1'])
         cat.add_element(row['Ele2'], row['Wt2'])
         cat.add_element(row['Ele3'], row['Wt3'])
-        # cat.input_reactor_number(int(row['Reactor']))
+        cat.input_reactor_number(int(row['Reactor']))
         cat.input_temperature(row['Temperature'])
         cat.input_space_velocity(row['Space Velocity'])
         cat.input_ammonia_concentration(row['NH3'])
@@ -45,6 +45,44 @@ def load_nh3_catalysts(learner, featgen=0):
         learner.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
 
     learner.create_master_dataset()
+
+
+def prediction_pipeline(learner):
+    learner.filter_master_dataset()
+    learner.train_data()
+    learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
+    learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+
+
+def temperature_slice(learner):
+    for t in [None]: #['not350', 250, 300, 350, 400, 450, None]:
+        learner.set_temp_filter(t)
+        learner.filter_master_dataset()
+
+        learner.train_data()
+        learner.extract_important_features(sv=True, prnt=True)
+        learner.predict_crossvalidate(kfold=10)
+        if learner.regression:
+            learner.evaluate_regression_learner()
+        else:
+            learner.evaluate_classification_learner()
+        learner.preplotcessing()
+        learner.plot_basic()
+        learner.plot_error(metadata=True)
+        # learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
+        learner.bokeh_predictions()
+        learner.bokeh_by_elements()
+
+
+def unsuprevised_pipline(learner):
+    learner.filter_master_dataset()
+    learner.unsupervised_data_segmentation(n_clusters=3)
+    learner.set_learner(learner='etr', params='etr')
+    learner.train_data()
+    learner.predict_crossvalidate()
+    learner.evaluate_regression_learner()
+    learner.preplotcessing()
+    learner.plot_error(metadata=True)
 
 
 def predict_all_binaries():
@@ -109,7 +147,7 @@ def predict_all_binaries():
     load_nh3_catalysts(skynet, featgen=0)
     skynet.filter_master_dataset()
     skynet.train_data()
-    skynet.predict_dataset()
+    return skynet, skynet.predict_dataset()
 
 
 def predict_half_Ru_catalysts():
@@ -168,34 +206,27 @@ def predict_half_Ru_catalysts():
     load_nh3_catalysts(skynet, featgen=0)
     skynet.filter_master_dataset()
     skynet.train_data()
-    skynet.predict_dataset()
+    return skynet, skynet.predict_dataset()
 
 
-def prediction_pipeline(learner):
-    learner.filter_master_dataset()
-    learner.train_data()
-    learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
-    learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+def process_prediction_dataframes(learner, dat_df):
+    nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
+    df = pd.DataFrame(dat_df['Predictions'])
 
+    for inx, vals in nm_df.iterrows():
+        vals = vals[vals != 0]
+        if len(vals) == 2:
+            continue
+        vals.index = [item[0] for item in vals.index.str.split(' ').values]
+        df.loc[inx, 'Element 1'] = vals.index[0]
+        df.loc[inx, 'Loading 1'] = vals[0]
+        df.loc[inx, 'Element 2'] = vals.index[1]
+        df.loc[inx, 'Loading 2'] = vals[1]
+        df.loc[inx, 'Element 3'] = vals.index[2]
+        df.loc[inx, 'Loading 3'] = vals[2]
+        df.loc[inx, 'Name'] = '{}{} {}{} {}{}'.format(vals.index[0], vals[0], vals.index[1], vals[1], vals.index[2], vals[2])
 
-def temperature_slice(learner):
-    for t in [None]: #['not350', 250, 300, 350, 400, 450, None]:
-        learner.set_temp_filter(t)
-        learner.filter_master_dataset()
-
-        learner.train_data()
-        learner.extract_important_features(sv=True, prnt=True)
-        learner.predict_crossvalidate(kfold=10)
-        if learner.regression:
-            learner.evaluate_regression_learner()
-        else:
-            learner.evaluate_classification_learner()
-        learner.preplotcessing()
-        learner.plot_basic()
-        learner.plot_error(metadata=True)
-        # learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
-        learner.bokeh_predictions()
-        learner.bokeh_by_elements()
+    df.to_csv('{}//{}-Processed.csv'.format(learner.svfl, learner.version))
 
 
 def test_all_ML_models():
@@ -227,6 +258,7 @@ def test_all_ML_models():
 
     print(eval_dict)
     return eval_dict
+
 
 def plot_all_ML_models(d):
     nm_dict = {
@@ -262,36 +294,68 @@ def plot_all_ML_models(d):
     plt.show()
 
 
+def unsupervised_exploration(learner):
+    pth = '{}//{}-unsupervised-slave-dataset.csv'.format(learner.svfl, learner.version)
+    df = pd.read_csv(pth, usecols=['Element Dictionary','kmeans'])
+    df_new = pd.DataFrame()
+    for x in df['Element Dictionary'].values:
+        eles = x.split('[')[-1].split(']')[0].replace('\'', '').replace('(','').replace(')','').split(', ')
+        df_new = pd.concat([df_new, pd.DataFrame(eles)], axis=1)
+    df_new = df_new.transpose()
+    df_new.columns = ['Ele1','Wt1','Ele2','Wt2','Ele3','Wt3']
+    df_new['group'] = df['kmeans'].values
+    df_new.reset_index(drop=True, inplace=True)
+    df_new['Wt1'] = df_new['Wt1'].astype(float)
+    df_new['Wt2'] = df_new['Wt2'].astype(float)
+    df_new['Wt3'] = df_new['Wt3'].astype(float)
+
+    print(df_new)
+
+    # df_new.plot(kind='scatter',x='Wt1',y='Wt2',hue='group')
+    sns.swarmplot(x='Wt1', y='Wt2', data=df_new, hue='group')
+    plt.show()
+
 if __name__ == '__main__':
+    # ***** Testing ML Models for Paper *****
     # d = test_all_ML_models()
     # plot_all_ML_models(d)
     # exit()
 
-    # predict_all_binaries()
-    # predict_half_Ru_catalysts()
+    # ***** Predict Binaries and 0.5Ru Catalysts *****
+    # skynet, df = predict_all_binaries()
+    # process_prediction_dataframes(skynet, df)
+    # skynet, df = predict_half_Ru_catalysts()
+    # process_prediction_dataframes(skynet, df)
     # exit()
 
-    # Begin Machine Learning
+    # ***** Begin Machine Learning *****
     skynet = Learner(
         average_data=True,
-        element_filter=3,
+        element_filter=None,
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        version='v20-etr',
+        version='v21',
         regression=True
     )
 
-    if skynet.regression:
-        skynet.set_learner(learner='etr', params='etr')
-        # skynet.set_learner(learner='gbr', params='gbr')
-        # skynet.set_learner(learner='rfr', params='forest')
-    else:
-        skynet.set_learner(learner='rfc', params='forest')
+    load_nh3_catalysts(learner=skynet, featgen=0)  # 0 is elemental, 1 is statistics,  2 is statmech
 
-    load_nh3_catalysts(learner=skynet, featgen=0) # 0 is elemental, 1 is statistics,  2 is statmech
+    # ***** Unsupervised Learning
+    # unsuprevised_pipline(skynet)
+    # unsupervised_exploration(skynet)
+    # exit()
+
+    # ***** Load Learner *****
+    # Options: rfr, etr, gbr, rfc (not operational)
+    model = 'rfr'
+    skynet.set_learner(learner=model, params=model)
+
+    # ***** Tune Hyperparameters *****
     # skynet.filter_master_dataset()
     # skynet.hyperparameter_tuning()
     # exit()
+
+    # ***** General Opreation *****
     temperature_slice(learner=skynet)
     prediction_pipeline(learner=skynet)
