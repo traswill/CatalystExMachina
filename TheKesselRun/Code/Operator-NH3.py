@@ -59,7 +59,7 @@ def prediction_pipeline(learner):
 
 
 def temperature_slice(learner):
-    for t in [None]: #['not350', 250, 300, 350, 400, 450, None]:
+    for t in ['350orless', 250, 300, 350, 400, 450, None]:
         learner.set_temp_filter(t)
         learner.filter_master_dataset()
 
@@ -73,19 +73,15 @@ def temperature_slice(learner):
         learner.preplot_processing()
         g = Graphic(learner=learner)
         g.plot_basic()
-        g.plot_err()
+        g.plot_err(color_bounds=(250, 450))
+        g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
 
-        #
-        # learner.plot_basic()
-        # learner.plot_error(metadata=True)
-        # # learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')
+        # Re-add these html generators once moved to Graphic
         # learner.bokeh_predictions()
         # learner.bokeh_by_elements()
 
 
-
-
-def unsuprevised_pipline(learner):
+def unsupervised_pipline(learner):
     learner.filter_master_dataset()
     learner.unsupervised_data_segmentation(n_clusters=2)
     learner.set_learner(learner='etr', params='etr')
@@ -326,6 +322,7 @@ def unsupervised_exploration(learner):
     sns.swarmplot(x='Wt1', y='Wt2', data=df_new, hue='group')
     plt.show()
 
+
 if __name__ == '__main__':
     # ***** Testing ML Models for Paper *****
     # d = test_all_ML_models()
@@ -342,24 +339,24 @@ if __name__ == '__main__':
     # ***** Begin Machine Learning *****
     skynet = Learner(
         average_data=True,
-        element_filter=None,
+        element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        version='v21',
+        version='v22',
         regression=True
     )
 
     load_nh3_catalysts(learner=skynet, featgen=0)  # 0 is elemental, 1 is statistics,  2 is statmech
 
     # ***** Unsupervised Learning
-    # unsuprevised_pipline(skynet)
+    # unsupervised_pipline(skynet)
     # unsupervised_exploration(skynet)
     # exit()
 
     # ***** Load Learner *****
     # Options: rfr, etr, gbr, rfc (not operational)
-    model = 'rfr'
+    model = 'etr'
     skynet.set_learner(learner=model, params=model)
 
     # ***** Tune Hyperparameters *****
@@ -369,4 +366,4 @@ if __name__ == '__main__':
 
     # ***** General Opreation *****
     temperature_slice(learner=skynet)
-    # prediction_pipeline(learner=skynet)
+    prediction_pipeline(learner=skynet)

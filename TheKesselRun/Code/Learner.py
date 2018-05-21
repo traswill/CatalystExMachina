@@ -3,6 +3,8 @@
 # Contact: travisw@email.sc.edu
 # Project Start: February 15, 2018
 
+from TheKesselRun.Code.Plotter import Graphic
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -205,7 +207,10 @@ class Learner():
                     'not400': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 400) &
                                                   (self.master_dataset.loc[:, 'temperature'] != 150)].index,
                     'not350': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 350) &
-                                                  (self.master_dataset.loc[:, 'temperature'] != 150)].index
+                                                  (self.master_dataset.loc[:, 'temperature'] != 150)].index,
+                    '350orless': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 450) &
+                                                     (self.master_dataset.loc[:, 'temperature'] != 400) &
+                                                     (self.master_dataset.loc[:, 'temperature'] != 150)].index,
                 }
 
                 temp_slice = temp_dict.get(temp_filter)
@@ -250,6 +255,8 @@ class Learner():
 
         # drop_element('Mo', filt)
         # drop_element('Ir', filt)
+
+        # Outliers?
         # for ids in [51, 57, 85, 86, 90, 107, 17, 93, 50, 87, 108]:
         #     for tempers in [350, 400, 450]:
         #         filt = drop_ID('{id}_{t}'.format(id=ids, t=tempers), filt)
@@ -325,9 +332,9 @@ class Learner():
         }
 
         etr_tuning_params = {
-            'n_estimators': [10, 25, 50, 100],
+            'n_estimators': [10, 25, 50, 100, 200, 400],
             'criterion': ['mae'],
-            'max_features': ['auto', 'sqrt'],
+            'max_features': ['auto', 'sqrt', 'log2', 0.2, 0.1, 0.05, 0.01],
             'max_depth': [None, 3, 5, 10],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 3, 5],
@@ -370,6 +377,8 @@ class Learner():
                             'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
                             'criterion':'mae'},
                 'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                        'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+                'etr-old': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
                         'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
                 'gbr': {'subsample': 0.5, 'n_estimators': 500, 'min_samples_split': 10, 'min_samples_leaf': 3,
                         'min_impurity_decrease': 0, 'max_leaf_nodes': 5, 'max_features': 'sqrt', 'max_depth': 5,
@@ -464,99 +473,106 @@ class Learner():
                     for key, val in x) for x in self.test_dataset['Element Dictionary']
         ]
         comparison_df['temperature'] = original_test_df['temperature']
+        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 450].index, inplace=True)
+        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 400].index, inplace=True)
 
-        rats = np.abs(np.subtract(predvals, measvals, out=np.zeros_like(predvals),
-                                  where=measvals != 0))
+        g = Graphic(learner=self, df=comparison_df)
+        g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
+        g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
 
-        rat_count = rats.size
-        wi5 = (rats < 0.05).sum()
-        wi10 = (rats < 0.10).sum()
-        wi20 = (rats < 0.20).sum()
-
-        x = np.array([0, 0.5, 1])
-        y = np.array([0, 0.5, 1])
-
-        fig, ax = plt.subplots()
-        ax.plot(x, y, lw=2, c='k')
-        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
-        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
-        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
-
-        plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
-            five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
-                    horizontalalignment='right', fontsize=6)
-
-        mean_abs_err = mean_absolute_error(measvals, predvals)
-        rmse = np.sqrt(mean_squared_error(measvals, predvals))
-
-        plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
-                    horizontalalignment='left', fontsize=6)
-
-        plt.figtext(0.5, 0.01, 'E{} A{} S{}'.format(self.element_filter, self.ammonia_filter, self.sv_filter),
-                    horizontalalignment='center', fontsize=6)
-
-        comparison_df.to_csv('{}\\{}-predict_{}.csv'.format(self.svfl, self.version, svnm))
-
-
-        uniq_features = np.unique(comparison_df['temperature'].values)
-
-        cmap = get_cmap('plasma')
-        norm = Normalize(vmin=250, vmax=450)
-
-        color_selector = {
-            150: cmap(norm(250)), # treat 150 as 250 for now
-            250: cmap(norm(250)),
-            300: cmap(norm(300)),
-            350: cmap(norm(350)),
-            400: cmap(norm(400)),
-            450: cmap(norm(450))
-        }
-
-        for feat in uniq_features:
-            slice = comparison_df['temperature'] == feat
-            ax.scatter(comparison_df.loc[slice, 'Predicted Conversion'], comparison_df.loc[slice, 'Measured Conversion'],
-                       c=color_selector.get(feat), label='{}{}C'.format(int(feat), u'\N{DEGREE SIGN}'),
-                       edgecolors='k')
-
-        plt.xlim(0,1)
-        plt.ylim(0,1)
-        plt.xlabel('Predicted Conversion')
-        plt.ylabel('Measured Conversion')
-        plt.legend(title='Temperature')
-        plt.tight_layout()
-        plt.savefig('{}\\{}-predict_{}.png'.format(self.svfl, self.version, svnm), dpi=400)
-        plt.close()
-
-        # START BOKEH PLOT
-        tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
-        hover = HoverTool(tooltips=[
-            ('Name', '@Name'),
-            ("ID", "@ID"),
-            ('T', '@temperature')
-        ])
-
-        tools.append(hover)
-
-        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=svnm)
-        p.x_range = Range1d(0, 1)
-        p.y_range = Range1d(0, 1)
-        p.background_fill_color = "#dddddd"
-        p.xaxis.axis_label = "Predicted Conversion"
-        p.yaxis.axis_label = "Measured Conversion"
-        p.grid.grid_line_color = "white"
-
-        # if self.plot_df['temperature_hues'].all() != 0:
-        #     self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
-        # else:
-        #     self.plot_df['bokeh_color'] = 'blue'
-
-        source = ColumnDataSource(comparison_df)
-
-        p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
-                 line_color="black", fill_alpha=0.8) # color='bokeh_color',
-
-        output_file("{}\\{}-predict_{}.html".format(self.svfl, self.version, svnm), title="stats.py")
-        save(p)
+        #
+        # rats = np.abs(np.subtract(predvals, measvals, out=np.zeros_like(predvals),
+        #                           where=measvals != 0))
+        #
+        # rat_count = rats.size
+        # wi5 = (rats < 0.05).sum()
+        # wi10 = (rats < 0.10).sum()
+        # wi20 = (rats < 0.20).sum()
+        #
+        # x = np.array([0, 0.5, 1])
+        # y = np.array([0, 0.5, 1])
+        #
+        # fig, ax = plt.subplots()
+        # ax.plot(x, y, lw=2, c='k')
+        # ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
+        # ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
+        # ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
+        #
+        # plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+        #     five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
+        #             horizontalalignment='right', fontsize=6)
+        #
+        # mean_abs_err = mean_absolute_error(measvals, predvals)
+        # rmse = np.sqrt(mean_squared_error(measvals, predvals))
+        #
+        # plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
+        #             horizontalalignment='left', fontsize=6)
+        #
+        # plt.figtext(0.5, 0.01, 'E{} A{} S{}'.format(self.element_filter, self.ammonia_filter, self.sv_filter),
+        #             horizontalalignment='center', fontsize=6)
+        #
+        # comparison_df.to_csv('{}\\{}-predict_{}.csv'.format(self.svfl, self.version, svnm))
+        #
+        #
+        # uniq_features = np.unique(comparison_df['temperature'].values)
+        #
+        # cmap = get_cmap('plasma')
+        # norm = Normalize(vmin=250, vmax=450)
+        #
+        # color_selector = {
+        #     150: cmap(norm(250)), # treat 150 as 250 for now
+        #     250: cmap(norm(250)),
+        #     300: cmap(norm(300)),
+        #     350: cmap(norm(350)),
+        #     400: cmap(norm(400)),
+        #     450: cmap(norm(450))
+        # }
+        #
+        # for feat in uniq_features:
+        #     slice = comparison_df['temperature'] == feat
+        #     ax.scatter(comparison_df.loc[slice, 'Predicted Conversion'], comparison_df.loc[slice, 'Measured Conversion'],
+        #                c=color_selector.get(feat), label='{}{}C'.format(int(feat), u'\N{DEGREE SIGN}'),
+        #                edgecolors='k')
+        #
+        # plt.xlim(0,1)
+        # plt.ylim(0,1)
+        # plt.xlabel('Predicted Conversion')
+        # plt.ylabel('Measured Conversion')
+        # plt.legend(title='Temperature')
+        # plt.tight_layout()
+        # plt.savefig('{}\\{}-predict_{}.png'.format(self.svfl, self.version, svnm), dpi=400)
+        # plt.close()
+        #
+        # # START BOKEH PLOT
+        # tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
+        # hover = HoverTool(tooltips=[
+        #     ('Name', '@Name'),
+        #     ("ID", "@ID"),
+        #     ('T', '@temperature')
+        # ])
+        #
+        # tools.append(hover)
+        #
+        # p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=svnm)
+        # p.x_range = Range1d(0, 1)
+        # p.y_range = Range1d(0, 1)
+        # p.background_fill_color = "#dddddd"
+        # p.xaxis.axis_label = "Predicted Conversion"
+        # p.yaxis.axis_label = "Measured Conversion"
+        # p.grid.grid_line_color = "white"
+        #
+        # # if self.plot_df['temperature_hues'].all() != 0:
+        # #     self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
+        # # else:
+        # #     self.plot_df['bokeh_color'] = 'blue'
+        #
+        # source = ColumnDataSource(comparison_df)
+        #
+        # p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
+        #          line_color="black", fill_alpha=0.8) # color='bokeh_color',
+        #
+        # output_file("{}\\{}-predict_{}.html".format(self.svfl, self.version, svnm), title="stats.py")
+        # save(p)
 
     def predict_dataset(self):
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
