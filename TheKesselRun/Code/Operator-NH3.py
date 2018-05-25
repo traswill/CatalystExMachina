@@ -5,6 +5,7 @@ from TheKesselRun.Code.Plotter import Graphic
 import itertools
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 import seaborn as sns
 
 
@@ -34,6 +35,7 @@ def load_nh3_catalysts(learner, featgen=0):
             cat.input_n_averaged_samples(row['nAveraged'])
         cat.activity = row['Concentration']
         cat.feature_add_n_elements()
+        # cat.add_Lp_norms()
         # cat.feature_add_oxidation_states()
 
         feature_generator = {
@@ -49,17 +51,23 @@ def load_nh3_catalysts(learner, featgen=0):
 
 
 def prediction_pipeline(learner):
+    learner.set_temp_filter(None)
     learner.filter_master_dataset()
     learner.train_data()
+    learner.set_temp_filter('350orless')
+    learner.filter_master_dataset()
     learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
 
+    learner.set_temp_filter(None)
     learner.filter_master_dataset()
     learner.train_data()
+    learner.set_temp_filter('350orless')
+    learner.filter_master_dataset()
     learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
 
 
-def temperature_slice(learner):
-    for t in ['350orless', 250, 300, 350, 400, 450, None]:
+def temperature_slice(learner, tslice):
+    for t in tslice:
         learner.set_temp_filter(t)
         learner.filter_master_dataset()
 
@@ -72,9 +80,19 @@ def temperature_slice(learner):
             learner.evaluate_classification_learner()
         learner.preplot_processing()
         g = Graphic(learner=learner)
+        g.plot_important_features()
         g.plot_basic()
-        g.plot_err(color_bounds=(250, 450))
-        g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
+        g.plot_err()
+        g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
+        g.plot_kernel_density(feat_list=['Second Ionization Energy_wt-mad',
+                                         'Number d-shell Valance Electrons_wt-mad',
+                                         'Periodic Table Column_wt-mad',
+                                         'Electronegativity_wt-mad',
+                                         'Number Valence Electrons_wt-mean',
+                                         ], margins=False)
+
+        # g.plot_err(color_bounds=(250, 450))
+        # g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
 
         # Re-add these html generators once moved to Graphic
         # learner.bokeh_predictions()
@@ -322,8 +340,14 @@ def unsupervised_exploration(learner):
     sns.swarmplot(x='Wt1', y='Wt2', data=df_new, hue='group')
     plt.show()
 
+def generate_kde_plots(feature):
+    pass
+
 
 if __name__ == '__main__':
+    # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
+    # exit()
+
     # ***** Testing ML Models for Paper *****
     # d = test_all_ML_models()
     # plot_all_ML_models(d)
@@ -343,7 +367,7 @@ if __name__ == '__main__':
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        version='v22',
+        version='v23',
         regression=True
     )
 
@@ -365,5 +389,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    temperature_slice(learner=skynet)
+    temperature_slice(learner=skynet, tslice=[250, 300, 350, '350orless', 'not450']) # ['350orless', 250, 300, 350, 400, 450, None]
     prediction_pipeline(learner=skynet)

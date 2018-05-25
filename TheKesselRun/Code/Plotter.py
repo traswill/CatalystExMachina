@@ -3,6 +3,7 @@ import numpy as np
 
 import seaborn as sns
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import rgb2hex, BoundaryNorm, to_hex, Normalize
 from matplotlib import  cm
@@ -18,6 +19,8 @@ from bokeh.layouts import row, widgetbox, column, layout
 
 class Graphic():
     def __init__(self, learner, df=None):
+        sns.set(palette='plasma', context='paper', style='white')
+
         self.learner = learner
         if df is None:
             self.graphdf = learner.plot_df
@@ -114,7 +117,7 @@ class Graphic():
                         y=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'Measured Conversion'],
                         c=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'clr'].values,
                         label='{}{}C'.format(int(tmp), u'\N{DEGREE SIGN}'),
-                        edgecolors='k')
+                        edgecolors='k', linewidth=1)
 
         x = np.array([0, 0.5, 1])
         y = np.array([0, 0.5, 1])
@@ -155,6 +158,73 @@ class Graphic():
             plt.savefig('{}//figures//{}.png'.format(self.learner.svfl, svnm), dpi=400)
         plt.close()
 
+    def plot_kernel_density(self, feat_list=None, margins=True):
+        if feat_list is None:
+            self.learner.feature_importance_df.sort_values(by='Feature Importance', inplace=True, ascending=False)
+            top_features = self.learner.feature_importance_df.head().index
+
+        for feat in feat_list:
+            if margins:
+                g = sns.jointplot(x=feat, y='Measured Conversion',  data=self.learner.slave_dataset, kind='kde', color='k',
+                                  stat_func=None)
+                g.plot_joint(plt.scatter, c='w', s=15, linewidth=1, marker=".")
+                g.ax_joint.collections[0].set_alpha(0)
+            else:
+                fig, ax = plt.subplots(figsize=(5,5))
+                sns.kdeplot(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
+                                cmap='Greys', shade=True, shade_lowest=False, ax=ax)
+                ax.scatter(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
+                            c='w', s=15, marker='.')
+
+            # Modifying things for publication
+            lim_dict = {
+                'Number d-shell Valance Electrons_wt-mad': plt.xlim(-2.5, 17.5),
+                'Periodic Table Column_wt-mad': plt.xlim(0, 35),
+                'Second Ionization Energy_wt-mad': plt.xlim(500, 700)
+            }
+
+            lim_dict.get(feat, plt.autoscale())
+            plt.ylim(-0.3, 1.3)
+
+            plt.xlabel(feat.split('_')[0])
+
+            plt.tight_layout()
+            plt.savefig('{}//Figures//{}-{}'.format(self.learner.svfl, feat, self.learner.svnm), dpi=400)
+            plt.close()
+
+    def plot_important_features(self):
+        df = self.learner.feature_importance_df.copy()
+        df.sort_values(by='Feature Importance', inplace=True, ascending=False)
+        df.rename(index={'reactor_number':'Reactor', 'temperature':'Temperature','space_velocity':'Space Velocity',
+                         'n_elements':'Number of Elements', 'ammonia_concentration':'Ammonia Concentration',
+                         }, inplace=True)
+
+        pltdf = pd.DataFrame()
+
+        for idx in df.index.values:
+            spidx = idx.split('_')
+
+            df.loc[idx, 'Feature'] = spidx[0]
+
+            if len(spidx) == 2:
+                df.loc[idx, 'Type'] = spidx[1]
+                pltdf.loc[spidx[0], spidx[1]] = df.loc[idx, 'Feature Importance']
+            else:
+                df.loc[idx, 'Type'] = 'N/A'
+                pltdf.loc[spidx[0], 'N/A'] = df.loc[idx, 'Feature Importance']
+
+        f, ax = plt.subplots(figsize=(8, 20))
+        # sns.barplot(x="Feature Importance", y="Feature", data=df, color="b")
+        sns.set_palette('muted')
+        pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax)
+        plt.gca().invert_yaxis()
+
+        plt.tight_layout()
+        plt.savefig('{}//Figures//features-{}'.format(self.learner.svfl, self.learner.svnm), dpi=400)
+        plt.close()
+        sns.set_palette('plasma')
+
+# TODO Implement Bokeh
     def bokeh_predictions(self):
         """ Comment """
         if self.predictions is None:

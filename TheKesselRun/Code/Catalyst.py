@@ -73,15 +73,16 @@ class Catalyst():
         eledf = eledf.loc[list(self.elements.keys())]
 
         # Methods of processing different features
-        def calc_weighted_average(self, values, weights, feature_name):
-            numor = np.sum(values * weights)
-            denom = np.sum(weights)
-            self.feature_add('{nm}_wtavg'.format(nm=feature_name), numor/denom)
+        def calc_valence(self, values, weights, feature_name):
+            pass
 
         def calc_statistics(self, values, weights, feature_name):
-            self.feature_add('{}_mean'.format(feature_name), np.mean(values))
-            self.feature_add('{}_mad'.format(feature_name), np.mean(np.abs(values-np.mean(values))))
-            # self.feature_add('{}_med'.format(feature_name), np.median(values))
+            # self.feature_add('{}_mean'.format(feature_name), np.mean(values))
+            # self.feature_add('{}_mad'.format(feature_name), np.mean(np.abs(values-np.mean(values))))
+            fwmean = np.sum(values * weights)/np.sum(weights)
+            avgdev = np.sum(weights * np.abs(values)* np.mean(values))/np.sum(weights)
+            self.feature_add('{}_wt-mean'.format(feature_name), fwmean)
+            self.feature_add('{}_wt-mad'.format(feature_name), avgdev)
             # self.feature_add('{}_min'.format(feature_name), np.max(values))
             # self.feature_add('{}_max'.format(feature_name), np.min(values))
             # self.feature_add('{}_rng'.format(feature_name), np.max(values)-np.min(values))
@@ -89,38 +90,37 @@ class Catalyst():
         # Create Dictionary to process each feature differently
         process_dict = {
             'Atomic Number': calc_statistics,
-            # 'Abbreviation': None,
-            'Atomic Volume': calc_weighted_average,
-            'Atomic Weight': calc_weighted_average,
-            'Boiling Temperature': calc_weighted_average,
+            'Atomic Volume': calc_statistics,
+            'Atomic Weight': calc_statistics,
+            'Boiling Temperature': calc_statistics,
             'Periodic Table Column': calc_statistics,
-            'Conductivity': calc_weighted_average,
-            'Covalent Radius': calc_weighted_average,
-            'Density': calc_weighted_average,
-            'Dipole Polarizability': calc_weighted_average,
-            'Electron Affinity': calc_weighted_average,
-            'Electronegativity': calc_weighted_average,
-            'Fusion Enthalpy': calc_weighted_average,
-            'GS Bandgap': calc_weighted_average,
-            'GS Energy': calc_weighted_average,
-            'Heat Capacity (Mass)': calc_weighted_average,
-            'Heat Capacity (Molar)': calc_weighted_average,
-            'Heat Fusion': calc_weighted_average,
-            'First Ionization Energy': calc_weighted_average,
-            'Second Ionization Energy': calc_weighted_average,
-            'Third Ionization Energy': calc_weighted_average,
-            'Fourth Ionization Energy': calc_weighted_average,
-            'Fifth Ionization Energy': calc_weighted_average,
-            'Sixth Ionization Energy': calc_weighted_average,
-            'Seventh Ionization Energy': calc_weighted_average,
-            'Eighth Ionization Energy': calc_weighted_average,
+            'Conductivity': calc_statistics,
+            'Covalent Radius': calc_statistics,
+            'Density': calc_statistics,
+            'Dipole Polarizability': calc_statistics,
+            'Electron Affinity': calc_statistics,
+            'Electronegativity': calc_statistics,
+            'Fusion Enthalpy': calc_statistics,
+            'GS Bandgap': calc_statistics,
+            'GS Energy': calc_statistics,
+            'Heat Capacity (Mass)': calc_statistics,
+            'Heat Capacity (Molar)': calc_statistics,
+            'Heat Fusion': calc_statistics,
+            'First Ionization Energy': calc_statistics,
+            'Second Ionization Energy': calc_statistics,
+            'Third Ionization Energy': calc_statistics,
+            'Fourth Ionization Energy': calc_statistics,
+            'Fifth Ionization Energy': calc_statistics,
+            'Sixth Ionization Energy': calc_statistics,
+            'Seventh Ionization Energy': calc_statistics,
+            'Eighth Ionization Energy': calc_statistics,
             'IsAlkali': calc_statistics,
             'IsDBlock': calc_statistics,
             'IsFBlock': calc_statistics,
             'IsMetal': calc_statistics,
             'IsMetalloid': calc_statistics,
             'IsNonmetal': calc_statistics,
-            'Melting Temperature': calc_weighted_average,
+            'Melting Temperature': calc_statistics,
             'Mendeleev Number': calc_statistics,
             'Number d-shell Unfilled Electrons': calc_statistics,
             'Number d-shell Valance Electrons': calc_statistics,
@@ -132,7 +132,7 @@ class Catalyst():
             'Number s-shell Valance Electrons': calc_statistics,
             'Number Unfilled Electrons': calc_statistics,
             'Number Valence Electrons': calc_statistics,
-            'Polarizability': calc_weighted_average,
+            'Polarizability': calc_statistics,
             'Periodic Table Row': calc_statistics,
             'phi': calc_statistics,
             'Zunger Pseudopotential (d)': calc_statistics,
@@ -150,6 +150,14 @@ class Catalyst():
                 np.fromiter(self.elements.values(), dtype=float),
                 feature_name
             )
+
+    def add_Lp_norms(self):
+        vals = np.fromiter(self.elements.values(), dtype=float)
+        sm = np.sum(vals)
+
+        for p in [2, 3, 5, 7, 10]:
+            pnorm = np.sum(np.power(vals / sm, p))**(1/p)
+            self.feature_add(key='Lp{}'.format(p), value=pnorm)
 
     def feature_add_n_elements(self):
         n_eles = 0

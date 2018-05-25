@@ -60,6 +60,7 @@ class Learner():
         self.labels_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
         self.predictions = list()
+        self.feature_importance_df = pd.DataFrame()
 
         '''Initialize ML algorithm and tuning parameters'''
         self.machina = None
@@ -480,100 +481,6 @@ class Learner():
         g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
         g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
 
-        #
-        # rats = np.abs(np.subtract(predvals, measvals, out=np.zeros_like(predvals),
-        #                           where=measvals != 0))
-        #
-        # rat_count = rats.size
-        # wi5 = (rats < 0.05).sum()
-        # wi10 = (rats < 0.10).sum()
-        # wi20 = (rats < 0.20).sum()
-        #
-        # x = np.array([0, 0.5, 1])
-        # y = np.array([0, 0.5, 1])
-        #
-        # fig, ax = plt.subplots()
-        # ax.plot(x, y, lw=2, c='k')
-        # ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
-        # ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
-        # ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
-        #
-        # plt.figtext(0.99, 0.01, 'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
-        #     five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
-        #             horizontalalignment='right', fontsize=6)
-        #
-        # mean_abs_err = mean_absolute_error(measvals, predvals)
-        # rmse = np.sqrt(mean_squared_error(measvals, predvals))
-        #
-        # plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
-        #             horizontalalignment='left', fontsize=6)
-        #
-        # plt.figtext(0.5, 0.01, 'E{} A{} S{}'.format(self.element_filter, self.ammonia_filter, self.sv_filter),
-        #             horizontalalignment='center', fontsize=6)
-        #
-        # comparison_df.to_csv('{}\\{}-predict_{}.csv'.format(self.svfl, self.version, svnm))
-        #
-        #
-        # uniq_features = np.unique(comparison_df['temperature'].values)
-        #
-        # cmap = get_cmap('plasma')
-        # norm = Normalize(vmin=250, vmax=450)
-        #
-        # color_selector = {
-        #     150: cmap(norm(250)), # treat 150 as 250 for now
-        #     250: cmap(norm(250)),
-        #     300: cmap(norm(300)),
-        #     350: cmap(norm(350)),
-        #     400: cmap(norm(400)),
-        #     450: cmap(norm(450))
-        # }
-        #
-        # for feat in uniq_features:
-        #     slice = comparison_df['temperature'] == feat
-        #     ax.scatter(comparison_df.loc[slice, 'Predicted Conversion'], comparison_df.loc[slice, 'Measured Conversion'],
-        #                c=color_selector.get(feat), label='{}{}C'.format(int(feat), u'\N{DEGREE SIGN}'),
-        #                edgecolors='k')
-        #
-        # plt.xlim(0,1)
-        # plt.ylim(0,1)
-        # plt.xlabel('Predicted Conversion')
-        # plt.ylabel('Measured Conversion')
-        # plt.legend(title='Temperature')
-        # plt.tight_layout()
-        # plt.savefig('{}\\{}-predict_{}.png'.format(self.svfl, self.version, svnm), dpi=400)
-        # plt.close()
-        #
-        # # START BOKEH PLOT
-        # tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
-        # hover = HoverTool(tooltips=[
-        #     ('Name', '@Name'),
-        #     ("ID", "@ID"),
-        #     ('T', '@temperature')
-        # ])
-        #
-        # tools.append(hover)
-        #
-        # p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=svnm)
-        # p.x_range = Range1d(0, 1)
-        # p.y_range = Range1d(0, 1)
-        # p.background_fill_color = "#dddddd"
-        # p.xaxis.axis_label = "Predicted Conversion"
-        # p.yaxis.axis_label = "Measured Conversion"
-        # p.grid.grid_line_color = "white"
-        #
-        # # if self.plot_df['temperature_hues'].all() != 0:
-        # #     self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
-        # # else:
-        # #     self.plot_df['bokeh_color'] = 'blue'
-        #
-        # source = ColumnDataSource(comparison_df)
-        #
-        # p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
-        #          line_color="black", fill_alpha=0.8) # color='bokeh_color',
-        #
-        # output_file("{}\\{}-predict_{}.html".format(self.svfl, self.version, svnm), title="stats.py")
-        # save(p)
-
     def predict_dataset(self):
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
         data = data.drop(
@@ -591,6 +498,8 @@ class Learner():
         if self.cluster is None:
             self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(kfold))
+            self.slave_dataset['predictions'] = self.predictions
+
         else:
             group_df = pd.DataFrame(self.groups, index=self.slave_dataset.index)
             preddf = pd.DataFrame()
@@ -615,6 +524,8 @@ class Learner():
             self.slave_dataset['predictions'] = preddf
             self.predictions = self.slave_dataset['predictions'].values
 
+        self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+
     def save_predictions(self):
         """ Comment """
         if self.predictions is not None:
@@ -630,6 +541,8 @@ class Learner():
         try:
             df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
                           columns=['Feature Importance'])
+
+            self.feature_importance_df = df
         except AttributeError:
             return
 
@@ -638,8 +551,21 @@ class Learner():
 
         if sv:
             df.to_csv('{}//features//feature_importance-{}.csv'.format(self.svfl, self.svnm))
+
+            new_df = pd.DataFrame()
+
+            for nm in df.index:
+                df.loc[nm, 'Feature'] = nm.split('_')[0]
+
+            for feat in df.Feature.unique():
+                new_df.loc[feat, 'Feature Importance'] = df[df['Feature'] == feat]['Feature Importance'].sum()
+
+            new_df.sort_values('Feature Importance', ascending=False, inplace=True)
+            new_df.to_csv('{}//features//feature_importance-{}-summed.csv'.format(self.svfl, self.svnm))
         else:
             return df
+
+
 
     def evaluate_regression_learner(self):
         """ Comment """
