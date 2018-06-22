@@ -480,6 +480,7 @@ class Learner():
         g = Graphic(learner=self, df=comparison_df)
         g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
         g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
+        g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
 
     def predict_dataset(self):
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
@@ -529,8 +530,8 @@ class Learner():
     def save_predictions(self):
         """ Comment """
         if self.predictions is not None:
-            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels_df.values]).T,
-                              columns=['ID', 'Predicted Conversion', 'Measured Conversion'])
+            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels_df.values, self.groups]).T,
+                              columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')

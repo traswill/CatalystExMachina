@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
+import numpy as np
 
 
 def load_nh3_catalysts(learner, featgen=0):
@@ -18,6 +19,12 @@ def load_nh3_catalysts(learner, featgen=0):
         df = pd.read_csv(r"..\Data\Processed\AllData.csv", index_col=0)
 
     cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
+
+    xrd_intensity_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_Peak_Extraction.csv', index_col=0)
+    xrd_intensity_lst = np.array(xrd_intensity_df.columns.values, dtype=int).tolist()
+
+    xrd_fwhm_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_FWHM_Extraction.csv', index_col=0)
+    xrd_fwhm_lst = np.array(xrd_fwhm_df.index.values, dtype=int).tolist()
 
     for index, row in df.iterrows():
         cat = Catalyst()
@@ -37,7 +44,15 @@ def load_nh3_catalysts(learner, featgen=0):
         cat.feature_add_n_elements()
         # cat.add_Lp_norms()
         # cat.feature_add_oxidation_states()
+        if row['ID'] in xrd_intensity_lst:
+            xrd_xs = xrd_intensity_df.index.values
+            xrd_ys = xrd_intensity_df.loc[:, str(row['ID'])].values
+            cat.feature_add_xrd_peaks(xrd_xs, xrd_ys)
 
+        if row['ID'] in xrd_fwhm_lst:
+            dat = xrd_fwhm_df.loc[row['ID']]
+            for nm, val in dat.iteritems():
+                cat.feature_add_xrd_peak_FWHM(peak_nm=nm, peak_fwhm=val)
         feature_generator = {
             0: cat.feature_add_elemental_properties,
             1: cat.feature_add_statistics,
@@ -79,23 +94,24 @@ def temperature_slice(learner, tslice):
         else:
             learner.evaluate_classification_learner()
         learner.preplot_processing()
+        learner.save_predictions()
         g = Graphic(learner=learner)
         g.plot_important_features()
         g.plot_basic()
         g.plot_err()
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
-        g.plot_kernel_density(feat_list=['Second Ionization Energy_wt-mad',
-                                         'Number d-shell Valance Electrons_wt-mad',
-                                         'Periodic Table Column_wt-mad',
-                                         'Electronegativity_wt-mad',
-                                         'Number Valence Electrons_wt-mean',
-                                         ], margins=False)
+        # g.plot_kernel_density(feat_list=['Second Ionization Energy_wt-mad',
+        #                                  'Number d-shell Valance Electrons_wt-mad',
+        #                                  'Periodic Table Column_wt-mad',
+        #                                  'Electronegativity_wt-mad',
+        #                                  'Number Valence Electrons_wt-mean',
+        #                                  ], margins=False)
 
         # g.plot_err(color_bounds=(250, 450))
         # g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
 
         # Re-add these html generators once moved to Graphic
-        # learner.bokeh_predictions()
+        g.bokeh_predictions()
         # learner.bokeh_by_elements()
 
 
@@ -111,6 +127,10 @@ def unsupervised_pipline(learner):
 
 
 def predict_all_binaries():
+    SV = 2000
+    NH3 = 10
+    TMP = 350
+
     # TODO migrate into learner
     def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
         cat = Catalyst()
@@ -136,15 +156,15 @@ def predict_all_binaries():
     skynet = Learner(
         average_data=True,
         element_filter=0,
-        temperature_filter=None,
-        version='v20-pred',
+        # temperature_filter=None,
+        # ammonia_filter=1,
+        # space_vel_filter=2000,
+        version='v24-pred',
         regression=True
     )
 
-    if skynet.regression:
-        skynet.set_learner(learner='rfr', params='default')
-    else:
-        skynet.set_learner(learner='rfc', params='default')
+    model = 'etr'
+    skynet.set_learner(learner=model, params=model)
 
     eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
     ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
@@ -155,18 +175,16 @@ def predict_all_binaries():
     combos = list(itertools.combinations(eles, r=2))
 
     for vals in combos:
-        tmp = 250
-
         cat1 = create_catalyst(e1=vals[0], w1=3, e2=vals[1], w2=1, e3='K', w3=12,
-                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
         skynet.add_catalyst('Predict', cat1)
 
         cat2 = create_catalyst(e1=vals[0], w1=2, e2=vals[1], w2=2, e3='K', w3=12,
-                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
         skynet.add_catalyst('Predict', cat2)
 
         cat3 = create_catalyst(e1=vals[0], w1=1, e2=vals[1], w2=3, e3='K', w3=12,
-                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
         skynet.add_catalyst('Predict', cat3)
 
     load_nh3_catalysts(skynet, featgen=0)
@@ -176,6 +194,10 @@ def predict_all_binaries():
 
 
 def predict_half_Ru_catalysts():
+    SV = 2000
+    NH3 = 10
+    TMP = 350
+
     def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
         cat = Catalyst()
         cat.ID = 'A'
@@ -200,15 +222,15 @@ def predict_half_Ru_catalysts():
     skynet = Learner(
         average_data=True,
         element_filter=0,
-        temperature_filter=None,
-        version='v20-pred',
+        # temperature_filter=None,
+        # ammonia_filter=1,
+        # space_vel_filter=2000,
+        version='v24-pred',
         regression=True
     )
 
-    if skynet.regression:
-        skynet.set_learner(learner='rfr', params='default')
-    else:
-        skynet.set_learner(learner='rfc', params='default')
+    model = 'etr'
+    skynet.set_learner(learner=model, params=model)
 
     eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
     ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
@@ -218,14 +240,12 @@ def predict_half_Ru_catalysts():
     eles = ele_df.index.values
 
     for val in eles:
-        tmp = 300
-
         cat1 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=4, e3='K', w3=12,
-                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
         skynet.add_catalyst('Predict', cat1)
 
         cat2 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=2, e3='K', w3=12,
-                               tmp=tmp, reactnum=1, space_vel=2000, ammonia_conc=1)
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
         skynet.add_catalyst('Predict', cat2)
 
     load_nh3_catalysts(skynet, featgen=0)
@@ -234,7 +254,7 @@ def predict_half_Ru_catalysts():
     return skynet, skynet.predict_dataset()
 
 
-def process_prediction_dataframes(learner, dat_df):
+def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
     nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
     df = pd.DataFrame(dat_df['Predictions'])
 
@@ -251,7 +271,7 @@ def process_prediction_dataframes(learner, dat_df):
         df.loc[inx, 'Loading 3'] = vals[2]
         df.loc[inx, 'Name'] = '{}{} {}{} {}{}'.format(vals.index[0], vals[0], vals.index[1], vals[1], vals.index[2], vals[2])
 
-    df.to_csv('{}//{}-Processed.csv'.format(learner.svfl, learner.version))
+    df.to_csv('{}//{}-{}.csv'.format(learner.svfl, learner.version, svnm))
 
 
 def test_all_ML_models():
@@ -355,19 +375,20 @@ if __name__ == '__main__':
 
     # ***** Predict Binaries and 0.5Ru Catalysts *****
     # skynet, df = predict_all_binaries()
-    # process_prediction_dataframes(skynet, df)
+    # process_prediction_dataframes(skynet, df, svnm='binaries')
+    #
     # skynet, df = predict_half_Ru_catalysts()
-    # process_prediction_dataframes(skynet, df)
+    # process_prediction_dataframes(skynet, df, svnm='half-ru')
     # exit()
 
     # ***** Begin Machine Learning *****
     skynet = Learner(
         average_data=True,
-        element_filter=3,
+        element_filter=0,
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        version='v23',
+        version='v24',
         regression=True
     )
 
@@ -389,5 +410,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    temperature_slice(learner=skynet, tslice=[250, 300, 350, '350orless', 'not450']) # ['350orless', 250, 300, 350, 400, 450, None]
+    temperature_slice(learner=skynet, tslice=['350orless', 250, 300]) # ['350orless', 250, 300, 350, 400, 450, None]
     prediction_pipeline(learner=skynet)

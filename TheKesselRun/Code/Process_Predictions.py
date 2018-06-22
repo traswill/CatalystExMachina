@@ -21,7 +21,7 @@ def raw_to_processed(pth):
         df.loc[inx, 'Loading 3'] = vals[2]
         df.loc[inx, 'Name'] = '{}{} {}{} {}{}'.format(vals.index[0], vals[0], vals.index[1], vals[1], vals.index[2], vals[2])
 
-    df.to_csv('{}-Processed.csv'.format(pth))
+    df.to_csv('{}-mod.csv'.format(pth))
 
 def plot_heatmap():
     pass
@@ -53,6 +53,6 @@ def plot_heatmap():
     #             square=True, linewidths=.5, cbar_kws={"shrink": .5})
 
 if __name__ == '__main__':
-    raw_to_processed(pth='../Results/v20-pred_r/v20-pred-HalfRu')
+    raw_to_processed(pth=r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v24-pred_r\v24-pred-binaries')
     # raw_to_processed(pth='../Results/v15-pred_r/v15-pred-HalfRu-300C')
 

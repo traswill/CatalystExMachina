@@ -151,7 +151,7 @@ class Catalyst():
                 feature_name
             )
 
-    def add_Lp_norms(self):
+    def feature_add_Lp_norms(self):
         vals = np.fromiter(self.elements.values(), dtype=float)
         sm = np.sum(vals)
 
@@ -190,3 +190,14 @@ class Catalyst():
             for index, _ in enumerate(self.elements):
                 self.feature_add('{nm}_{index}'.format(nm=feature_name, index=index),
                                  feature_values.values[index])
+
+    def feature_add_xrd_peaks(self, peak_xx, peak_yy):
+        # Adds peak intensities
+        peak_xx = ['XRD 2TH {:0.2f}'.format(x) for x in peak_xx]
+        bundle_data = list(zip(peak_xx, peak_yy))
+
+        for x, y in bundle_data:
+            self.feature_add(key=x, value=y)
+
+    def feature_add_xrd_peak_FWHM(self, peak_nm, peak_fwhm):
+        self.feature_add(key=peak_nm, value=peak_fwhm)

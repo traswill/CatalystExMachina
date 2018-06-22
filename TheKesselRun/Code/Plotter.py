@@ -159,6 +159,13 @@ class Graphic():
         plt.close()
 
     def plot_kernel_density(self, feat_list=None, margins=True):
+        """
+
+        :param feat_list: A list of features to be plotted
+        :param margins:
+        :return:
+        """
+
         if feat_list is None:
             self.learner.feature_importance_df.sort_values(by='Feature Importance', inplace=True, ascending=False)
             top_features = self.learner.feature_importance_df.head().index
@@ -175,6 +182,7 @@ class Graphic():
                                 cmap='Greys', shade=True, shade_lowest=False, ax=ax)
                 ax.scatter(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
                             c='w', s=15, marker='.')
+
 
             # Modifying things for publication
             lim_dict = {
@@ -225,11 +233,8 @@ class Graphic():
         sns.set_palette('plasma')
 
 # TODO Implement Bokeh
-    def bokeh_predictions(self):
+    def bokeh_predictions(self, svnm=None):
         """ Comment """
-        if self.predictions is None:
-            self.predict_crossvalidate()
-
         tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
         hover = HoverTool(tooltips=[
             ('Name', '@Name'),
@@ -239,7 +244,7 @@ class Graphic():
 
         tools.append(hover)
 
-        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.learner.svnm)
         p.x_range = Range1d(0,1)
         p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
@@ -247,17 +252,14 @@ class Graphic():
         p.yaxis.axis_label = "Measured Conversion"
         p.grid.grid_line_color = "white"
 
-        if self.plot_df['temperature_hues'].all() != 0:
-            self.plot_df['bokeh_color'] = self.plot_df['temperature_hues'].apply(rgb2hex)
-        else:
-            self.plot_df['bokeh_color'] = 'blue'
-
-        source = ColumnDataSource(self.plot_df)
+        source = ColumnDataSource(self.graphdf)
 
         p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
-                 color='bokeh_color', line_color="black", fill_alpha=0.8)
-
-        output_file("{}\\htmls\\{}.html".format(self.svfl, self.svnm), title="stats.py")
+                 color='clr', line_color="black", fill_alpha=0.8)
+        if svnm is None:
+            output_file("{}\\htmls\\{}.html".format(self.learner.svfl, self.learner.svnm), title="stats.py")
+        else:
+            output_file("{}\\htmls\\{}.html".format(self.learner.svfl, svnm), title="stats.py")
         save(p)
 
     def bokeh_by_elements(self):
