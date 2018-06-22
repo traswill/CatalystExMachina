@@ -158,11 +158,11 @@ class Graphic():
             plt.savefig('{}//figures//{}.png'.format(self.learner.svfl, svnm), dpi=400)
         plt.close()
 
-    def plot_kernel_density(self, feat_list=None, margins=True):
+    def plot_kernel_density(self, feat_list=None, margins=True, element=None):
         """
 
         :param feat_list: A list of features to be plotted
-        :param margins:
+        :param margins: Whether to have KDE 1D plots in the margins or plane plots
         :return:
         """
 
@@ -180,9 +180,13 @@ class Graphic():
                 fig, ax = plt.subplots(figsize=(5,5))
                 sns.kdeplot(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
                                 cmap='Greys', shade=True, shade_lowest=False, ax=ax)
+
                 ax.scatter(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
                             c='w', s=15, marker='.')
 
+                if element is not None:
+                    df = self.learner.slave_dataset[self.learner.slave_dataset['{} Loading'.format(element)] != 0].copy()
+                    ax.scatter(df[feat], df['Measured Conversion'], c='r', s=15, marker='x')
 
             # Modifying things for publication
             lim_dict = {
@@ -197,7 +201,10 @@ class Graphic():
             plt.xlabel(feat.split('_')[0])
 
             plt.tight_layout()
-            plt.savefig('{}//Figures//{}-{}'.format(self.learner.svfl, feat, self.learner.svnm), dpi=400)
+            if element is not None:
+                plt.savefig('{}//Figures//{}-{}-{}'.format(self.learner.svfl, feat, self.learner.svnm, element), dpi=400)
+            else:
+                plt.savefig('{}//Figures//{}-{}'.format(self.learner.svfl, feat, self.learner.svnm), dpi=400)
             plt.close()
 
     def plot_important_features(self):

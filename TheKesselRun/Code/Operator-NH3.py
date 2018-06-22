@@ -100,12 +100,12 @@ def temperature_slice(learner, tslice):
         g.plot_basic()
         g.plot_err()
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
-        # g.plot_kernel_density(feat_list=['Second Ionization Energy_wt-mad',
-        #                                  'Number d-shell Valance Electrons_wt-mad',
-        #                                  'Periodic Table Column_wt-mad',
-        #                                  'Electronegativity_wt-mad',
-        #                                  'Number Valence Electrons_wt-mean',
-        #                                  ], margins=False)
+        g.plot_kernel_density(feat_list=['Second Ionization Energy_wt-mad',
+                                         'Number d-shell Valance Electrons_wt-mad',
+                                         'Periodic Table Column_wt-mad',
+                                         'Electronegativity_wt-mad',
+                                         'Number Valence Electrons_wt-mean',
+                                         ], margins=False, element='Hf')
 
         # g.plot_err(color_bounds=(250, 450))
         # g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
@@ -384,7 +384,7 @@ if __name__ == '__main__':
     # ***** Begin Machine Learning *****
     skynet = Learner(
         average_data=True,
-        element_filter=0,
+        element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
@@ -410,5 +410,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    temperature_slice(learner=skynet, tslice=['350orless', 250, 300]) # ['350orless', 250, 300, 350, 400, 450, None]
+    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350, 400]) # ['350orless', 250, 300, 350, 400, 450, None]
     prediction_pipeline(learner=skynet)
