@@ -35,6 +35,7 @@ def load_nh3_catalysts(learner, featgen=0):
         cat.input_reactor_number(int(row['Reactor']))
         cat.input_temperature(row['Temperature'])
         cat.input_space_velocity(row['Space Velocity'])
+        cat.input_group(row['Groups'])
         cat.input_ammonia_concentration(row['NH3'])
         # cat.input_n_Cl_atoms(cl_atom_df.loc[row['ID']].values[0])
         if learner.average_data:
@@ -42,17 +43,19 @@ def load_nh3_catalysts(learner, featgen=0):
             cat.input_n_averaged_samples(row['nAveraged'])
         cat.activity = row['Concentration']
         cat.feature_add_n_elements()
+
         # cat.add_Lp_norms()
         # cat.feature_add_oxidation_states()
-        if row['ID'] in xrd_intensity_lst:
-            xrd_xs = xrd_intensity_df.index.values
-            xrd_ys = xrd_intensity_df.loc[:, str(row['ID'])].values
-            cat.feature_add_xrd_peaks(xrd_xs, xrd_ys)
+        # if row['ID'] in xrd_intensity_lst:
+        #     xrd_xs = xrd_intensity_df.index.values
+        #     xrd_ys = xrd_intensity_df.loc[:, str(row['ID'])].values
+        #     cat.feature_add_xrd_peaks(xrd_xs, xrd_ys)
+        #
+        # if row['ID'] in xrd_fwhm_lst:
+        #     dat = xrd_fwhm_df.loc[row['ID']]
+        #     for nm, val in dat.iteritems():
+        #         cat.feature_add_xrd_peak_FWHM(peak_nm=nm, peak_fwhm=val)
 
-        if row['ID'] in xrd_fwhm_lst:
-            dat = xrd_fwhm_df.loc[row['ID']]
-            for nm, val in dat.iteritems():
-                cat.feature_add_xrd_peak_FWHM(peak_nm=nm, peak_fwhm=val)
         feature_generator = {
             0: cat.feature_add_elemental_properties,
             1: cat.feature_add_statistics,
@@ -66,6 +69,20 @@ def load_nh3_catalysts(learner, featgen=0):
 
 
 def prediction_pipeline(learner):
+    # learner.set_temp_filte    r('350orless')
+    # learner.filter_master_dataset()
+    # learner.train_data()
+    # learner.set_temp_filter('350orless')
+    # learner.filter_master_dataset()
+    # learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
+    #
+    # learner.set_temp_filter('350orless')
+    # learner.filter_master_dataset()
+    # learner.train_data()
+    # learner.set_temp_filter('350orless')
+    # learner.filter_master_dataset()
+    # learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+
     learner.set_temp_filter(None)
     learner.filter_master_dataset()
     learner.train_data()
@@ -100,11 +117,21 @@ def temperature_slice(learner, tslice):
         g.plot_basic()
         g.plot_err()
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
-        g.plot_kernel_density(feat_list=['Second Ionization Energy_wt-mad',
+        g.plot_kernel_density(feat_list=['temperature',
+                                         'Ru Loading',
+                                         'Rh Loading',
+                                         'Second Ionization Energy_wt-mad',
+                                         'Second Ionization Energy_wt-mean',
+                                         'Number d-shell Valance Electrons_wt-mean',
                                          'Number d-shell Valance Electrons_wt-mad',
+                                         'Periodic Table Column_wt-mean',
                                          'Periodic Table Column_wt-mad',
+                                         'Electronegativity_wt-mean',
                                          'Electronegativity_wt-mad',
                                          'Number Valence Electrons_wt-mean',
+                                         'Number Valence Electrons_wt-mad',
+                                         'Conductivity_wt-mean',
+                                         'Conductivity_wt-mad',
                                          ], margins=False, element='Hf')
 
         # g.plot_err(color_bounds=(250, 450))
@@ -388,7 +415,7 @@ if __name__ == '__main__':
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        version='v24',
+        version='v25',
         regression=True
     )
 

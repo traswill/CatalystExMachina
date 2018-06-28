@@ -20,10 +20,11 @@ from bokeh.layouts import row, widgetbox, column, layout
 class Graphic():
     def __init__(self, learner, df=None):
         sns.set(palette='plasma', context='paper', style='white')
-
         self.learner = learner
+
         if df is None:
-            self.graphdf = learner.plot_df
+            self.graphdf = self.learner.slave_dataset.copy()
+            self.graphdf['Predicted Conversion'] = self.learner.predictions
 
             if self.graphdf.empty:
                 print('Graphic Failed to initialize.  Learner does not contain valid plot dataframe.')
@@ -190,9 +191,10 @@ class Graphic():
 
             # Modifying things for publication
             lim_dict = {
-                'Number d-shell Valance Electrons_wt-mad': plt.xlim(-2.5, 17.5),
-                'Periodic Table Column_wt-mad': plt.xlim(0, 35),
-                'Second Ionization Energy_wt-mad': plt.xlim(500, 700)
+                '': '',
+                # 'Number d-shell Valance Electrons_wt-mad': plt.xlim(-2.5, 17.5),
+                # 'Periodic Table Column_wt-mad': plt.xlim(0, 35),
+                # 'Second Ionization Energy_wt-mad': plt.xlim(500, 700)
             }
 
             lim_dict.get(feat, plt.autoscale())
@@ -228,16 +230,17 @@ class Graphic():
                 df.loc[idx, 'Type'] = 'N/A'
                 pltdf.loc[spidx[0], 'N/A'] = df.loc[idx, 'Feature Importance']
 
-        f, ax = plt.subplots(figsize=(8, 20))
+        f, ax = plt.subplots()
         # sns.barplot(x="Feature Importance", y="Feature", data=df, color="b")
-        sns.set_palette('muted')
-        pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax)
+        # sns.set_palette('muted')
+        pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', 3))
+
         plt.gca().invert_yaxis()
 
         plt.tight_layout()
         plt.savefig('{}//Figures//features-{}'.format(self.learner.svfl, self.learner.svnm), dpi=400)
         plt.close()
-        sns.set_palette('plasma')
+        # sns.set_palette('plasma')
 
 # TODO Implement Bokeh
     def bokeh_predictions(self, svnm=None):

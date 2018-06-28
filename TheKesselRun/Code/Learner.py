@@ -26,6 +26,7 @@ from sklearn.feature_selection import SelectKBest
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.linear_model import Ridge, Lasso, SGDRegressor
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, FeatureAgglomeration
+from sklearn.feature_selection import VarianceThreshold, univariate_selection
 
 from bokeh.models import ColumnDataSource, LabelSet, HoverTool, Whisker, CustomJS, Slider, Select
 from bokeh.plotting import figure, show, output_file, save, curdoc
@@ -76,7 +77,7 @@ class Learner():
         self.temperature_filter = temperature_filter
         self.ammonia_filter = ammonia_filter
         self.sv_filter = space_vel_filter
-        self.group_style = 'blind'
+        self.group_style = 'full-blind'
         self.version = version
         self.regression = regression
 
@@ -271,18 +272,22 @@ class Learner():
         self.slave_dataset = self.master_dataset.loc[filt].copy()
         self.slave_dataset = self.slave_dataset[self.slave_dataset.index.str.contains('Predict') == False]
         self.slave_dataset = shuffle(self.slave_dataset)
-        # pd.DataFrame(self.slave_dataset).to_csv('..\\SlaveTest.csv')
+        pd.DataFrame(self.slave_dataset).to_csv('..\\SlaveTest.csv')
 
         # Set up training data and apply grouping
         self.set_training_data()
         self.group_for_training()
+        self.trim_slave_dataset()
+
+    def drop_features(self):
+        pass
 
     def set_training_data(self):
         ''' Use the slave dataframe to set other dataframe properties '''
 
         if self.average_data:
             self.features_df = self.slave_dataset.drop(
-                labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
+                labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged', 'group'], axis=1
             )
         else:
             self.features_df = self.slave_dataset.drop(
@@ -300,11 +305,19 @@ class Learner():
         """ Comment """
 
         group_dict = {
+            'full-blind': self.slave_dataset['group'].values,
             'blind': [x.split('_')[0] for x in self.slave_dataset.index.values],
             'semiblind': ['{}_{}'.format(x.split('_')[0], x.split('_')[1]) for x in self.slave_dataset.index.values]
         }
 
         self.groups = group_dict.get(self.group_style, None)
+
+    def trim_slave_dataset(self):
+        ''' Feature Selection '''
+        trim = VarianceThreshold(threshold=0.9)
+        test = trim.fit_transform(self.features_df.values, self.labels_df.values)
+        self.features_df = pd.DataFrame(trim.inverse_transform(test), columns=self.features_df.columns, index=self.features_df.index)
+        self.features_df = self.features_df.loc[:, (self.features_df != 0).any(axis=0)]
 
     def hyperparameter_tuning(self):
         """ Comment """
@@ -410,7 +423,6 @@ class Learner():
         print(self.cluster.labels_)
         self.slave_dataset.to_csv('{}//{}-unsupervised-slave-dataset.csv'.format(self.svfl, self.version))
 
-
     def train_data(self):
         """ Comment """
 
@@ -452,7 +464,7 @@ class Learner():
         """ Comment - Work in Progress """
         if self.average_data:
             data = self.test_dataset.drop(
-                labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'],
+                labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged', 'group'],
                 axis=1).values
         else:
             data = self.test_dataset.drop(
@@ -485,7 +497,7 @@ class Learner():
     def predict_dataset(self):
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
         data = data.drop(
-            labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged'], axis=1
+            labels=['Measured Conversion', 'Element Dictionary', 'standard error', 'n_averaged', 'group'], axis=1
         )
 
         predvals = self.machina.predict(data.values)
@@ -514,11 +526,11 @@ class Learner():
                     k = kfold
 
                 pred = cross_val_predict(estimator=self.machina,
-                                  X=self.features_df.loc[idx].values,
-                                  y=self.labels_df.loc[idx].values,
-                                  groups=group_df.loc[idx].values,
-                                  cv=GroupKFold(k)
-                                  )
+                                         X=self.features_df.loc[idx].values,
+                                         y=self.labels_df.loc[idx].values,
+                                         groups=group_df.loc[idx].values,
+                                         cv=GroupKFold(k)
+                                         )
 
                 preddf = pd.concat([preddf, pd.DataFrame(pred, index=idx)])
 
@@ -527,11 +539,38 @@ class Learner():
 
         self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
+    def preplot_processing(self):
+        """ Prepare all data for plotting """
+
+        # Ensure Predictions Exist
+        if self.predictions is None:
+            self.predict_crossvalidate()
+
+        # Set up the plot dataframe for easy plotting
+        self.plot_df = self.slave_dataset.copy()
+        self.plot_df['Predicted Conversion'] = self.predictions
+
+        self.plot_df['Name'] = [
+            ''.join('{}({})'.format(key, str(int(val)))
+                    for key, val in x) for x in self.plot_df['Element Dictionary']
+        ]
+
+        for index, edict in self.plot_df['Element Dictionary'].iteritems():
+            self.plot_df.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
+
+            i = 1
+            for key, val in edict:
+                self.plot_df.loc[index, 'Ele{}'.format(i)] = key
+                self.plot_df.loc[index, 'Load{}'.format(i)] = val
+                i += 1
+
+        self.save_predictions()
+
     def save_predictions(self):
         """ Comment """
-        if self.predictions is not None:
-            df = pd.DataFrame(np.array([self.slave_dataset.index, self.predictions, self.labels_df.values, self.groups]).T,
-                              columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups'])
+        if not self.plot_df.empty:
+            df = pd.DataFrame(np.array([self.plot_df.index, self.predictions, self.labels_df.values, self.groups, self.plot_df['Name']]).T,
+                              columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups', 'Name'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
@@ -593,16 +632,7 @@ class Learner():
         plt.plot(fpr, tpr)
         plt.show()
 
-    def preplot_processing(self):
-        """ Prepare all data for plotting """
 
-        # Ensure Predictions Exist
-        if self.predictions is None:
-            self.predict_crossvalidate()
-
-        # Set up the plot dataframe for easy plotting
-        self.plot_df = self.slave_dataset.copy()
-        self.plot_df['Predicted Conversion'] = self.predictions
 
         #
         # # Full descriptive name X(#)Y(#)Z(#)

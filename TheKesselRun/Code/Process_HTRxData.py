@@ -333,6 +333,12 @@ def create_super_monster_file():
     final_df = final_df.transpose()[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3', 'Reactor', 'NH3',
                                      'Space Velocity', 'Temperature', 'Concentration', 'Standard Error', 'nAveraged']]
 
+    ele2 = final_df['Ele2'].copy()
+    ele_dict = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation', 'Atomic Number'], index_col='Abbreviation').transpose().to_dict(orient='list')
+    groups = [ele_dict.get(x)[0] for x in ele2.values]
+
+    final_df['Groups'] = groups
+
     final_df.to_csv('..//Data//Processed//AllData_Condensed.csv')
 
 

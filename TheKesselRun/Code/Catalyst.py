@@ -37,6 +37,9 @@ class Catalyst():
     def input_n_Cl_atoms(self, Cl_atoms):
         self.input_dict['n_Cl_atoms'] = Cl_atoms
 
+    def input_group(self, group):
+        self.input_dict['group'] = group
+
     def feature_add(self, key, value):
         self.feature_dict[key] = value
 
@@ -80,7 +83,7 @@ class Catalyst():
             # self.feature_add('{}_mean'.format(feature_name), np.mean(values))
             # self.feature_add('{}_mad'.format(feature_name), np.mean(np.abs(values-np.mean(values))))
             fwmean = np.sum(values * weights)/np.sum(weights)
-            avgdev = np.sum(weights * np.abs(values)* np.mean(values))/np.sum(weights)
+            avgdev = np.sum(weights * np.abs(values - np.mean(values)))/np.sum(weights)
             self.feature_add('{}_wt-mean'.format(feature_name), fwmean)
             self.feature_add('{}_wt-mad'.format(feature_name), avgdev)
             # self.feature_add('{}_min'.format(feature_name), np.max(values))
