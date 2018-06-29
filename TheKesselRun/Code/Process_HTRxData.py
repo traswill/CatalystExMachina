@@ -105,7 +105,8 @@ def merge_activity_catalysts(actdf, catdf, nh3scale=100):
 
     output_df.loc[output_df['Pred Value'] < 0, 'Pred Value'] = 0
     output_df['NH3'] = output_df['NH3'] * nh3scale
-    output_df['Concentration'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
+    output_df['Concentration'] = (1 - output_df['Pred Value']) / 1
+    # output_df['Concentration'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
     output_df.loc[output_df['Concentration'] < 0,  'Concentration'] = 0
 
     # output_df.drop(['Reactor(2)','KTag'] ,inplace=True)

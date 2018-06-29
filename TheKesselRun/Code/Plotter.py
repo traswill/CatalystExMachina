@@ -230,7 +230,7 @@ class Graphic():
                 df.loc[idx, 'Type'] = 'N/A'
                 pltdf.loc[spidx[0], 'N/A'] = df.loc[idx, 'Feature Importance']
 
-        f, ax = plt.subplots()
+        f, ax = plt.subplots(figsize=(8,20))
         # sns.barplot(x="Feature Importance", y="Feature", data=df, color="b")
         # sns.set_palette('muted')
         pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', 3))

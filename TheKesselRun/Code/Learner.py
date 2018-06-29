@@ -45,7 +45,8 @@ class Learner():
     """Learner will use catalysts to construct feature-label set and perform machine learning"""
 
     def __init__(self, element_filter=3, temperature_filter=None, ammonia_filter=None, space_vel_filter=None,
-                 version='v00', average_data=True, feature_generator=0, regression=True):
+                 ru_filter=None, pressure_filter=None,
+                 version='v00', average_data=True, regression=True):
         """ Put Words Here """
 
         '''Initialize dictionary to hold import data'''
@@ -76,6 +77,8 @@ class Learner():
         self.element_filter = element_filter
         self.temperature_filter = temperature_filter
         self.ammonia_filter = ammonia_filter
+        self.ru_filter = ru_filter
+        self.pressure_filter = pressure_filter
         self.sv_filter = space_vel_filter
         self.group_style = 'full-blind'
         self.version = version
@@ -213,6 +216,10 @@ class Learner():
                     '350orless': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 450) &
                                                      (self.master_dataset.loc[:, 'temperature'] != 400) &
                                                      (self.master_dataset.loc[:, 'temperature'] != 150)].index,
+                    '300orless': self.master_dataset[(self.master_dataset.loc[:, 'temperature'] != 450) &
+                                                     (self.master_dataset.loc[:, 'temperature'] != 400) &
+                                                     (self.master_dataset.loc[:, 'temperature'] != 350) &
+                                                     (self.master_dataset.loc[:, 'temperature'] != 150)].index,
                 }
 
                 temp_slice = temp_dict.get(temp_filter)
@@ -222,14 +229,32 @@ class Learner():
 
         def filter_ammonia(ammo_filter):
             filter_dict_ammonia = {
-                1: self.master_dataset[(self.master_dataset.loc[:, 'ammonia_concentration'] > 0.7) &
-                                       (self.master_dataset.loc[:, 'ammonia_concentration'] < 1.3)].index,
+                1: self.master_dataset[(self.master_dataset.loc[:, 'ammonia_concentration'] > 0.5) &
+                                       (self.master_dataset.loc[:, 'ammonia_concentration'] < 1.5)].index,
                 5: self.master_dataset[(self.master_dataset.loc[:, 'ammonia_concentration'] > 4.8) &
                                        (self.master_dataset.loc[:, 'ammonia_concentration'] < 5.2)].index
             }
 
             ammo_slice = filter_dict_ammonia.get(ammo_filter, self.master_dataset.index)
             return ammo_slice
+
+        def filter_ruthenium_weight_loading(ru_filter):
+            filter_dict_ruthenium = {
+                1: self.master_dataset[(self.master_dataset.loc[:, 'Ru Loading'] == 0.01)].index,
+                2: self.master_dataset[(self.master_dataset.loc[:, 'Ru Loading'] == 0.02)].index,
+                3: self.master_dataset[(self.master_dataset.loc[:, 'Ru Loading'] == 0.03)].index,
+            }
+
+            ru_slice = filter_dict_ruthenium.get(ru_filter, self.master_dataset.index)
+            return ru_slice
+
+        def filter_pressure(p_filter):
+            filter_dict_ruthenium = {
+
+            }
+
+            p_slice = filter_dict_ruthenium.get(p_filter, self.master_dataset.index)
+            return p_slice
 
         def filter_space_velocity(sv_filter):
             filter_dict_sv = {
@@ -252,8 +277,14 @@ class Learner():
             filter_elements(self.element_filter),
             filter_temperature(self.temperature_filter),
             filter_ammonia(self.ammonia_filter),
-            filter_space_velocity(self.sv_filter)
+            filter_space_velocity(self.sv_filter),
+            filter_ruthenium_weight_loading(self.ru_filter),
+            filter_pressure(self.pressure_filter)
         ])
+
+        filt = drop_element('Y', filt)
+        filt = drop_element('Rh', filt)
+        filt = drop_element('Hf', filt)
 
         # drop_element('Mo', filt)
         # drop_element('Ir', filt)
@@ -277,7 +308,7 @@ class Learner():
         # Set up training data and apply grouping
         self.set_training_data()
         self.group_for_training()
-        self.trim_slave_dataset()
+        # self.trim_slave_dataset()  # I think this is bad now
 
     def drop_features(self):
         pass
@@ -511,6 +542,7 @@ class Learner():
         if self.cluster is None:
             self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(kfold))
+
             self.slave_dataset['predictions'] = self.predictions
 
         else:

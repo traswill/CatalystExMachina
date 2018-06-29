@@ -69,20 +69,6 @@ def load_nh3_catalysts(learner, featgen=0):
 
 
 def prediction_pipeline(learner):
-    # learner.set_temp_filte    r('350orless')
-    # learner.filter_master_dataset()
-    # learner.train_data()
-    # learner.set_temp_filter('350orless')
-    # learner.filter_master_dataset()
-    # learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
-    #
-    # learner.set_temp_filter('350orless')
-    # learner.filter_master_dataset()
-    # learner.train_data()
-    # learner.set_temp_filter('350orless')
-    # learner.filter_master_dataset()
-    # learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
-
     learner.set_temp_filter(None)
     learner.filter_master_dataset()
     learner.train_data()
@@ -95,7 +81,7 @@ def prediction_pipeline(learner):
     learner.train_data()
     learner.set_temp_filter('350orless')
     learner.filter_master_dataset()
-    learner.predict_from_masterfile(catids=[38, 84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+    learner.predict_from_masterfile(catids=[84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
 
 
 def temperature_slice(learner, tslice):
@@ -311,7 +297,7 @@ def test_all_ML_models():
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        version='v20',
+        version='v25',
         regression=True
     )
 
@@ -387,9 +373,6 @@ def unsupervised_exploration(learner):
     sns.swarmplot(x='Wt1', y='Wt2', data=df_new, hue='group')
     plt.show()
 
-def generate_kde_plots(feature):
-    pass
-
 
 if __name__ == '__main__':
     # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
@@ -414,8 +397,10 @@ if __name__ == '__main__':
         element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
-        space_vel_filter=2000,
-        version='v25',
+        space_vel_filter=None,
+        ru_filter=1,
+        pressure_filter=None,
+        version='v33-ru_filter=3-dropoutliers',
         regression=True
     )
 
@@ -437,5 +422,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350, 400]) # ['350orless', 250, 300, 350, 400, 450, None]
+    temperature_slice(learner=skynet, tslice=['300orless', '350orless', 250, 300, 350]) # ['350orless', 250, 300, 350, 400, 450, None]
     prediction_pipeline(learner=skynet)
