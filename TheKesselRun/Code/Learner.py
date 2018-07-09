@@ -282,17 +282,9 @@ class Learner():
             filter_pressure(self.pressure_filter)
         ])
 
-        filt = drop_element('Y', filt)
-        filt = drop_element('Rh', filt)
-        filt = drop_element('Hf', filt)
-
-        # drop_element('Mo', filt)
-        # drop_element('Ir', filt)
-
-        # Outliers?
-        # for ids in [51, 57, 85, 86, 90, 107, 17, 93, 50, 87, 108]:
-        #     for tempers in [350, 400, 450]:
-        #         filt = drop_ID('{id}_{t}'.format(id=ids, t=tempers), filt)
+        # filt = drop_element('Y', filt)
+        # filt = drop_element('Rh', filt)
+        # filt = drop_element('Hf', filt)
 
         # ***** FILTER SS8 AND SS9 OUT *****
         # for ids in [65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83, 38, 84, 85, 86, 87, 89, 90, 91, 93]:
@@ -308,7 +300,7 @@ class Learner():
         # Set up training data and apply grouping
         self.set_training_data()
         self.group_for_training()
-        # self.trim_slave_dataset()  # I think this is bad now
+        # self.trim_slave_dataset()
 
     def drop_features(self):
         pass
@@ -345,10 +337,15 @@ class Learner():
 
     def trim_slave_dataset(self):
         ''' Feature Selection '''
-        trim = VarianceThreshold(threshold=0.9)
-        test = trim.fit_transform(self.features_df.values, self.labels_df.values)
-        self.features_df = pd.DataFrame(trim.inverse_transform(test), columns=self.features_df.columns, index=self.features_df.index)
-        self.features_df = self.features_df.loc[:, (self.features_df != 0).any(axis=0)]
+        # trim = VarianceThreshold(threshold=0.9)
+        # test = trim.fit_transform(self.features_df.values, self.labels_df.values)
+        # self.features_df = pd.DataFrame(trim.inverse_transform(test), columns=self.features_df.columns, index=self.features_df.index)
+        # self.features_df = self.features_df.loc[:, (self.features_df != 0).any(axis=0)]
+        self.features_df = self.features_df.loc[
+                           :, ['temperature',
+                               'Number d-shell Valence Electrons_wt-mean', 'Number d-shell Valence Electrons_wt-mad',
+                               ]
+                           ].copy()
 
     def hyperparameter_tuning(self):
         """ Comment """
@@ -520,9 +517,13 @@ class Learner():
         comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 450].index, inplace=True)
         comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 400].index, inplace=True)
 
+        feat_df = self.extract_important_features()
+        feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
+
         g = Graphic(learner=self, df=comparison_df)
         g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
         g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
+        g.plot_important_features(svnm=svnm)
         g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
 
     def predict_dataset(self):
@@ -538,7 +539,6 @@ class Learner():
 
     def predict_crossvalidate(self, kfold=10):
         """ Comment """
-
         if self.cluster is None:
             self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(kfold))
@@ -1142,3 +1142,20 @@ class Learner():
                 os.system('dot -Tpng {fl}//Trees//{nm}.dot -o {fl}//Trees//{nm}-{ind}.png'.format(fl=self.svfl,
                                                                                                   nm=self.svnm,
                                                                                                   ind=index))
+
+    def parse_element_dictionary(self):
+        df = self.master_dataset[['Element Dictionary']].copy()
+        df['index'] = [idx.split('_')[0] for idx in df.index]
+        things = [list(x) for x in df['Element Dictionary'].values]
+        for idx, elements in df[['Element Dictionary']]:
+            print(idx, elements)
+            df[idx, 'ele1'] = elements[0][0]
+            df[idx, 'ele2'] = elements[1][0]
+            df[idx, 'ele3'] = elements[2][0]
+            df[idx, 'wt1'] = elements[0][1]
+            df[idx, 'wt2'] = elements[1][1]
+            df[idx, 'wt3'] = elements[2][1]
+
+        print(df)
+
+        exit()

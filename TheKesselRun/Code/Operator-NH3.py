@@ -69,20 +69,62 @@ def load_nh3_catalysts(learner, featgen=0):
 
 
 def prediction_pipeline(learner):
-    learner.set_temp_filter(None)
-    learner.filter_master_dataset()
-    learner.train_data()
-    learner.set_temp_filter('350orless')
-    learner.filter_master_dataset()
+    # def predict_catalysts(eles, svnm):
+    #     learner.set_temp_filter(None)
+    #     learner.filter_master_dataset()
+    #     learner.train_data()
+    #     learner.set_temp_filter('350orless')
+    #     learner.filter_master_dataset()
+    #     learner.parse_element_dictionary()
+    #     exit()
+    #
+    #     catlst = [1, 2, 3, 4, 5, 6, 29, 30, 31, 32, 43, 44, 45, 49, 50, 51, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 67,
+    #               68, 69, 73, 74, 75, 76, 77, 78, 85, 86, 87, 89, 90, 106, 107, 108]
+    #     learner.predict_from_masterfile(catids=catlst, svnm='CuMgMnPdReRh')
+    #
+    # predict_catalysts(eles=['Cu','Mg','Mn','Pd','Re','Rh'], svnm='CuMgMnPdReRh')
+
+    def setup():
+        learner.set_temp_filter(None)
+        learner.filter_master_dataset()
+        learner.train_data()
+        learner.set_temp_filter('350orless')
+        learner.filter_master_dataset()
+
+    setup()
     learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
 
+    setup()
+    learner.predict_from_masterfile(catids=[84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+
+    # Predict all from Cu, Mg, Mn, Pd, Re, Rh
     learner.set_temp_filter(None)
     learner.filter_master_dataset()
     learner.train_data()
     learner.set_temp_filter('350orless')
     learner.filter_master_dataset()
-    learner.predict_from_masterfile(catids=[84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
 
+    CuMgMnPdReRh = [1,2,3,4,5,6,29,30,31,32,43,44,45,49,50,51,55,56,57,58,59,60,61,62,63,64,67,68,69,73,74,75,76,77,
+                    78,85,86,87,89,90,106,107,108]
+    setup()
+    learner.predict_from_masterfile(catids=CuMgMnPdReRh, svnm='CuMgMnPdReRh')
+
+    NiPdIrPt = [1,2,3,4,5,6,15,16,17,25,27,28,29,30,31,32,33,34,35,36,37,38,39,43,44,45,49,50,51,55,56,57,58,59,60,
+                61,62,63,64,65,66,67,68,69,73,74,75,76,77,78,85,86,87,91,93,106,107,108,112,114,115,116,117,118,119,
+                121,123,124,125,126]
+    setup()
+    learner.predict_from_masterfile(catids=NiPdIrPt, svnm='NiPdIrPt')
+
+    NiPdIrPtCu = [1,2,3,4,5,6,25,27,28,29,30,31,32,33,34,35,36,37,38,39,43,44,45,49,50,51,55,56,57,58,59,60,61,62,
+                  63,64,65,66,67,68,69,73,74,75,76,77,78,85,86,87,91,93,106,107,108,112,114,115,116,117,118,119,121,
+                  123,124,125,126]
+    setup()
+    learner.predict_from_masterfile(catids=NiPdIrPtCu, svnm='NiPdIrPtCu')
+
+    HfYScCaSrMg = [1,2,3,4,5,6,15,16,17,25,27,28,36,37,38,39,40,41,42,43,44,45,49,50,51,65,66,67,68,69,76,77,78,82,
+                   83,84,85,86,87,89,90,91,93,106,107,108,112,113,114,115,116,117,118,119,120,122,124,125]
+    setup()
+    learner.predict_from_masterfile(catids=HfYScCaSrMg, svnm='HfYScCaSrMg')
 
 def temperature_slice(learner, tslice):
     for t in tslice:
@@ -108,8 +150,8 @@ def temperature_slice(learner, tslice):
                                          'Rh Loading',
                                          'Second Ionization Energy_wt-mad',
                                          'Second Ionization Energy_wt-mean',
-                                         'Number d-shell Valance Electrons_wt-mean',
-                                         'Number d-shell Valance Electrons_wt-mad',
+                                         'Number d-shell Valence Electrons_wt-mean',
+                                         'Number d-shell Valence Electrons_wt-mad',
                                          'Periodic Table Column_wt-mean',
                                          'Periodic Table Column_wt-mad',
                                          'Electronegativity_wt-mean',
@@ -118,7 +160,7 @@ def temperature_slice(learner, tslice):
                                          'Number Valence Electrons_wt-mad',
                                          'Conductivity_wt-mean',
                                          'Conductivity_wt-mad',
-                                         ], margins=False, element='Hf')
+                                         ], margins=False, element=None)
 
         # g.plot_err(color_bounds=(250, 450))
         # g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
@@ -374,6 +416,8 @@ def unsupervised_exploration(learner):
     plt.show()
 
 
+
+
 if __name__ == '__main__':
     # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
     # exit()
@@ -398,9 +442,9 @@ if __name__ == '__main__':
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=None,
-        ru_filter=1,
+        ru_filter=None,
         pressure_filter=None,
-        version='v33-ru_filter=3-dropoutliers',
+        version='v35-predict-all-from-few',
         regression=True
     )
 
@@ -422,5 +466,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    temperature_slice(learner=skynet, tslice=['300orless', '350orless', 250, 300, 350]) # ['350orless', 250, 300, 350, 400, 450, None]
+    # temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350]) # ['350orless', 250, 300, 350, 400, 450, None]
     prediction_pipeline(learner=skynet)

@@ -209,7 +209,8 @@ class Graphic():
                 plt.savefig('{}//Figures//{}-{}'.format(self.learner.svfl, feat, self.learner.svnm), dpi=400)
             plt.close()
 
-    def plot_important_features(self):
+    def plot_important_features(self, svnm=''):
+        # Copy, sort, and clean up dataframe
         df = self.learner.feature_importance_df.copy()
         df.sort_values(by='Feature Importance', inplace=True, ascending=False)
         df.rename(index={'reactor_number':'Reactor', 'temperature':'Temperature','space_velocity':'Space Velocity',
@@ -231,15 +232,22 @@ class Graphic():
                 pltdf.loc[spidx[0], 'N/A'] = df.loc[idx, 'Feature Importance']
 
         f, ax = plt.subplots(figsize=(8,20))
-        # sns.barplot(x="Feature Importance", y="Feature", data=df, color="b")
-        # sns.set_palette('muted')
         pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', 3))
-
         plt.gca().invert_yaxis()
-
         plt.tight_layout()
-        plt.savefig('{}//Figures//features-{}'.format(self.learner.svfl, self.learner.svnm), dpi=400)
+        plt.savefig('{}//Figures//features-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
         plt.close()
+
+        f, ax = plt.subplots()
+        pltdf.iloc[:10].plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', 3))
+        plt.gca().invert_yaxis()
+        plt.tight_layout()
+        plt.savefig('{}//Figures//top10-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
+        plt.close()
+
+
+
+
         # sns.set_palette('plasma')
 
 # TODO Implement Bokeh

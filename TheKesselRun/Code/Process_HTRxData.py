@@ -8,6 +8,9 @@ import itertools
 
 
 def load_info_sheet(pth, thresh=15, sheetname='Info', skip_footer=13, skiprow=1):
+    """ Reads data from path, drops NAN columns up to a threshold (variable per sheet), trashes empty reactor columns,
+    and returns a dataframe """
+
     df = pd.read_excel(pth, skiprows=skiprow, skip_footer=skip_footer, sheet_name=sheetname)
     df.dropna(inplace=True, axis=1, thresh=thresh)
     df = df.loc[~np.isnan(df['Reactor'])]
@@ -16,6 +19,7 @@ def load_info_sheet(pth, thresh=15, sheetname='Info', skip_footer=13, skiprow=1)
 
 
 def load_activity_sheet(pth, sheet, cols=None):
+    """ Literally just loads it and drops NANs """
     df = pd.read_excel(pth,
                        sheet_name=sheet,
                        usecols=cols)
@@ -24,6 +28,13 @@ def load_activity_sheet(pth, sheet, cols=None):
 
 
 def extract_activity_information(df):
+    """
+    Input: Activity datasheet in the form of a dataframe
+    Output: Dataframe with 4 columns, numerical index
+
+    Regex search is used to parse file name in spreadsheet to determine if the ramp direction is up or down
+    Format = [000d.*-0]
+    """
     act_list = list()
 
     for tmp in df.values:
@@ -41,6 +52,19 @@ def extract_activity_information(df):
 
 
 def split_katies_ID(df):
+    """
+    This code parses Katie's IDs of the form "1,3,12 RuFeK" into a dataframe with columns:
+        Catalyst Index:     ##
+        Concentration:      [1, 3, 12]
+        Elements:           [Ru, Fe, K]
+        Catalyst Object:    [*, *, *] (These are the objects from class Catalyst)
+
+    The code has been modified to especially handle '-' and '--' values, which are placeholders for monometallic and
+    bimetallic catalysts.  A '-' replaces the second element in a trimetallic, whereas a '--' replaces the third metal,
+    typically K.
+
+    """
+
     output_list = list()
     for catdat in df['Catalyst']:
         catlst = catdat.split(' ')
@@ -80,6 +104,7 @@ def split_katies_ID(df):
 
 
 def merge_ids_flows(flowsdf, iddf):
+    """ Concatinate data with parsed elements and concentrations from Katie's IDs """
     df = pd.concat([flowsdf.set_index('Catalyst'), iddf.set_index('KatieID')], axis=1, join='inner')
     return df
 
@@ -104,7 +129,7 @@ def merge_activity_catalysts(actdf, catdf, nh3scale=100):
         output_df = pd.concat([output_df, df])
 
     output_df.loc[output_df['Pred Value'] < 0, 'Pred Value'] = 0
-    output_df['NH3'] = output_df['NH3'] * nh3scale
+    output_df['NH3'] = 1
     output_df['Concentration'] = (1 - output_df['Pred Value']) / 1
     # output_df['Concentration'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
     output_df.loc[output_df['Concentration'] < 0,  'Concentration'] = 0
@@ -181,8 +206,6 @@ def read_v4_data():
     datpth = r'..\Data\RAW\NH3_v4_Data.xlsx'
 
     for num in [3, 4, 5, 6, 7]:
-        # if num != 6:
-        #     continue
         if num == 3:
             nh3scale = 1
             referencedata_df = load_info_sheet(datpth, sheetname='Info {}'.format(num), thresh=15, skip_footer=15,
@@ -342,8 +365,15 @@ def create_super_monster_file():
 
     final_df.to_csv('..//Data//Processed//AllData_Condensed.csv')
 
+def read_data0_data1():
+    pth = r'../Data/RAW/NH3_v0_data1_data2.xlsx'
+    df = pd.read_excel(pth)
+    df = df[['ID','Ele1','Wt1','Ele2','Wt2','Ele3','Wt3','Reactor','Weight','NH3','Space Velocity','Ramp Direction','Temperature','Pred Value','Conversion']]
+    df.columns = ['ID','Ele1','Wt1','Ele2','Wt2','Ele3','Wt3','Reactor','Wt(g)','NH3','Space Velocity','Ramp Direction','Temperature','Pred Value','Concentration']
+    df.to_csv('..//Data//Processed//SS1.csv')
 
 if __name__ == '__main__':
+    # read_data0_data1()
     # read_v4_data()
     # read_v4_data_8()
     # read_data_9()
