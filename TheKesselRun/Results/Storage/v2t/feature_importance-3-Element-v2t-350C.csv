@@ -1,0 +1,180 @@
+,Feature Importance
+Mg Loading,0.012129763808172808
+K Loading,0.0
+Ca Loading,0.00845037765152753
+Sc Loading,0.0
+Cr Loading,0.010974766356605728
+Mn Loading,0.003156829324583662
+Ni Loading,0.02261375038044966
+Cu Loading,4.5912700737715456e-05
+Y Loading,3.686968193270936e-05
+Ru Loading,0.1118679154464902
+Rh Loading,0.0
+In Loading,0.0004111834915170964
+Hf Loading,1.4828214660486247e-07
+W Loading,0.0
+Ir Loading,0.0
+Pt Loading,0.0
+- Loading,0.0
+-- Loading,0.0
+reactor_number,0.00353804039839931
+temperature,0.0
+space_velocity,0.06079314441646767
+ammonia_concentration,0.003444980497487514
+n_elements,0.0
+Atomic Number_0,0.0
+Atomic Number_1,0.00013113536200876346
+Atomic Number_2,0.0
+AtomicVolume_0,0.0
+AtomicVolume_1,0.00603015069483661
+AtomicVolume_2,0.0
+AtomicWeight_0,0.0
+AtomicWeight_1,0.0034717888195854958
+AtomicWeight_2,0.0
+BoilingT_0,0.0
+BoilingT_1,0.0019940214984217
+BoilingT_2,0.0
+Column_0,0.0
+Column_1,0.1701168213339475
+Column_2,0.0
+CovalentRadius_0,0.0
+CovalentRadius_1,0.002890117657428294
+CovalentRadius_2,0.0
+Density_0,0.0
+Density_1,0.0005606217835208727
+Density_2,0.0
+DipolePolarizability_0,0.0
+DipolePolarizability_1,0.0008413629185341393
+DipolePolarizability_2,0.0
+ElectronAffinity_0,0.0
+ElectronAffinity_1,0.0030373394719593223
+ElectronAffinity_2,0.0
+Electronegativity_0,0.0
+Electronegativity_1,0.004114134740123422
+Electronegativity_2,0.0
+FusionEnthalpy_0,0.0
+FusionEnthalpy_1,0.0010436340744185916
+FusionEnthalpy_2,0.0
+GSbandgap_0,0.0
+GSbandgap_1,0.0
+GSbandgap_2,0.0
+GSenergy_pa_0,0.0
+GSenergy_pa_1,0.0003363234287919598
+GSenergy_pa_2,0.0
+HeatCapacityMass_0,0.0
+HeatCapacityMass_1,0.00045556339039267167
+HeatCapacityMass_2,0.0
+HeatCapacityMolar_0,0.0
+HeatCapacityMolar_1,0.00026162676385689814
+HeatCapacityMolar_2,0.0
+HeatFusion_0,0.0
+HeatFusion_1,0.0002606543463126452
+HeatFusion_2,0.0
+IonizationEnergies_1_0,0.0
+IonizationEnergies_1_1,0.000236903474241431
+IonizationEnergies_1_2,0.0
+IonizationEnergies_2_0,0.0
+IonizationEnergies_2_1,0.2355588857975511
+IonizationEnergies_2_2,0.0
+IonizationEnergies_3_0,0.0
+IonizationEnergies_3_1,0.020742956850346737
+IonizationEnergies_3_2,0.0
+IonizationEnergies_4_0,0.0
+IonizationEnergies_4_1,0.00026336331847638233
+IonizationEnergies_4_2,0.0
+IonizationEnergies_5_0,0.0
+IonizationEnergies_5_1,5.9999702632433165e-05
+IonizationEnergies_5_2,0.0
+IonizationEnergies_6_0,0.0
+IonizationEnergies_6_1,0.0013537355655750575
+IonizationEnergies_6_2,0.0
+IonizationEnergies_7_0,0.0
+IonizationEnergies_7_1,5.893661324049891e-05
+IonizationEnergies_7_2,0.0
+IonizationEnergies_8_0,0.0
+IonizationEnergies_8_1,2.8738585410686783e-05
+IonizationEnergies_8_2,0.0
+IsAlkali_0,0.0
+IsAlkali_1,0.0004396553775309506
+IsAlkali_2,0.0
+IsDBlock_0,0.0
+IsDBlock_1,0.00038870857695633794
+IsDBlock_2,0.0
+IsFBlock_0,0.0
+IsFBlock_1,0.0
+IsFBlock_2,0.0
+IsMetal_0,0.0
+IsMetal_1,0.0
+IsMetal_2,0.0
+IsMetalloid_0,0.0
+IsMetalloid_1,0.0
+IsMetalloid_2,0.0
+IsNonmetal_0,0.0
+IsNonmetal_1,0.0
+IsNonmetal_2,0.0
+MeltingT_0,0.0
+MeltingT_1,0.0004045625707447057
+MeltingT_2,0.0
+MendeleevNumber_0,0.0
+MendeleevNumber_1,3.288882126434271e-05
+MendeleevNumber_2,0.0
+NdUnfilled_0,0.0
+NdUnfilled_1,0.01671025070090271
+NdUnfilled_2,0.0
+NdValence_0,0.0
+NdValence_1,0.2710108177206953
+NdValence_2,0.0
+NfUnfilled_0,0.0
+NfUnfilled_1,0.0
+NfUnfilled_2,0.0
+NfValence_0,0.0
+NfValence_1,0.0
+NfValence_2,0.0
+NpUnfilled_0,0.0
+NpUnfilled_1,5.664906065297048e-08
+NpUnfilled_2,0.0
+NpValence_0,0.0
+NpValence_1,1.968542413017098e-06
+NpValence_2,0.0
+NsUnfilled_0,0.0
+NsUnfilled_1,1.4882954758375144e-06
+NsUnfilled_2,0.0
+NsValence_0,0.0
+NsValence_1,2.784761864136961e-05
+NsValence_2,0.0
+Number_0,0.0
+Number_1,8.180698362827862e-05
+Number_2,0.0
+NUnfilled_0,0.0
+NUnfilled_1,0.012102430602195619
+NUnfilled_2,0.0
+NValence_0,0.0
+NValence_1,4.140573148926859e-05
+NValence_2,0.0
+Polarizability_0,0.0
+Polarizability_1,0.0002940405129700323
+Polarizability_2,0.0
+Row_0,0.0
+Row_1,5.097056433549046e-05
+Row_2,0.0
+ZungerPP-r_d_0,0.0
+ZungerPP-r_d_1,2.5753115205871544e-06
+ZungerPP-r_d_2,0.0
+ZungerPP-r_p_0,0.0
+ZungerPP-r_p_1,4.2923602986621804e-05
+ZungerPP-r_p_2,0.0
+ZungerPP-r_pi_0,0.0
+ZungerPP-r_pi_1,5.342335851258629e-05
+ZungerPP-r_pi_2,0.0
+ZungerPP-r_s_0,0.0
+ZungerPP-r_s_1,5.5991840862998574e-05
+ZungerPP-r_s_2,0.0
+ZungerPP-r_sigma_0,0.0
+ZungerPP-r_sigma_1,0.00025216505964155525
+ZungerPP-r_sigma_2,0.0
+phi_0,0.0
+phi_1,0.0005995690528478501
+phi_2,0.0
+Conductivity_0,0.0
+Conductivity_1,0.006091953877192363
+Conductivity_2,0.0

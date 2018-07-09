@@ -1,0 +1,47 @@
+,Feature Importance
+reactor_number,0.0180619819484305
+space_velocity,0.021596120683615886
+Atomic Number_wt-mean,0.011543283025168584
+Atomic Number_wt-mad,0.02625334411277044
+Atomic Volume_wt-mean,0.006491469795780502
+Atomic Volume_wt-mad,0.0077909450233145
+Atomic Weight_wt-mean,0.016499527123877346
+Atomic Weight_wt-mad,0.041457160970049485
+Boiling Temperature_wt-mean,0.01165377672657081
+Boiling Temperature_wt-mad,0.007669761543175261
+Periodic Table Column_wt-mad,0.051425026477979516
+Covalent Radius_wt-mean,0.010760535039992443
+Covalent Radius_wt-mad,0.007167673909039126
+Density_wt-mean,0.019050464880714844
+Density_wt-mad,0.01423376741811341
+Dipole Polarizability_wt-mean,0.01825253054395726
+Dipole Polarizability_wt-mad,0.009744759693720339
+Electron Affinity_wt-mean,0.020218612471469354
+Electron Affinity_wt-mad,0.02679417277966237
+Fusion Enthalpy_wt-mean,0.0378154058421977
+Fusion Enthalpy_wt-mad,0.026129804953234317
+Heat Fusion_wt-mean,0.032908809331811735
+Heat Fusion_wt-mad,0.02677480666021564
+Second Ionization Energy_wt-mad,0.03182982104278367
+Third Ionization Energy_wt-mean,0.02414163920642719
+Third Ionization Energy_wt-mad,0.007998282430995428
+Fourth Ionization Energy_wt-mean,0.008235325136079321
+Fourth Ionization Energy_wt-mad,0.006187666327765343
+Fifth Ionization Energy_wt-mean,0.021497391290472668
+Fifth Ionization Energy_wt-mad,0.008542257191625397
+Sixth Ionization Energy_wt-mean,0.013276724088820977
+Sixth Ionization Energy_wt-mad,0.012222263255094862
+Seventh Ionization Energy_wt-mean,0.010167114627322157
+Seventh Ionization Energy_wt-mad,0.004772299998421308
+Eighth Ionization Energy_wt-mean,0.01991504390731981
+Eighth Ionization Energy_wt-mad,0.0045196165753384945
+Melting Temperature_wt-mean,0.030059624272107337
+Melting Temperature_wt-mad,0.025671753614109397
+Mendeleev Number_wt-mean,0.04209765099357583
+Mendeleev Number_wt-mad,0.06915415383692648
+Number f-shell Valance Electrons_wt-mad,0.002640653985075677
+Number Valence Electrons_wt-mad,0.06439351663097435
+Polarizability_wt-mean,0.01987321974025892
+Polarizability_wt-mad,0.015925471862744858
+Conductivity_wt-mean,0.06505255436429637
+Conductivity_wt-mad,0.021532214666602875

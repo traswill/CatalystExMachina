@@ -1,0 +1,82 @@
+,Feature Importance
+temperature,0.2876128375572041
+Heat Capacity (Mass),0.06232006780898175
+Mendeleev Number,0.05355717033747705
+Electronegativity,0.04754836306837322
+Conductivity,0.029892874052184628
+Atomic Number,0.02926782753789853
+Density,0.02651028758031289
+Covalent Radius,0.02581334003552009
+Polarizability,0.023467794644851707
+Second Ionization Energy,0.021533862790085075
+Atomic Weight,0.021209812618424986
+Dipole Polarizability,0.019720695708268433
+Fifth Ionization Energy,0.017918664027075343
+Periodic Table Row,0.01737597817948024
+First Ionization Energy,0.017133980145417012
+Zunger Pseudopotential (d),0.016982646516479745
+Eighth Ionization Energy,0.013383053094035067
+space,0.01319404355758446
+Zunger Pseudopotential (s),0.012042956308602956
+Third Ionization Energy,0.011934990431067723
+Sixth Ionization Energy,0.011313871333950619
+Zunger Pseudopotential (sigma),0.011217949920862105
+Electron Affinity,0.011140834202575417
+Cu Loading,0.011022113711722846
+Ir Loading,0.010394712314302026
+Number Unfilled Electrons,0.01016379383822352
+Number f-shell Valance Electrons,0.009585086985904736
+Zunger Pseudopotential (pi),0.009430095099099593
+Zunger Pseudopotential (p),0.009364257298701368
+Cr Loading,0.008704267769962004
+phi,0.00857555792705272
+Number Valence Electrons,0.008398195198209205
+Mn Loading,0.008245449553313931
+ammonia,0.008070174861047035
+Seventh Ionization Energy,0.007300710652328171
+Heat Capacity (Molar),0.006881099454970937
+Number d-shell Unfilled Electrons,0.006719283792760201
+reactor,0.006626816975810804
+Ca Loading,0.006020626502631258
+Ni Loading,0.005821539922095616
+Atomic Volume,0.0056532890267814665
+GS Energy,0.005633442805876085
+Boiling Temperature,0.004853366787957412
+Melting Temperature,0.004499643366198193
+Periodic Table Column,0.004152130153321917
+Number d-shell Valance Electrons,0.0037653668061277553
+Re Loading,0.003528895818274337
+Heat Fusion,0.00311429800132636
+Number p-shell Valance Electrons,0.002459488596341677
+Fusion Enthalpy,0.002239538180096445
+Number p-shell Unfilled Electrons,0.0022283678437390302
+Fourth Ionization Energy,0.0022236328493391547
+Number s-shell Valance Electrons,0.001648779312351588
+IsDBlock,0.001630646690915952
+Sc Loading,0.0016185220397804754
+Zn Loading,0.0015591573480995742
+In Loading,0.001060548590982777
+IsAlkali,0.0009749948645752243
+Number s-shell Unfilled Electrons,0.0008821916559882288
+Mo Loading,0.0007424417566704357
+Pd Loading,0.0007253162881139798
+Sr Loading,0.0006799171525740549
+Bi Loading,0.0005955580148578682
+W Loading,0.00010476146652421925
+Mg Loading,8.021268336508255e-06
+GS Bandgap,0.0
+Number f-shell Unfilled Electrons,0.0
+Os Loading,0.0
+Pt Loading,0.0
+IsNonmetal,0.0
+IsMetalloid,0.0
+Rh Loading,0.0
+Ru Loading,0.0
+IsMetal,0.0
+Y Loading,0.0
+IsFBlock,0.0
+n,0.0
+Co Loading,0.0
+Fe Loading,0.0
+K Loading,0.0
+Hf Loading,0.0

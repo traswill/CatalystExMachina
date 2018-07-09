@@ -1,0 +1,82 @@
+,Feature Importance
+Mg Loading,0.00022221422269882876
+K Loading,0.0
+Ca Loading,2.2282569854411682e-07
+Sc Loading,0.00010275415975948717
+Cr Loading,0.0014320566136260438
+Mn Loading,6.571829464427162e-05
+Fe Loading,0.0
+Co Loading,0.0
+Ni Loading,0.00018748849879220004
+Cu Loading,0.001603157653294547
+Zn Loading,0.00022154168036366023
+Sr Loading,0.0002433614154925516
+Y Loading,2.404972141919941e-05
+Mo Loading,0.0
+Ru Loading,0.0008654048833149194
+Rh Loading,0.0002059932942646475
+Pd Loading,0.0
+In Loading,0.007379270331982809
+Hf Loading,5.153584269832791e-05
+W Loading,0.0
+Os Loading,0.0
+Ir Loading,0.0
+Pt Loading,0.0
+Bi Loading,0.00031871136081575174
+reactor_number,0.004779662533119075
+temperature,0.5853878899275393
+space_velocity,0.005411807122551452
+ammonia_concentration,0.0346398131226481
+n_elements,0.0
+Atomic Number_wtavg,0.0020885159620651237
+AtomicVolume_wtavg,0.0017798295816071686
+AtomicWeight_wtavg,0.0020085666339623204
+BoilingT_wtavg,0.002095518677988658
+Column_wtavg,0.08074995024126869
+CovalentRadius_wtavg,0.007315263497246954
+Density_wtavg,0.001999718695821576
+DipolePolarizability_wtavg,0.004217838848303398
+ElectronAffinity_wtavg,0.006152032284272428
+Electronegativity_wtavg,0.0014809346161902554
+FusionEnthalpy_wtavg,0.0023233445320485465
+GSbandgap_wtavg,0.0
+GSenergy_pa_wtavg,0.003099211026088455
+HeatCapacityMass_wtavg,0.004411791703246489
+HeatCapacityMolar_wtavg,0.00331127481371162
+HeatFusion_wtavg,0.002442196835967766
+IonizationEnergies_1_wtavg,0.0022692367162146076
+IonizationEnergies_2_wtavg,0.018031633972516902
+IonizationEnergies_3_wtavg,0.0028711150538731707
+IonizationEnergies_4_wtavg,0.0
+IonizationEnergies_5_wtavg,0.0
+IonizationEnergies_6_wtavg,0.0
+IonizationEnergies_7_wtavg,0.0
+IonizationEnergies_8_wtavg,0.0
+IsAlkali_wtavg,0.0002976250836432907
+IsDBlock_wtavg,0.00013385171468883021
+IsFBlock_wtavg,0.0
+IsMetal_wtavg,0.0
+IsMetalloid_wtavg,0.0
+IsNonmetal_wtavg,0.0
+MeltingT_wtavg,0.007183585864738475
+MendeleevNumber_wtavg,0.010493248697095994
+NdUnfilled_wtavg,0.0004549579009587373
+NdValence_wtavg,0.0033070593295750988
+NfUnfilled_wtavg,0.0
+NfValence_wtavg,0.0002367509000133629
+NpUnfilled_wtavg,0.032102305198603895
+NpValence_wtavg,0.031158823347478135
+NsUnfilled_wtavg,0.000850593166855265
+NsValence_wtavg,0.00045968884057666083
+Number_wtavg,0.002025295855244905
+NUnfilled_wtavg,0.0009871246991115757
+NValence_wtavg,0.003685688656818336
+Polarizability_wtavg,0.002311512189747594
+Row_wtavg,0.0011445691612200863
+ZungerPP-r_d_wtavg,0.01628815713552351
+ZungerPP-r_p_wtavg,0.012255640928349241
+ZungerPP-r_pi_wtavg,0.0020003522949797125
+ZungerPP-r_s_wtavg,0.05924124927594683
+ZungerPP-r_sigma_wtavg,0.012098592493728355
+phi_wtavg,0.0014029460278373995
+Conductivity_wtavg,0.008089754040146913

@@ -1,0 +1,48 @@
+,Feature Importance
+reactor_number,0.013901965439545914
+temperature,0.3122172763723099
+space_velocity,0.01291448570541903
+Atomic Number_wt-mean,0.011047629356367505
+Atomic Number_wt-mad,0.009471276800673526
+Atomic Volume_wt-mean,0.008034992908704403
+Atomic Volume_wt-mad,0.009385182175347081
+Atomic Weight_wt-mean,0.010357661203597936
+Atomic Weight_wt-mad,0.0061017888012686195
+Boiling Temperature_wt-mean,0.008086237750661892
+Boiling Temperature_wt-mad,0.007554338786214453
+Periodic Table Column_wt-mad,0.07159500433846054
+Covalent Radius_wt-mean,0.008617491932412456
+Covalent Radius_wt-mad,0.029225178809236266
+Density_wt-mean,0.010646465006173217
+Density_wt-mad,0.006420087107097688
+Dipole Polarizability_wt-mean,0.0077343128229835755
+Dipole Polarizability_wt-mad,0.01891356724622639
+Electron Affinity_wt-mean,0.007620299156553988
+Electron Affinity_wt-mad,0.013256436731748845
+Fusion Enthalpy_wt-mean,0.010610817024217416
+Fusion Enthalpy_wt-mad,0.020576082372904238
+Heat Fusion_wt-mean,0.012324897144502705
+Heat Fusion_wt-mad,0.0201941328607805
+Second Ionization Energy_wt-mad,0.041098962758107316
+Third Ionization Energy_wt-mean,0.011975714385493323
+Third Ionization Energy_wt-mad,0.019781368697113357
+Fourth Ionization Energy_wt-mean,0.012820832084597864
+Fourth Ionization Energy_wt-mad,0.01943390189500608
+Fifth Ionization Energy_wt-mean,0.010468463615038791
+Fifth Ionization Energy_wt-mad,0.009230649144425453
+Sixth Ionization Energy_wt-mean,0.007890755462790671
+Sixth Ionization Energy_wt-mad,0.013074779291242773
+Seventh Ionization Energy_wt-mean,0.013322334052099219
+Seventh Ionization Energy_wt-mad,0.008057224549282076
+Eighth Ionization Energy_wt-mean,0.012374629730024976
+Eighth Ionization Energy_wt-mad,0.006970485109618232
+Melting Temperature_wt-mean,0.019371885874687366
+Melting Temperature_wt-mad,0.017153408297641927
+Mendeleev Number_wt-mean,0.023531023581891013
+Mendeleev Number_wt-mad,0.02028513018082396
+Number f-shell Valance Electrons_wt-mad,0.0007264229368995361
+Number Valence Electrons_wt-mad,0.019557528580538667
+Polarizability_wt-mean,0.0065093085060270485
+Polarizability_wt-mad,0.025178466084246284
+Conductivity_wt-mean,0.011111934360529168
+Conductivity_wt-mad,0.02326718296846685

@@ -1,0 +1,108 @@
+,Feature Importance
+Mg Loading,0.0
+K Loading,0.0
+Ca Loading,0.0
+Sc Loading,0.002964081550930497
+Cr Loading,0.0
+Mn Loading,0.0006572906008704798
+Fe Loading,0.0
+Co Loading,0.0
+Ni Loading,0.0017553152854554058
+Cu Loading,0.0002880504462232122
+Zn Loading,2.6589490687046424e-05
+Sr Loading,0.0
+Y Loading,3.9466439061798615e-05
+Mo Loading,0.0007751138662969008
+Ru Loading,0.01657993005148197
+Rh Loading,0.012067220773194932
+Pd Loading,0.0007544115343692905
+In Loading,0.00023380061200011068
+Hf Loading,8.676591177608173e-05
+W Loading,0.00026319015656458335
+Re Loading,0.0008938526742596734
+Os Loading,0.0
+Ir Loading,0.0008995760551519436
+Pt Loading,0.0
+Bi Loading,0.0
+temperature,0.0
+space_velocity,0.029177080141511987
+ammonia_concentration,0.028788113350155492
+n_Cl_atoms,0.004360093124983492
+n_elements,0.0
+Atomic Number_mean,0.010561319135662259
+Atomic Number_mad,0.0029863724399864845
+Atomic Volume_wtavg,0.034170128528830085
+Atomic Weight_wtavg,0.041743289481436976
+Boiling Temperature_wtavg,0.005410451327704616
+Periodic Table Column_mean,0.07433728876271331
+Periodic Table Column_mad,0.0018750305983149145
+Covalent Radius_wtavg,0.008464080512069996
+Density_wtavg,0.012672369175160503
+Dipole Polarizability_wtavg,0.009180201291065266
+Electron Affinity_wtavg,0.013079226945341842
+Electronegativity_wtavg,0.01574763447259034
+Fusion Enthalpy_wtavg,0.011544117957931675
+GS Bandgap_wtavg,0.0
+GS Energy_wtavg,0.007652242098731007
+Heat Capacity (Mass)_wtavg,0.019645174896522167
+Heat Capacity (Molar)_wtavg,0.00924133040590578
+Heat Fusion_wtavg,0.01643929951431855
+First Ionization Energy_wtavg,0.012869612789230178
+Second Ionization Energy_wtavg,0.010153267640089942
+Third Ionization Energy_wtavg,0.017507319923501737
+Fourth Ionization Energy_wtavg,0.023262329893805108
+Fifth Ionization Energy_wtavg,0.005122107908064578
+Sixth Ionization Energy_wtavg,0.012295081528692863
+Seventh Ionization Energy_wtavg,0.011110514928524025
+Eighth Ionization Energy_wtavg,0.010614794473487541
+IsAlkali_mean,4.9944725334605924e-05
+IsAlkali_mad,0.0
+IsDBlock_mean,0.0007277301746187803
+IsDBlock_mad,0.0
+IsFBlock_mean,0.0
+IsFBlock_mad,0.0
+IsMetal_mean,0.0
+IsMetal_mad,0.0
+IsMetalloid_mean,0.0
+IsMetalloid_mad,0.0
+IsNonmetal_mean,0.0
+IsNonmetal_mad,0.0
+Melting Temperature_wtavg,0.028442980288713473
+Mendeleev Number_mean,0.0015462231010773197
+Mendeleev Number_mad,0.005718957835054246
+Number d-shell Unfilled Electrons_mean,0.0017459032398334006
+Number d-shell Unfilled Electrons_mad,0.023219820808429506
+Number d-shell Valance Electrons_mean,0.1561257376480479
+Number d-shell Valance Electrons_mad,0.0008544492449635258
+Number f-shell Unfilled Electrons_mean,0.0
+Number f-shell Unfilled Electrons_mad,0.0
+Number f-shell Valance Electrons_mean,4.809267996803536e-05
+Number f-shell Valance Electrons_mad,0.000512942631212894
+Number p-shell Unfilled Electrons_mean,6.553360809187325e-05
+Number p-shell Unfilled Electrons_mad,6.530193746511406e-05
+Number p-shell Valance Electrons_mean,0.0
+Number p-shell Valance Electrons_mad,5.17975448563827e-05
+Number s-shell Unfilled Electrons_mean,0.0006542304811438086
+Number s-shell Unfilled Electrons_mad,0.0005000493552478577
+Number s-shell Valance Electrons_mean,0.001216050832414726
+Number s-shell Valance Electrons_mad,0.00028188669644847264
+Number Unfilled Electrons_mean,0.003024825064086901
+Number Unfilled Electrons_mad,0.0020180501918795834
+Number Valence Electrons_mean,0.00111240433870179
+Number Valence Electrons_mad,0.001767438242240339
+Polarizability_wtavg,0.00977918987621026
+Periodic Table Row_mean,0.001224845060138928
+Periodic Table Row_mad,0.0011656797104036439
+Zunger Pseudopotential (d)_mean,0.006822934642698656
+Zunger Pseudopotential (d)_mad,0.010752474893513008
+Zunger Pseudopotential (p)_mean,0.008647436289199433
+Zunger Pseudopotential (p)_mad,0.001016277424788116
+Zunger Pseudopotential (pi)_mean,0.007686910549671334
+Zunger Pseudopotential (pi)_mad,0.002114370268737664
+Zunger Pseudopotential (s)_mean,0.0008321611827414192
+Zunger Pseudopotential (s)_mad,0.003412548433205198
+Zunger Pseudopotential (sigma)_mean,0.007000074578575056
+Zunger Pseudopotential (sigma)_mad,0.0022275227420684557
+phi_mean,0.17772205239788583
+phi_mad,0.004514372954048365
+Conductivity_wtavg,0.02703626963162745

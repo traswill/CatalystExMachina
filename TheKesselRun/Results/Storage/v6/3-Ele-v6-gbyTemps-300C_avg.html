@@ -1,0 +1,71 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>stats.py</title>
+        
+<link rel="stylesheet" href="https://cdn.pydata.org/bokeh/release/bokeh-0.12.13.min.css" type="text/css" />
+        
+<script type="text/javascript" src="https://cdn.pydata.org/bokeh/release/bokeh-0.12.13.min.js"></script>
+<script type="text/javascript">
+    Bokeh.set_log_level("info");
+</script>
+        <style>
+          html {
+            width: 100%;
+            height: 100%;
+          }
+          body {
+            width: 90%;
+            height: 100%;
+            margin: auto;
+          }
+        </style>
+    </head>
+    <body>
+        
+        <div class="bk-root">
+            <div class="bk-plotdiv" id="5b0abe7f-0075-4d50-951e-a16822bf8bd9"></div>
+        </div>
+        
+        <script type="application/json" id="423aa798-beac-4bd2-9c9b-ded4a4a88d73">
+          {"25a1fb35-3959-4265-99d6-a5a86dbe27e4":{"roots":{"references":[{"attributes":{"callback":null,"tooltips":[["Name","@Name"],["ID","@ID"],["T","@Temperature"]]},"id":"503938ce-9696-4062-a654-c64402454a9b","type":"HoverTool"},{"attributes":{},"id":"b7b46b3e-078d-422e-b960-5c7fd688f067","type":"WheelZoomTool"},{"attributes":{"data_source":{"id":"7a1be377-5a99-4e5b-b554-fff6e4b69d72","type":"ColumnDataSource"},"glyph":{"id":"e2ae0ccb-1910-47ef-bd63-eb415e1211bf","type":"Circle"},"hover_glyph":null,"muted_glyph":null,"nonselection_glyph":{"id":"fb4e1099-6653-4d35-98f2-730c14f63673","type":"Circle"},"selection_glyph":null,"view":{"id":"08ea5d06-1e9c-4bca-b1fb-56614faefd75","type":"CDSView"}},"id":"c3d0189c-1ccc-46fa-9d47-ef37466172e7","type":"GlyphRenderer"},{"attributes":{},"id":"3dafba80-dcb1-4db0-a08b-0938564e2ed1","type":"SaveTool"},{"attributes":{"background_fill_color":{"value":"#dddddd"},"below":[{"id":"bfcb6856-2231-45dd-811e-0cd62091790c","type":"LinearAxis"}],"left":[{"id":"a61c2b5a-601d-4b88-8a75-9eda037d52e7","type":"LinearAxis"}],"renderers":[{"id":"bfcb6856-2231-45dd-811e-0cd62091790c","type":"LinearAxis"},{"id":"35086359-34b4-45df-9316-b89543a8e37f","type":"Grid"},{"id":"a61c2b5a-601d-4b88-8a75-9eda037d52e7","type":"LinearAxis"},{"id":"6007c210-cdb8-427a-ad46-1eabf082e1ac","type":"Grid"},{"id":"30fd7289-23fb-4f94-a951-590e47d5911a","type":"BoxAnnotation"},{"id":"c3d0189c-1ccc-46fa-9d47-ef37466172e7","type":"GlyphRenderer"},{"id":"6f933e3d-0181-4552-92ae-8a653cf489b9","type":"Whisker"}],"title":{"id":"1dabed57-9357-4d9f-a4fd-1a6907626732","type":"Title"},"toolbar":{"id":"2bf3cef8-d0d2-4c9e-964a-541c590a5c14","type":"Toolbar"},"toolbar_location":"above","x_range":{"id":"94a9f81f-de42-4dd9-a92c-90b657b5e454","type":"Range1d"},"x_scale":{"id":"49f0bbc7-517f-4653-aa49-6be728c7fa82","type":"LinearScale"},"y_range":{"id":"ae7fe04c-3db2-49c8-afda-7c9629a6d19e","type":"Range1d"},"y_scale":{"id":"e267acf7-e97e-456e-9b4c-a4254d5bc885","type":"LinearScale"}},"id":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb","subtype":"Figure","type":"Plot"},{"attributes":{},"id":"3e9a1b47-56bd-407b-b941-da873c3ffaf0","type":"BasicTicker"},{"attributes":{"grid_line_color":{"value":"white"},"plot":{"id":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb","subtype":"Figure","type":"Plot"},"ticker":{"id":"7f225c40-a78e-432b-ac9c-0e93537bd10c","type":"BasicTicker"}},"id":"35086359-34b4-45df-9316-b89543a8e37f","type":"Grid"},{"attributes":{"source":{"id":"7a1be377-5a99-4e5b-b554-fff6e4b69d72","type":"ColumnDataSource"}},"id":"08ea5d06-1e9c-4bca-b1fb-56614faefd75","type":"CDSView"},{"attributes":{"plot":null,"text":"3-Ele-v6-gbyTemps-300C"},"id":"1dabed57-9357-4d9f-a4fd-1a6907626732","type":"Title"},{"attributes":{},"id":"a632333f-5fb4-4880-bedc-563c68aadab3","type":"PanTool"},{"attributes":{},"id":"49f0bbc7-517f-4653-aa49-6be728c7fa82","type":"LinearScale"},{"attributes":{"level":"underlay","plot":null,"size":10},"id":"f5f961e9-cfc8-484d-9fb0-18daf3bdea13","type":"TeeHead"},{"attributes":{"axis_label":"Predicted Activity","formatter":{"id":"56eb0d9e-e608-4ca7-941a-36486b8817fc","type":"BasicTickFormatter"},"plot":{"id":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb","subtype":"Figure","type":"Plot"},"ticker":{"id":"7f225c40-a78e-432b-ac9c-0e93537bd10c","type":"BasicTicker"}},"id":"bfcb6856-2231-45dd-811e-0cd62091790c","type":"LinearAxis"},{"attributes":{},"id":"e267acf7-e97e-456e-9b4c-a4254d5bc885","type":"LinearScale"},{"attributes":{"overlay":{"id":"30fd7289-23fb-4f94-a951-590e47d5911a","type":"BoxAnnotation"}},"id":"6039f38a-a0e7-445b-9531-5e6dd72354e7","type":"BoxZoomTool"},{"attributes":{"fill_alpha":{"value":0.1},"fill_color":{"value":"#1f77b4"},"line_alpha":{"value":0.1},"line_color":{"value":"#1f77b4"},"size":{"units":"screen","value":8},"x":{"field":"Predicted"},"y":{"field":"Measured"}},"id":"fb4e1099-6653-4d35-98f2-730c14f63673","type":"Circle"},{"attributes":{},"id":"7f225c40-a78e-432b-ac9c-0e93537bd10c","type":"BasicTicker"},{"attributes":{"bottom_units":"screen","fill_alpha":{"value":0.5},"fill_color":{"value":"lightgrey"},"left_units":"screen","level":"overlay","line_alpha":{"value":1.0},"line_color":{"value":"black"},"line_dash":[4,4],"line_width":{"value":2},"plot":null,"render_mode":"css","right_units":"screen","top_units":"screen"},"id":"30fd7289-23fb-4f94-a951-590e47d5911a","type":"BoxAnnotation"},{"attributes":{"active_drag":"auto","active_inspect":"auto","active_scroll":"auto","active_tap":"auto","logo":"grey","tools":[{"id":"503938ce-9696-4062-a654-c64402454a9b","type":"HoverTool"},{"id":"a632333f-5fb4-4880-bedc-563c68aadab3","type":"PanTool"},{"id":"b7b46b3e-078d-422e-b960-5c7fd688f067","type":"WheelZoomTool"},{"id":"6039f38a-a0e7-445b-9531-5e6dd72354e7","type":"BoxZoomTool"},{"id":"9c9b882c-4382-4521-9027-a59e63066dc2","type":"ResetTool"},{"id":"3dafba80-dcb1-4db0-a08b-0938564e2ed1","type":"SaveTool"}]},"id":"2bf3cef8-d0d2-4c9e-964a-541c590a5c14","type":"Toolbar"},{"attributes":{"callback":null,"column_names":["ID","Lower","Measured","Measured Standard Error","Name","Predicted","Temperature","Upper","color","n Samples","index"],"data":{"ID":[57.0,45.0,17.0,60.0,108.0,35.0,39.0,42.0,63.0,31.0,56.0,44.0,16.0,59.0,107.0,34.0,38.0,41.0,62.0,30.0,55.0,43.0,15.0,58.0,106.0,33.0,37.0,40.0,61.0,29.0,32.0],"Lower":[0.2336107104447296,0.228286395343104,0.08629205905585528,0.8098403973047344,0.19575744808351514,0.3689520878199842,0.2563904241740229,0.17132615090634426,0.5098006667394033,0.8567315790112138,0.6747484169622273,0.34030518466811144,0.175819236600345,0.7943500649681149,0.11747204532330013,0.3911559923089337,0.4574935614161519,0.37077973127045144,0.5889108001281241,0.9332057424518421,0.9058736753553164,0.5286907019265268,0.2386501072652425,0.7523784083717086,0.20771329044091696,0.8709256377875999,0.33406682248337366,0.5185864283121334,0.8379755951341585,0.946680725464704,0.951132475737134],"Measured":[0.2624388022323234,0.24414354166180383,0.11075924705823437,0.8154847981309296,0.21217753660350577,0.374982429272486,0.27447878331669545,0.19801764972385605,0.5250619025466591,0.8703920828140919,0.6971633010227691,0.3520005747227376,0.2123667412658962,0.7993198581801622,0.13431116599184023,0.40446978753913404,0.4687923468556841,0.3974574375529717,0.5915653232479702,0.9393617188044502,0.9129470189170151,0.5538515344692593,0.30323336940343465,0.7924969314097617,0.24010788194125046,0.8974038866572183,0.3660179205923335,0.5490821608622959,0.8874977725801614,0.9524203071824155,0.9574928582255678],"Measured Standard Error":[0.028828091787593803,0.01585714631869983,0.024467188002379087,0.005644400826195095,0.01642008851999064,0.006030341452501818,0.018088359142672546,0.0266914988175118,0.015261235807255828,0.013660503802878128,0.02241488406054186,0.011695390054626149,0.03654750466555117,0.004969793212047215,0.01683912066854009,0.01331379523020032,0.011298785439532234,0.026677706282520267,0.0026545231198460235,0.006155976352608127,0.007073343561698774,0.025160832542732468,0.06458326213819217,0.040118523038053175,0.03239459150033349,0.026478248869618384,0.03195109810895984,0.03049573255016249,0.04952217744600282,0.0057395817177115,0.00636038248843383],"Name":["Ru(1)Ca(3)K(12)","Ru(1)Cr(3)K(12)","Ru(1)Cu(3)K(12)","Ru(1)Hf(3)K(12)","Ru(1)In(3)K(12)","Ru(1)Mg(3)K(12)","Ru(1)Mn(3)K(12)","Ru(1)Ni(3)K(12)","Ru(1)Sc(3)K(12)","Ru(1)Y(3)K(12)","Ru(2)Ca(2)K(12)","Ru(2)Cr(2)K(12)","Ru(2)Cu(2)K(12)","Ru(2)Hf(2)K(12)","Ru(2)In(2)K(12)","Ru(2)Mg(2)K(12)","Ru(2)Mn(2)K(12)","Ru(2)Ni(2)K(12)","Ru(2)Sc(2)K(12)","Ru(2)Y(2)K(12)","Ru(3)Ca(1)K(12)","Ru(3)Cr(1)K(12)","Ru(3)Cu(1)K(12)","Ru(3)Hf(1)K(12)","Ru(3)In(1)K(12)","Ru(3)Mg(1)K(12)","Ru(3)Mn(1)K(12)","Ru(3)Ni(1)K(12)","Ru(3)Sc(1)K(12)","Ru(3)Y(1)K(12)","Ru(4)Y(0)K(12)"],"Predicted":[0.8496939526182744,0.5237921406065226,0.27973476502411027,0.8134750578588413,0.19462842332183058,0.4283378688559174,0.2805861660844851,0.3376972543604701,0.780017973718639,0.8389747441849064,0.723536023370005,0.6572366813778019,0.2025582990822491,0.9099811806252176,0.3539048728713226,0.7635383703115178,0.36913186380995106,0.25549329607148746,0.8935161199919267,0.8587214444059507,0.7755132507313327,0.3788539110857711,0.3268842388516239,0.9015273070617998,0.41059639681226234,0.4124774950095192,0.5364047428289098,0.400460530140626,0.8063099795714775,0.8924330178748174,0.9348647135214818],"Temperature":[300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0,300.0],"Upper":[0.29126689401991723,0.26000068798050363,0.13522643506061346,0.8211291989571247,0.2285976251234964,0.3810127707249878,0.292567142459368,0.22470914854136784,0.5403231383539149,0.88405258661697,0.719578185083311,0.36369596477736377,0.24891424593144737,0.8042896513922094,0.15115028666038033,0.41778358276933436,0.4800911322952163,0.42413514383549195,0.5942198463678162,0.9455176951570583,0.9200203624787139,0.5790123670119918,0.3678166315416268,0.8326154544478149,0.27250247344158396,0.9238821355268366,0.39796901870129336,0.5795778934124584,0.9370199500261642,0.958159888900127,0.9638532407140017],"color":["#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821","#EFF821"],"index":[0,11,26,47,63,10,51,43,60,12,22,7,25,5,129,14,69,30,44,23,1,8,27,77,3,2,18,6,9,15,4],"n Samples":[3,3,6,3,3,6,3,5,3,11,3,5,6,3,3,6,3,5,3,6,3,5,6,3,3,11,6,8,6,6,6]}},"id":"7a1be377-5a99-4e5b-b554-fff6e4b69d72","type":"ColumnDataSource"},{"attributes":{"level":"underlay","plot":null,"size":10},"id":"d9e32129-b59b-4457-a98b-8ac5985658aa","type":"TeeHead"},{"attributes":{},"id":"9c9b882c-4382-4521-9027-a59e63066dc2","type":"ResetTool"},{"attributes":{"callback":null},"id":"94a9f81f-de42-4dd9-a92c-90b657b5e454","type":"Range1d"},{"attributes":{"fill_alpha":{"value":0.8},"fill_color":{"field":"color"},"size":{"units":"screen","value":8},"x":{"field":"Predicted"},"y":{"field":"Measured"}},"id":"e2ae0ccb-1910-47ef-bd63-eb415e1211bf","type":"Circle"},{"attributes":{"callback":null},"id":"ae7fe04c-3db2-49c8-afda-7c9629a6d19e","type":"Range1d"},{"attributes":{},"id":"56eb0d9e-e608-4ca7-941a-36486b8817fc","type":"BasicTickFormatter"},{"attributes":{"axis_label":"Measured Activity","formatter":{"id":"5d44759a-68f5-49c3-bfce-30f80cc5b885","type":"BasicTickFormatter"},"plot":{"id":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb","subtype":"Figure","type":"Plot"},"ticker":{"id":"3e9a1b47-56bd-407b-b941-da873c3ffaf0","type":"BasicTicker"}},"id":"a61c2b5a-601d-4b88-8a75-9eda037d52e7","type":"LinearAxis"},{"attributes":{"dimension":1,"grid_line_color":{"value":"white"},"plot":{"id":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb","subtype":"Figure","type":"Plot"},"ticker":{"id":"3e9a1b47-56bd-407b-b941-da873c3ffaf0","type":"BasicTicker"}},"id":"6007c210-cdb8-427a-ad46-1eabf082e1ac","type":"Grid"},{"attributes":{},"id":"5d44759a-68f5-49c3-bfce-30f80cc5b885","type":"BasicTickFormatter"},{"attributes":{"base":{"field":"Predicted","units":"data"},"level":"overlay","lower":{"field":"Lower","units":"data"},"lower_head":{"id":"f5f961e9-cfc8-484d-9fb0-18daf3bdea13","type":"TeeHead"},"plot":{"id":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb","subtype":"Figure","type":"Plot"},"source":{"id":"7a1be377-5a99-4e5b-b554-fff6e4b69d72","type":"ColumnDataSource"},"upper":{"field":"Upper","units":"data"},"upper_head":{"id":"d9e32129-b59b-4457-a98b-8ac5985658aa","type":"TeeHead"}},"id":"6f933e3d-0181-4552-92ae-8a653cf489b9","type":"Whisker"}],"root_ids":["4c6fc472-8dd9-4d70-a637-3a920e4dfabb"]},"title":"Bokeh Application","version":"0.12.13"}}
+        </script>
+        <script type="text/javascript">
+          (function() {
+            var fn = function() {
+              Bokeh.safely(function() {
+                (function(root) {
+                  function embed_document(root) {
+                    
+                  var docs_json = document.getElementById('423aa798-beac-4bd2-9c9b-ded4a4a88d73').textContent;
+                  var render_items = [{"docid":"25a1fb35-3959-4265-99d6-a5a86dbe27e4","elementid":"5b0abe7f-0075-4d50-951e-a16822bf8bd9","modelid":"4c6fc472-8dd9-4d70-a637-3a920e4dfabb"}];
+                  root.Bokeh.embed.embed_items(docs_json, render_items);
+                
+                  }
+                  if (root.Bokeh !== undefined) {
+                    embed_document(root);
+                  } else {
+                    var attempts = 0;
+                    var timer = setInterval(function(root) {
+                      if (root.Bokeh !== undefined) {
+                        embed_document(root);
+                        clearInterval(timer);
+                      }
+                      attempts++;
+                      if (attempts > 100) {
+                        console.log("Bokeh: ERROR: Unable to run BokehJS code because BokehJS library is missing")
+                        clearInterval(timer);
+                      }
+                    }, 10, root)
+                  }
+                })(window);
+              });
+            };
+            if (document.readyState != "loading") fn();
+            else document.addEventListener("DOMContentLoaded", fn);
+          })();
+        </script>
+    </body>
+</html>

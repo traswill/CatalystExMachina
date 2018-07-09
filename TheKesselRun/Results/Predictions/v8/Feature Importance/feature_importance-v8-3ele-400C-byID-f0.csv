@@ -1,0 +1,187 @@
+,Feature Importance
+Atomic Number_0,0.0
+Atomic Number_1,0.004524526316562901
+Atomic Number_2,0.0
+AtomicVolume_0,0.0
+AtomicVolume_1,0.0015303055850487376
+AtomicVolume_2,0.0
+AtomicWeight_0,0.0
+AtomicWeight_1,0.011091454956264311
+AtomicWeight_2,0.0
+Bi Loading,0.011490477899869242
+BoilingT_0,0.0
+BoilingT_1,0.002978521333358094
+BoilingT_2,0.0
+Ca Loading,0.0
+Co Loading,0.0
+Column_0,0.0
+Column_1,0.1220753131559253
+Column_2,0.0
+Conductivity_0,0.0
+Conductivity_1,0.013234424118567506
+Conductivity_2,0.0
+CovalentRadius_0,0.0
+CovalentRadius_1,0.0001281472116571382
+CovalentRadius_2,0.0
+Cr Loading,0.002494435439444631
+Cu Loading,0.07505732254273775
+Density_0,0.0
+Density_1,0.006229168011242573
+Density_2,0.0
+DipolePolarizability_0,0.0
+DipolePolarizability_1,0.00010515835072679365
+DipolePolarizability_2,0.0
+ElectronAffinity_0,0.0
+ElectronAffinity_1,0.013367456079272602
+ElectronAffinity_2,0.0
+Electronegativity_0,0.0
+Electronegativity_1,7.74312471830988e-05
+Electronegativity_2,0.0
+Fe Loading,0.0
+FusionEnthalpy_0,0.0
+FusionEnthalpy_1,0.007875412178317906
+FusionEnthalpy_2,0.0
+GSbandgap_0,0.0
+GSbandgap_1,0.0
+GSbandgap_2,0.0
+GSenergy_pa_0,0.0
+GSenergy_pa_1,0.006264010406112122
+GSenergy_pa_2,0.0
+HeatCapacityMass_0,0.0
+HeatCapacityMass_1,0.003544261954362126
+HeatCapacityMass_2,0.0
+HeatCapacityMolar_0,0.0
+HeatCapacityMolar_1,0.01631019684061106
+HeatCapacityMolar_2,0.0
+HeatFusion_0,0.0
+HeatFusion_1,0.0018302018064450156
+HeatFusion_2,0.0
+Hf Loading,0.0
+In Loading,0.10779221460378988
+IonizationEnergies_1_0,0.0
+IonizationEnergies_1_1,0.0007455627588649429
+IonizationEnergies_1_2,0.0
+IonizationEnergies_2_0,0.0
+IonizationEnergies_2_1,0.04994332545547489
+IonizationEnergies_2_2,0.0
+IonizationEnergies_3_0,0.0
+IonizationEnergies_3_1,0.0009922965052294123
+IonizationEnergies_3_2,0.0
+IonizationEnergies_4_0,0.0
+IonizationEnergies_4_1,0.00035731577066850046
+IonizationEnergies_4_2,0.0
+IonizationEnergies_5_0,0.0
+IonizationEnergies_5_1,0.00103262601319765
+IonizationEnergies_5_2,0.0
+IonizationEnergies_6_0,0.0
+IonizationEnergies_6_1,0.0024048920078204293
+IonizationEnergies_6_2,0.0
+IonizationEnergies_7_0,0.0
+IonizationEnergies_7_1,0.004544257707641255
+IonizationEnergies_7_2,0.0
+IonizationEnergies_8_0,0.0
+IonizationEnergies_8_1,0.0007623297223218177
+IonizationEnergies_8_2,0.0
+Ir Loading,0.0
+IsAlkali_0,0.0
+IsAlkali_1,0.0
+IsAlkali_2,0.0
+IsDBlock_0,0.0
+IsDBlock_1,3.5964275483195677e-06
+IsDBlock_2,0.0
+IsFBlock_0,0.0
+IsFBlock_1,0.0
+IsFBlock_2,0.0
+IsMetal_0,0.0
+IsMetal_1,0.0
+IsMetal_2,0.0
+IsMetalloid_0,0.0
+IsMetalloid_1,0.0
+IsMetalloid_2,0.0
+IsNonmetal_0,0.0
+IsNonmetal_1,0.0
+IsNonmetal_2,0.0
+K Loading,0.0
+M1M2_ratio,0.026892746682834586
+MeltingT_0,0.0
+MeltingT_1,0.057798535877815936
+MeltingT_2,0.0
+MendeleevNumber_0,0.0
+MendeleevNumber_1,0.06241769688362979
+MendeleevNumber_2,0.0
+Mg Loading,2.528263283959372e-06
+Mn Loading,1.0833918338873332e-05
+Mo Loading,0.0
+NUnfilled_0,0.0
+NUnfilled_1,0.00024797193447381895
+NUnfilled_2,0.0
+NValence_0,0.0
+NValence_1,0.013978967407753277
+NValence_2,0.0
+NdUnfilled_0,0.0
+NdUnfilled_1,2.376996543601978e-05
+NdUnfilled_2,0.0
+NdValence_0,0.0
+NdValence_1,0.010622110064497618
+NdValence_2,0.0
+NfUnfilled_0,0.0
+NfUnfilled_1,0.0
+NfUnfilled_2,0.0
+NfValence_0,0.0
+NfValence_1,0.0
+NfValence_2,0.0
+Ni Loading,5.16967903923956e-06
+NpUnfilled_0,0.0
+NpUnfilled_1,0.07839294919931655
+NpUnfilled_2,0.0
+NpValence_0,0.0
+NpValence_1,0.09424698346468499
+NpValence_2,0.0
+NsUnfilled_0,0.0
+NsUnfilled_1,4.842044136170469e-06
+NsUnfilled_2,0.0
+NsValence_0,0.0
+NsValence_1,0.00012486425843007078
+NsValence_2,0.0
+Number_0,0.0
+Number_1,0.0018809704947508144
+Number_2,0.0
+Os Loading,0.0
+Pd Loading,3.4253825269778714e-06
+Polarizability_0,0.0
+Polarizability_1,0.0026466184899610994
+Polarizability_2,0.0
+Pt Loading,0.0
+Rh Loading,0.0
+Row_0,0.0
+Row_1,3.380469610242013e-05
+Row_2,0.0
+Ru Loading,0.04642253808503269
+Sc Loading,6.23499577099659e-05
+Sr Loading,8.88776361365636e-07
+W Loading,0.0
+Y Loading,1.6732536527130038e-05
+Zn Loading,0.0024001627116309156
+ZungerPP-r_d_0,0.0
+ZungerPP-r_d_1,4.7516679475002885e-05
+ZungerPP-r_d_2,0.0
+ZungerPP-r_p_0,0.0
+ZungerPP-r_p_1,0.01027855756834758
+ZungerPP-r_p_2,0.0
+ZungerPP-r_pi_0,0.0
+ZungerPP-r_pi_1,0.06373503076055395
+ZungerPP-r_pi_2,0.0
+ZungerPP-r_s_0,0.0
+ZungerPP-r_s_1,0.004331202123751114
+ZungerPP-r_s_2,0.0
+ZungerPP-r_sigma_0,0.0
+ZungerPP-r_sigma_1,4.232991679596166e-05
+ZungerPP-r_sigma_2,0.0
+ammonia_concentration,0.008921170167457056
+n_elements,0.0
+phi_0,0.0
+phi_1,4.492117814950101e-05
+phi_2,0.0
+reactor_number,0.022492819673601266
+space_velocity,0.02308234875132817
+temperature,0.0

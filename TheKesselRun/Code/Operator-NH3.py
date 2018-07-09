@@ -308,6 +308,60 @@ def predict_half_Ru_catalysts():
     skynet.train_data()
     return skynet, skynet.predict_dataset()
 
+def predict_catalyst_sample_space():
+    '''
+    These prediction bounds were decided upon in July 2018 by Jochen, Katie, Calvin, and myself.
+    This code creates the catalyst design space and uses unsupervised ML to determine 64 catalysts for testing.
+    '''
+    SV = 2000
+    NH3 = 10
+    TMP = 350
+
+    def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
+        cat = Catalyst()
+        cat.ID = 'A'
+        cat.add_element(e1, w1)
+        cat.add_element(e2, w2)
+        cat.add_element(e3, w3)
+        cat.input_reactor_number(reactnum)
+        cat.input_temperature(tmp)
+        cat.input_space_velocity(space_vel)
+        cat.input_ammonia_concentration(ammonia_conc)
+        cat.feature_add_n_elements()
+
+        feature_generator = {
+            0: cat.feature_add_elemental_properties,
+            1: cat.feature_add_statistics,
+            2: cat.feature_add_weighted_average
+        }
+        feature_generator.get(0, lambda: print('No Feature Generator Selected'))()
+
+        return cat
+
+    eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
+               list(range(44, 51)) + list(range(73, 80)) + [56, 72, 82, 83]
+
+    print(ele_list)
+    exit()
+
+    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
+    eles = ele_df.index.values
+
+    for val in eles:
+        cat1 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=4, e3='K', w3=12,
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
+        skynet.add_catalyst('Predict', cat1)
+
+        cat2 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=2, e3='K', w3=12,
+                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
+        skynet.add_catalyst('Predict', cat2)
+
+    load_nh3_catalysts(skynet, featgen=0)
+    skynet.filter_master_dataset()
+    skynet.train_data()
+    return skynet, skynet.predict_dataset()
+
 
 def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
     nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
@@ -419,6 +473,8 @@ def unsupervised_exploration(learner):
 
 
 if __name__ == '__main__':
+    predict_catalyst_sample_space()
+
     # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
     # exit()
 
