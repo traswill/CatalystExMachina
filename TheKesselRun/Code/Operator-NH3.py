@@ -1,4 +1,5 @@
-from TheKesselRun.Code.Learner import Learner
+from TheKesselRun.Code.LearnerOrder import Learner
+from TheKesselRun.Code.LearnerAnarchy import Anarchy
 from TheKesselRun.Code.Catalyst import Catalyst
 from TheKesselRun.Code.Plotter import Graphic
 
@@ -8,6 +9,8 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
 import numpy as np
+import time
+import scipy.cluster
 
 
 def load_nh3_catalysts(learner, featgen=0):
@@ -313,55 +316,88 @@ def predict_catalyst_sample_space():
     These prediction bounds were decided upon in July 2018 by Jochen, Katie, Calvin, and myself.
     This code creates the catalyst design space and uses unsupervised ML to determine 64 catalysts for testing.
     '''
-    SV = 2000
-    NH3 = 10
-    TMP = 350
+    start_time = time.time()
+    skynet = Anarchy()
 
-    def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
-        cat = Catalyst()
-        cat.ID = 'A'
-        cat.add_element(e1, w1)
-        cat.add_element(e2, w2)
-        cat.add_element(e3, w3)
-        cat.input_reactor_number(reactnum)
-        cat.input_temperature(tmp)
-        cat.input_space_velocity(space_vel)
-        cat.input_ammonia_concentration(ammonia_conc)
-        cat.feature_add_n_elements()
-
-        feature_generator = {
-            0: cat.feature_add_elemental_properties,
-            1: cat.feature_add_statistics,
-            2: cat.feature_add_weighted_average
-        }
-        feature_generator.get(0, lambda: print('No Feature Generator Selected'))()
-
-        return cat
-
+    # Create Element List, elements selected by Katie
     eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
-    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
-               list(range(44, 51)) + list(range(73, 80)) + [56, 72, 82, 83]
 
-    print(ele_list)
+    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
+               list(range(44, 51)) + [52] + list(range(55, 59)) + list(range(72, 80)) + [82, 83]
+    # **********TESTING**********
+    # ele_list = [12, 20, 38]
+    # **********TESTING**********
+
+    promoter_list = [11, 19]
+
+    metal_df = eledf[eledf['Atomic Number'].isin(ele_list)].copy()
+    metal_elements = metal_df.index.values
+
+    promoter_df = eledf[eledf['Atomic Number'].isin(promoter_list)].copy()
+    promoter_elements = promoter_df.index.values
+
+    metals = list(itertools.combinations(metal_elements, r=3))
+    metal_loadings = list(itertools.permutations([0,1,3,5], r=3))
+
+    promoters = list(itertools.combinations(promoter_elements, r=2))
+    bipromoter_loadings = list(itertools.permutations([0, 5, 10, 15, 20], r=2))
+    biproms = [(p, pl) for p in promoters for pl in bipromoter_loadings if pl[0] + pl[1] < 21]
+
+    all_combinations = [(m[0], ml[0], m[1], ml[1], m[2], ml[2], p[0][0], p[1][0], p[0][1], p[1][1])
+                        for m in metals for ml in metal_loadings for p in biproms]
+
+    print('Number of Combinations: {}'.format(len(all_combinations)))
+    print('Number of metals: {}'.format(len(metals)))
+    print('Number of Loadings: {}'.format(len(metal_loadings)))
+    print('Number of Promoter Combinations: {}'.format(len(biproms)))
+    print('Time to generate samples: {:0.1f} s'.format(time.time() - start_time))
+
+    catdf = pd.DataFrame(all_combinations, columns=['E1','W1','E2','W2','E3','W3','E4','W4','E5','W5']).sample(frac=1)
+    all_combinations = list()
+    print("{:03.2f} MB".format(catdf.memory_usage(deep=True).sum() / 1024 ** 2))
+
+    spacing = np.linspace(0, len(catdf), 500, dtype=int)
+    start = spacing[:-1]
+    end = spacing[1:]
+
+    for i in range(len(start)):
+        skynet.add_catalyst_dataframe(catdf.iloc[start[i]:end[i]])
+        skynet.build_feature_set(header=metal_elements.tolist() + promoter_elements.tolist())
+        exit()
+
+
+    exit()
+    skynet.add_catalyst_dataframe(catdf.head(20000))
+    skynet.build_feature_set(header=metal_elements.tolist() + promoter_elements.tolist())
+    print('Time to generate pandas: {:0.1f} s'.format(time.time() - start_time))
+
     exit()
 
-    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
-    eles = ele_df.index.values
+    i = 0
+    for gencat in all_combinations:
+        cat = Catalyst()
+        cat.add_element(gencat[0][0], gencat[1][0])
+        cat.add_element(gencat[0][1], gencat[1][1])
+        cat.add_element(gencat[0][2], gencat[1][2])
+        cat.add_element(gencat[2][0][0], gencat[2][1][0])
+        cat.add_element(gencat[2][0][1], gencat[2][1][1])
+        cat.feature_add_n_elements()
+        cat.feature_add_unsupervised_properties()
+        cat.feature_add_Lp_norms()
+        skynet.add_catalyst('Predict', cat)
 
-    for val in eles:
-        cat1 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=4, e3='K', w3=12,
-                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat1)
+        if i % 100000 == 0:
+            print(i, time.time() - start_time)
 
-        cat2 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=2, e3='K', w3=12,
-                               tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat2)
+        i+=1
 
-    load_nh3_catalysts(skynet, featgen=0)
-    skynet.filter_master_dataset()
-    skynet.train_data()
-    return skynet, skynet.predict_dataset()
-
+    print('Skynet populated after {:0.1f} s'.format(time.time() - start_time))
+    skynet.build_feature_set()
+    print('Skynet feature generation after {:0.1f} s'.format(time.time() - start_time))
+    skynet.kmeans()
+    print('Skynet kmeans after {:0.1f} s'.format(time.time() - start_time))
+    skynet.find_closest_centroid()
+    print('Skynet centroid calculation after {:0.1f} s'.format(time.time() - start_time))
 
 def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
     nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]

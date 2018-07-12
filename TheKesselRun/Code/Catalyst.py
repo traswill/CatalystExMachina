@@ -76,6 +76,23 @@ class Catalyst():
             feat = calc_weighted_average(feature_values.values, np.fromiter(self.elements.values(), dtype=float))
             self.feature_add('{nm}_wtavg'.format(nm=feature_name), feat)
 
+    def feature_add_unsupervised_properties(self):
+        # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
+        eledf = pd.read_csv(r'../Data/Elements_Unsupervised.csv', index_col=1)
+        eledf = eledf.loc[list(self.elements.keys())]
+
+        weights = np.fromiter(self.elements.values(), dtype=float)
+
+        for feature_name, feature_values in eledf.T.iterrows():
+            fwmean = np.sum(feature_values * weights) / np.sum(weights)
+            avgdev = np.sum(weights * np.abs(feature_values - np.mean(feature_values))) / np.sum(weights)
+
+            self.feature_add('{}_mean'.format(feature_name), fwmean)
+            self.feature_add('{}_mad'.format(feature_name), avgdev)
+            self.feature_add('{}_min'.format(feature_name), np.max(feature_values))
+            self.feature_add('{}_max'.format(feature_name), np.min(feature_values))
+            self.feature_add('{}_rng'.format(feature_name), np.max(feature_values)-np.min(feature_values))
+
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
         eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
