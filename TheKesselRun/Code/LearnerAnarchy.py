@@ -18,7 +18,7 @@ class Anarchy():
         self.feature_set = pd.DataFrame()
         self.cluster_results = pd.DataFrame()
 
-    def add_catalyst_dataframe(self, df):
+    def set_catalyst_dataframe(self, df):
         self.catalyst_dataframe = df
 
     #
@@ -64,13 +64,13 @@ class Anarchy():
 
             # print(working_df.columns)
             # print(eledf)
-            print(input_df['E1'])
-            print(eledf.loc[[input_df.loc[input_df.index, 'E1'].values,
-                            input_df.loc[input_df.index, 'E2'].values,
-                            input_df.loc[input_df.index, 'E3'].values,
-                            input_df.loc[input_df.index, 'E4'].values,
-                            input_df.loc[input_df.index, 'E5'].values]]
-                )
+            elements_per_index = np.vstack((input_df.loc[input_df.index, 'E1'].values,
+                                            input_df.loc[input_df.index, 'E2'].values,
+                                            input_df.loc[input_df.index, 'E3'].values,
+                                            input_df.loc[input_df.index, 'E4'].values,
+                                            input_df.loc[input_df.index, 'E5'].values)).transpose()
+
+            print(eledf.loc[elements_per_index])
 
             # output_df[input_df.index, eledf.columns] = eledf[[input_df['E1'], input_df['E2'], input_df['E3'], input_df['E4'], input_df['E5']]]
 

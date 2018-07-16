@@ -361,43 +361,21 @@ def predict_catalyst_sample_space():
     end = spacing[1:]
 
     for i in range(len(start)):
-        skynet.add_catalyst_dataframe(catdf.iloc[start[i]:end[i]])
+        skynet.set_catalyst_dataframe(catdf.iloc[start[i]:end[i]])
         skynet.build_feature_set(header=metal_elements.tolist() + promoter_elements.tolist())
         exit()
+        print('Time to generate pandas: {:0.1f} s'.format(time.time() - start_time))
 
 
     exit()
-    skynet.add_catalyst_dataframe(catdf.head(20000))
-    skynet.build_feature_set(header=metal_elements.tolist() + promoter_elements.tolist())
-    print('Time to generate pandas: {:0.1f} s'.format(time.time() - start_time))
 
-    exit()
-
-    i = 0
-    for gencat in all_combinations:
-        cat = Catalyst()
-        cat.add_element(gencat[0][0], gencat[1][0])
-        cat.add_element(gencat[0][1], gencat[1][1])
-        cat.add_element(gencat[0][2], gencat[1][2])
-        cat.add_element(gencat[2][0][0], gencat[2][1][0])
-        cat.add_element(gencat[2][0][1], gencat[2][1][1])
-        cat.feature_add_n_elements()
-        cat.feature_add_unsupervised_properties()
-        cat.feature_add_Lp_norms()
-        skynet.add_catalyst('Predict', cat)
-
-        if i % 100000 == 0:
-            print(i, time.time() - start_time)
-
-        i+=1
-
-    print('Skynet populated after {:0.1f} s'.format(time.time() - start_time))
-    skynet.build_feature_set()
-    print('Skynet feature generation after {:0.1f} s'.format(time.time() - start_time))
-    skynet.kmeans()
-    print('Skynet kmeans after {:0.1f} s'.format(time.time() - start_time))
-    skynet.find_closest_centroid()
-    print('Skynet centroid calculation after {:0.1f} s'.format(time.time() - start_time))
+    # print('Skynet populated after {:0.1f} s'.format(time.time() - start_time))
+    # skynet.build_feature_set()
+    # print('Skynet feature generation after {:0.1f} s'.format(time.time() - start_time))
+    # skynet.kmeans()
+    # print('Skynet kmeans after {:0.1f} s'.format(time.time() - start_time))
+    # skynet.find_closest_centroid()
+    # print('Skynet centroid calculation after {:0.1f} s'.format(time.time() - start_time))
 
 def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
     nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
