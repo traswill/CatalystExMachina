@@ -11,6 +11,7 @@ import seaborn as sns
 import numpy as np
 import time
 import scipy.cluster
+import glob
 
 
 def load_nh3_catalysts(learner, featgen=0):
@@ -311,71 +312,167 @@ def predict_half_Ru_catalysts():
     skynet.train_data()
     return skynet, skynet.predict_dataset()
 
-def predict_catalyst_sample_space():
+def unsupervised_first_batch_selection():
     '''
     These prediction bounds were decided upon in July 2018 by Jochen, Katie, Calvin, and myself.
     This code creates the catalyst design space and uses unsupervised ML to determine 64 catalysts for testing.
     '''
+
+    # Initialize Time and unsupervised learning algorithm
     start_time = time.time()
     skynet = Anarchy()
 
     # Create Element List, elements selected by Katie
     eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
-
     ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
                list(range(44, 51)) + [52] + list(range(55, 59)) + list(range(72, 80)) + [82, 83]
-    # **********TESTING**********
-    # ele_list = [12, 20, 38]
-    # **********TESTING**********
 
+    # Create promoter list (K and Na)
     promoter_list = [11, 19]
 
+    # Create dataframes from these lists
     metal_df = eledf[eledf['Atomic Number'].isin(ele_list)].copy()
     metal_elements = metal_df.index.values
-
     promoter_df = eledf[eledf['Atomic Number'].isin(promoter_list)].copy()
     promoter_elements = promoter_df.index.values
 
+    # Permute all possible combinations of metals and loadings
     metals = list(itertools.combinations(metal_elements, r=3))
-    metal_loadings = list(itertools.permutations([0,1,3,5], r=3))
+    metal_loadings = list(itertools.permutations([0,1,1,3,3,5], r=3))
+    metal_loadings = [tuple(x) for x in set(tuple(x) for x in metal_loadings if np.sum(x) < 8)]
 
+    # Permute all possible combinations of promoters and loadings
     promoters = list(itertools.combinations(promoter_elements, r=2))
-    bipromoter_loadings = list(itertools.permutations([0, 5, 10, 15, 20], r=2))
+    bipromoter_loadings = list(itertools.permutations([0, 5, 10, 10, 15, 20], r=2))
+    bipromoter_loadings = [tuple(x) for x in set(tuple(x) for x in bipromoter_loadings)]
     biproms = [(p, pl) for p in promoters for pl in bipromoter_loadings if pl[0] + pl[1] < 21]
 
+    # Use the previous values to permute all possible combinations of metals, promoters, and loadings
     all_combinations = [(m[0], ml[0], m[1], ml[1], m[2], ml[2], p[0][0], p[1][0], p[0][1], p[1][1])
                         for m in metals for ml in metal_loadings for p in biproms]
 
+    # Print resulting informational statistics
     print('Number of Combinations: {}'.format(len(all_combinations)))
     print('Number of metals: {}'.format(len(metals)))
     print('Number of Loadings: {}'.format(len(metal_loadings)))
     print('Number of Promoter Combinations: {}'.format(len(biproms)))
     print('Time to generate samples: {:0.1f} s'.format(time.time() - start_time))
 
-    catdf = pd.DataFrame(all_combinations, columns=['E1','W1','E2','W2','E3','W3','E4','W4','E5','W5']).sample(frac=1)
-    all_combinations = list()
+    # Create a dataframe from all combinations, shuffle using .sample()
+    catdf = pd.DataFrame(all_combinations, columns=['E1','W1','E2','W2','E3','W3','E4','W4','E5','W5']).sample(
+        frac=1,
+        random_state=0
+    )
+
+    # Print df memory usage
     print("{:03.2f} MB".format(catdf.memory_usage(deep=True).sum() / 1024 ** 2))
 
-    spacing = np.linspace(0, len(catdf), 500, dtype=int)
+    # Create selectors for accessing a subset of the dataframe (mini-batches)
+    # This will create 2500 groups of catalysts, and print the number of catalysts per group
+    spacing = np.linspace(0, len(catdf), 2500, dtype=int)
     start = spacing[:-1]
     end = spacing[1:]
+    print('Number of catalysts per batch: {}'.format(end[0]))
 
+    # Iterate through the batches and run kmedians per batch, save as csv file with batch number
     for i in range(len(start)):
+        print('{} out of {}'.format(i, len(start)))
+        skynet.index = i
         skynet.set_catalyst_dataframe(catdf.iloc[start[i]:end[i]])
-        skynet.build_feature_set(header=metal_elements.tolist() + promoter_elements.tolist())
-        exit()
-        print('Time to generate pandas: {:0.1f} s'.format(time.time() - start_time))
+        skynet.build_feature_set()
+        skynet.kmeans('..\\Results\\Unsupervised\\Anarchy_NH3_B1\\Anarchy_Batch {}_kmeans_res.csv'.format(i))
+        skynet.find_closest_centroid('..\\Results\\Unsupervised\\Anarchy_NH3_B1\\Anarchy_Batch {}_kmedians_res.csv'.format(i))
+
+    print('Time for first batch completion: {:0.1f} s'.format(time.time() - start_time))
 
 
-    exit()
+def unsupervised_second_batch_selection():
+    def compile_previous_batch():
+        pths = glob.glob(r'..\Results\Unsupervised\Anarchy_NH3_B1\*kmedians_res.csv')
+        compile_df = pd.DataFrame()
 
-    # print('Skynet populated after {:0.1f} s'.format(time.time() - start_time))
-    # skynet.build_feature_set()
-    # print('Skynet feature generation after {:0.1f} s'.format(time.time() - start_time))
-    # skynet.kmeans()
-    # print('Skynet kmeans after {:0.1f} s'.format(time.time() - start_time))
-    # skynet.find_closest_centroid()
-    # print('Skynet centroid calculation after {:0.1f} s'.format(time.time() - start_time))
+        for pth in pths:
+            load_df = pd.read_csv(pth, index_col=0)
+            compile_df = pd.concat([compile_df, load_df], axis=0)
+
+        return compile_df
+
+    skynet = Anarchy()
+    start_time = time.time()
+    catdf = compile_previous_batch()
+    print('Time to compile batch 1: {:0.1f} s'.format(time.time() - start_time))
+
+    catdf = catdf.sample(frac=1, random_state=0)
+
+    spacing = np.linspace(0, len(catdf), 150, dtype=int)
+    start = spacing[:-1]
+    end = spacing[1:]
+    print('Number of catalysts per batch: {}'.format(end[0]))
+
+    # Iterate through the batches and run kmedians per batch, save as csv file with batch number
+    for i in range(len(start)):
+        print('{} out of {}'.format(i, len(start)))
+        skynet.index = i
+        skynet.features = catdf.iloc[start[i]:end[i]]
+        skynet.kmeans(sv='..\\Results\\Unsupervised\\Anarchy_NH3_B2\\Anarchy_Batch {}_kmeans_res.csv'.format(i))
+        skynet.find_closest_centroid('..\\Results\\Unsupervised\\Anarchy_NH3_B2\\Anarchy_Batch {}_kmedians_res.csv'.format(i))
+
+    print('Time for second batch completion: {:0.1f} s'.format(time.time() - start_time))
+
+
+def unsupervised_third_batch_selection():
+    def compile_previous_batch():
+        pths = glob.glob(r'..\Results\Unsupervised\Anarchy_NH3_B2\*kmedians_res.csv')
+        compile_df = pd.DataFrame()
+
+        for pth in pths:
+            load_df = pd.read_csv(pth, index_col=0)
+            load_df = load_df.loc[(load_df['n_elements'] != 0)] # I forgot to exclude all 0 samples, this kills them
+            compile_df = pd.concat([compile_df, load_df], axis=0)
+
+        return compile_df
+
+    skynet = Anarchy()
+    start_time = time.time()
+    catdf = compile_previous_batch()
+    print('Time to compile batch 1: {:0.1f} s'.format(time.time() - start_time))
+    print('Number of catalysts: {}'.format(len(catdf.index)))
+
+    skynet.features = catdf
+    skynet.kmeans(sv=r'..\Results\Unsupervised\Final_kmeans.csv')
+    skynet.find_closest_centroid(sv=r'..\Results\Unsupervised\Final_kmedians.csv')
+
+    print('Time for second batch completion: {:0.1f} s'.format(time.time() - start_time))
+
+
+def extract_final_kmedian():
+    df = pd.read_csv(r"..\Results\Unsupervised\Final_kmedians.csv", index_col=0)
+    df = df.transpose()[['Loading' in x for x in df.columns]].transpose()
+
+    output_list = list()
+
+    for index, catalyst in df.iterrows():
+        catalyst = catalyst[catalyst != 0]
+        catalyst.index = [x.replace(' Loading', '') for x in catalyst.index]
+
+        promoters = ''
+        metals = ''
+        for ele, wt in catalyst.iteritems():
+            if ele in ['K', 'Na']:
+                promoters += ele
+                promoters += str(int(wt*100))
+                promoters += ' '
+            else:
+                metals += ele
+                metals += str(int(wt * 100))
+                metals += ' '
+
+        cat = metals + promoters
+        output_list += [cat]
+
+    df = pd.DataFrame(output_list)
+    df.to_csv(r'..\Results\Unsupervised\Anarchy Results.csv')
+
 
 def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
     nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
@@ -487,7 +584,11 @@ def unsupervised_exploration(learner):
 
 
 if __name__ == '__main__':
-    predict_catalyst_sample_space()
+    unsupervised_first_batch_selection()
+    unsupervised_second_batch_selection()
+    unsupervised_third_batch_selection()
+    extract_final_kmedian()
+    exit()
 
     # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
     # exit()

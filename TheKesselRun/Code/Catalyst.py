@@ -7,37 +7,54 @@
 import pandas as pd
 import numpy as np
 
+from TheKesselRun.Code.Observation import Observation
 
 class Catalyst():
     """Catalyst will contain each individual training set"""
     def __init__(self):
         self.ID = None
         self.activity = None
+        self.group = None
 
-        self.input_dict = dict()
+        self.observation_dict = dict()
+        self.input_dict = dict() # TODO: deprecated, remove
         self.feature_dict = dict()
         self.elements = dict()
 
-    def input_temperature(self, T):
+    def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
+                        reactor_number=None, activity=None, selectivity=None):
+        obs = Observation()
+        obs.temperature = temperature
+        obs.space_velocity = space_velocity
+        obs.gas = gas
+        obs.concentration = gas_concentration
+        obs.pressure = pressure
+        obs.reactor = reactor_number
+        obs.activity = activity
+        obs.selectivity = selectivity
+
+        self.observation_dict['key'] = obs
+
+    def input_temperature(self, T): # TODO: deprecated, remove
         self.input_dict['temperature'] = T
 
     def add_element(self, element, weight_loading):
         if (element != '-') & (element != '--'):
             self.elements[element] = weight_loading
 
-    def input_space_velocity(self, space_velocity):
+    def input_space_velocity(self, space_velocity): # TODO: deprecated, remove
         self.input_dict['space_velocity'] = space_velocity
 
-    def input_reactor_number(self, reactor_number):
+    def input_reactor_number(self, reactor_number): # TODO: deprecated, remove
         self.input_dict['reactor_number'] = reactor_number
 
-    def input_ammonia_concentration(self, ammonia_concentration):
+    def input_ammonia_concentration(self, ammonia_concentration): # TODO: deprecated, remove
         self.input_dict['ammonia_concentration'] = ammonia_concentration
 
-    def input_standard_error(self, error):
+    def input_standard_error(self, error): # TODO: deprecated, remove
         self.input_dict['standard error'] = error
 
-    def input_n_averaged_samples(self, n_avg):
+    def input_n_averaged_samples(self, n_avg): # TODO: deprecated, remove
         self.input_dict['n_averaged'] = n_avg
 
     def input_n_Cl_atoms(self, Cl_atoms):
@@ -81,17 +98,24 @@ class Catalyst():
         eledf = pd.read_csv(r'../Data/Elements_Unsupervised.csv', index_col=1)
         eledf = eledf.loc[list(self.elements.keys())]
 
-        weights = np.fromiter(self.elements.values(), dtype=float)
-
         for feature_name, feature_values in eledf.T.iterrows():
+            # Drop elements with 0 weight loading
+            weights = np.fromiter(self.elements.values(), dtype=float)
+            feature_values = feature_values[weights != 0]
+            weights = weights[weights != 0]
+
+            # Calculate all values
             fwmean = np.sum(feature_values * weights) / np.sum(weights)
             avgdev = np.sum(weights * np.abs(feature_values - np.mean(feature_values))) / np.sum(weights)
+            mx = np.max(feature_values)
+            mn = np.min(feature_values)
 
+            # Add all values to feature list
             self.feature_add('{}_mean'.format(feature_name), fwmean)
             self.feature_add('{}_mad'.format(feature_name), avgdev)
-            self.feature_add('{}_min'.format(feature_name), np.max(feature_values))
-            self.feature_add('{}_max'.format(feature_name), np.min(feature_values))
-            self.feature_add('{}_rng'.format(feature_name), np.max(feature_values)-np.min(feature_values))
+            self.feature_add('{}_max'.format(feature_name), mx)
+            self.feature_add('{}_min'.format(feature_name), mn)
+            self.feature_add('{}_rng'.format(feature_name), mx-mn)
 
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present

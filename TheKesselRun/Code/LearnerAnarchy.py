@@ -15,98 +15,78 @@ class Anarchy():
     def __init__(self):
         '''Initialize dictionary to hold import data'''
         self.catalyst_dataframe = pd.DataFrame()
-        self.feature_set = pd.DataFrame()
+        self.features = pd.DataFrame()
         self.cluster_results = pd.DataFrame()
+        self.index = 0
+
+        self.loading_dataframe = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation'],
+                                 index_col='Abbreviation').transpose()
+        self.loading_dataframe.columns = ['{} Loading'.format(ele) for ele in self.loading_dataframe.columns]
 
     def set_catalyst_dataframe(self, df):
         self.catalyst_dataframe = df
 
-    #
-    # def add_catalyst(self, index, catalyst):
-    #     """ Add Catalysts to self.catalyst_dictionary.  This is the primary input function for the model. """
-    #     base_index = index
-    #     mod = 0
-    #
-    #     index = '{}_{}'.format(base_index, mod)
-    #
-    #     # Determine if key already exists in dictionary, modify key if so
-    #     while index in self.catalyst_dictionary:
-    #         mod += 1
-    #         index = '{}_{}'.format(base_index, mod)
-    #
-    #     # Add to dictionary
-    #     # self.catalyst_dictionary[index] = catalyst
+    def add_catalyst(self, index, catalyst):
+        """ Add Catalysts to self.catalyst_dictionary.  This is the primary input function for the model. """
+        base_index = index
+        mod = 0
 
-    def build_feature_set(self, header):
-        def load_catalysts_from_dataframe(input_df):
-            eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+        index = '{}_{}'.format(base_index, mod)
 
-            output_df = pd.DataFrame(index=input_df.index, columns=header)
-            # print("Empty Dataframe: {:03.2f} MB".format(output_df.memory_usage(deep=True).sum() / 1024 ** 2))
+        # Determine if key already exists in dictionary, modify key if so
+        while index in self.catalyst_dictionary:
+            mod += 1
+            index = '{}_{}'.format(base_index, mod)
 
-            output_df.loc[input_df.index, input_df['E1']] = input_df['W1']
-            # print("First Column: {:03.2f} MB".format(output_df.memory_usage(deep=True).sum() / 1024 ** 2))
+        # Add to dictionary
+        self.catalyst_dictionary[index] = catalyst
 
-            output_df.loc[input_df.index, input_df['E2']] = input_df['W2']
-            # print("Second Column: {:03.2f} MB".format(output_df.memory_usage(deep=True).sum() / 1024 ** 2))
+    def build_feature_set(self):
+        output_df = pd.DataFrame()
 
-            output_df.loc[input_df.index, input_df['E3']] = input_df['W3']
-            # print("Third Column: {:03.2f} MB".format(output_df.memory_usage(deep=True).sum() / 1024 ** 2))
+        for index, row in self.catalyst_dataframe.iterrows():
+            cat = Catalyst()
+            cat.add_element(row['E1'], row['W1'])
+            cat.add_element(row['E2'], row['W2'])
+            cat.add_element(row['E3'], row['W3'])
+            cat.add_element(row['E4'], row['W4'])
+            cat.add_element(row['E5'], row['W5'])
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_unsupervised_properties()
 
-            output_df.loc[input_df.index, input_df['E4']] = input_df['W4']
-            # print("Fourth Column: {:03.2f} MB".format(output_df.memory_usage(deep=True).sum() / 1024 ** 2))
+            # Reset loading dictionary
+            load_df = self.loading_dataframe.copy()
+            for ele, wt in cat.elements.items():
+                load_df.loc[index, '{} Loading'.format(ele)] = wt / 100
 
-            output_df.loc[input_df.index, input_df['E5']] = input_df['W5']
-            # print("Full Dataframe: {:03.2f} MB".format(output_df.memory_usage(deep=True).sum() / 1024 ** 2))
+            featdf = pd.DataFrame.from_dict(cat.feature_dict, orient='index').transpose()
+            featdf.index = [index]
 
-            working_df = output_df.dropna(axis=1, how='all')
-            eledf = eledf.loc[working_df.columns]
+            df = pd.concat([load_df, featdf], axis=1)
+            output_df = pd.concat([output_df, df], axis=0)
 
-            # print(working_df.columns)
-            # print(eledf)
-            elements_per_index = np.vstack((input_df.loc[input_df.index, 'E1'].values,
-                                            input_df.loc[input_df.index, 'E2'].values,
-                                            input_df.loc[input_df.index, 'E3'].values,
-                                            input_df.loc[input_df.index, 'E4'].values,
-                                            input_df.loc[input_df.index, 'E5'].values)).transpose()
+        self.catalyst_dataframe = output_df
 
-            print(eledf.loc[elements_per_index])
+        # Drop columns with all NaNs and catalysts that contain 0 elements
+        self.catalyst_dataframe.dropna(how='all', axis=1, inplace=True)
+        self.catalyst_dataframe.fillna(value=0, inplace=True)
+        # self.features = self.catalyst_dataframe.drop(columns=['E1','E2','E3','E4','E5','W1','W2','W3','W4','W5'])
+        self.features = self.catalyst_dataframe.copy()
 
-            # output_df[input_df.index, eledf.columns] = eledf[[input_df['E1'], input_df['E2'], input_df['E3'], input_df['E4'], input_df['E5']]]
-
-            return output_df
-
-        df = load_catalysts_from_dataframe(self.catalyst_dataframe)
-
-
-        #
-        #
-        # for catid, catobj in self.catalyst_dictionary.items():
-        #     # Reset loading dictionary
-        #     load_df = loading_df.copy()
-        #
-        #     # Add elements and loading to loading dict
-        #     for ele, wt in catobj.elements.items():
-        #         load_df.loc[catid, '{} Loading'.format(ele)] = wt / 100
-        #
-        #     # Create DF from features
-        #     featdf = pd.DataFrame.from_dict(catobj.feature_dict, orient='index').transpose()
-        #     featdf.index = [catid]
-        #
-        #     # Combine DFs
-        #     df = pd.concat([load_df, featdf], axis=1)
-        #     self.feature_set = pd.concat([self.feature_set, df], axis=0)
-        #
-        # self.feature_set.dropna(how='all', axis=1, inplace=True)
-        # self.feature_set.fillna(value=0, inplace=True)
-
-    def kmeans(self):
+    def kmeans(self, sv=None):
         alg = MiniBatchKMeans(n_clusters=64)
-        alg.fit(self.feature_set.values)
-        self.cluster_results = pd.DataFrame(alg.cluster_centers_, columns=self.feature_set.columns)
-        self.cluster_results.to_csv('..\\Results\\Unsupervised\\Anarchy_Version_1_kmeans_res.csv')
+        alg.fit(self.features.values)
+        self.cluster_results = pd.DataFrame(alg.cluster_centers_, columns=self.features.columns)
+        if sv is None:
+            self.cluster_results.to_csv('..\\Results\\Unsupervised\\Anarchy_Batch {}_kmeans_res.csv'.format(self.index))
+        else:
+            self.cluster_results.to_csv(sv)
 
-    def find_closest_centroid(self):
-        centroids_index = pairwise_distances_argmin(self.cluster_results, self.feature_set)
-        res = self.feature_set.iloc[centroids_index].copy()
-        res.to_csv('..\\Results\\Unsupervised\\Anarchy_Version_1.csv')
+    def find_closest_centroid(self, sv=None):
+        centroids_index = pairwise_distances_argmin(self.cluster_results, self.features)
+        res = self.features.iloc[centroids_index].copy()
+        if sv is None:
+            res.to_csv('..\\Results\\Unsupervised\\Anarchy_Batch {}_kmedian_res.csv'.format(self.index))
+        else:
+            res.to_csv(sv)
