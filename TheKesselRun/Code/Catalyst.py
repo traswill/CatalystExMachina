@@ -60,7 +60,7 @@ class Catalyst():
     def input_n_Cl_atoms(self, Cl_atoms):
         self.input_dict['n_Cl_atoms'] = Cl_atoms
 
-    def input_group(self, group):
+    def input_group(self, group): # TODO: change this to reflect updated class structure (self.group)
         self.input_dict['group'] = group
 
     def feature_add(self, key, value):
