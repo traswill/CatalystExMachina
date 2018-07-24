@@ -9,7 +9,7 @@ import seaborn as sns
 import os
 import time
 
-from TheKesselRun.Code.Catalyst import Catalyst
+from TheKesselRun.Code.Catalyst import CatalystObject
 
 class Anarchy():
     def __init__(self):
@@ -45,7 +45,7 @@ class Anarchy():
         output_df = pd.DataFrame()
 
         for index, row in self.catalyst_dataframe.iterrows():
-            cat = Catalyst()
+            cat = CatalystObject()
             cat.add_element(row['E1'], row['W1'])
             cat.add_element(row['E2'], row['W2'])
             cat.add_element(row['E3'], row['W3'])

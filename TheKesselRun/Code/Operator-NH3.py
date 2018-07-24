@@ -1,6 +1,6 @@
-from TheKesselRun.Code.LearnerOrder import Learner
+from TheKesselRun.Code.LearnerOrder import Learner, CatalystContainer
 from TheKesselRun.Code.LearnerAnarchy import Anarchy
-from TheKesselRun.Code.Catalyst import Catalyst
+from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
 from TheKesselRun.Code.Plotter import Graphic
 
 import itertools
@@ -14,63 +14,75 @@ import scipy.cluster
 import glob
 
 
-def load_nh3_catalysts(learner, featgen=0):
+def load_nh3_catalysts(catcont):
     """ Import NH3 data from Katie's HiTp dataset(cleaned). """
+    df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
 
-    if learner.average_data:
-        df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
-    else:
-        df = pd.read_csv(r"..\Data\Processed\AllData.csv", index_col=0)
-
+    # Import Cl atoms during synthesis
     cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
 
+    # Import XRD Peak locations
     xrd_intensity_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_Peak_Extraction.csv', index_col=0)
     xrd_intensity_lst = np.array(xrd_intensity_df.columns.values, dtype=int).tolist()
 
+    # Import XRD Peak FWHMs
     xrd_fwhm_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_FWHM_Extraction.csv', index_col=0)
     xrd_fwhm_lst = np.array(xrd_fwhm_df.index.values, dtype=int).tolist()
 
-    for index, row in df.iterrows():
-        cat = Catalyst()
-        cat.ID = row['ID']
-        cat.add_element(row['Ele1'], row['Wt1'])
-        cat.add_element(row['Ele2'], row['Wt2'])
-        cat.add_element(row['Ele3'], row['Wt3'])
-        cat.input_reactor_number(int(row['Reactor']))
-        cat.input_temperature(row['Temperature'])
-        cat.input_space_velocity(row['Space Velocity'])
-        cat.input_group(row['Groups'])
-        cat.input_ammonia_concentration(row['NH3'])
-        # cat.input_n_Cl_atoms(cl_atom_df.loc[row['ID']].values[0])
-        if learner.average_data:
-            cat.input_standard_error(row['Standard Error'])
-            cat.input_n_averaged_samples(row['nAveraged'])
-        cat.activity = row['Concentration']
-        cat.feature_add_n_elements()
+    # Loop through all data
+    for index, dat in df.iterrows():
+        # If the ID already exists in container, then only add an observation.  Else, generate a new catalyst.
+        if dat['ID'] in catcont.catalyst_dictionary:
+            catcont.catalyst_dictionary[dat['ID']].add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=None,
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Concentration'],
+                selectivity=None
+            )
+        else:
+            cat = CatalystObject()
+            cat.ID = dat['ID']
+            cat.add_element(dat['Ele1'], dat['Wt1'])
+            cat.add_element(dat['Ele2'], dat['Wt2'])
+            cat.add_element(dat['Ele3'], dat['Wt3'])
+            cat.input_group(dat['Groups'])
+            cat.input_n_Cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+            cat.input_standard_error(dat['Standard Error'])
+            cat.input_n_averaged_samples(dat['nAveraged'])
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties()
 
-        # cat.add_Lp_norms()
-        # cat.feature_add_oxidation_states()
-        # if row['ID'] in xrd_intensity_lst:
-        #     xrd_xs = xrd_intensity_df.index.values
-        #     xrd_ys = xrd_intensity_df.loc[:, str(row['ID'])].values
-        #     cat.feature_add_xrd_peaks(xrd_xs, xrd_ys)
-        #
-        # if row['ID'] in xrd_fwhm_lst:
-        #     dat = xrd_fwhm_df.loc[row['ID']]
-        #     for nm, val in dat.iteritems():
-        #         cat.feature_add_xrd_peak_FWHM(peak_nm=nm, peak_fwhm=val)
+            # cat.feature_add_oxidation_states()
 
-        feature_generator = {
-            0: cat.feature_add_elemental_properties,
-            1: cat.feature_add_statistics,
-            2: cat.feature_add_weighted_average
-        }
-        feature_generator.get(featgen, lambda: print('No Feature Generator Selected'))()
+            # if row['ID'] in xrd_intensity_lst:
+            #     xrd_xs = xrd_intensity_df.index.values
+            #     xrd_ys = xrd_intensity_df.loc[:, str(row['ID'])].values
+            #     cat.feature_add_xrd_peaks(xrd_xs, xrd_ys)
 
-        learner.add_catalyst(index='{ID}_{T}'.format(ID=cat.ID, T=row['Temperature']), catalyst=cat)
+            # if row['ID'] in xrd_fwhm_lst:
+            #     dat = xrd_fwhm_df.loc[row['ID']]
+            #     for nm, val in dat.iteritems():
+            #         cat.feature_add_xrd_peak_FWHM(peak_nm=nm, peak_fwhm=val)
 
-    learner.create_master_dataset()
+            cat.add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=None,
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Concentration'],
+                selectivity=None
+            )
 
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    catcont.build_master_container()
 
 def prediction_pipeline(learner):
     # def predict_catalysts(eles, svnm):
@@ -192,7 +204,7 @@ def predict_all_binaries():
 
     # TODO migrate into learner
     def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
-        cat = Catalyst()
+        cat = CatalystObject()
         cat.ID = 'A'
         cat.add_element(e1, w1)
         cat.add_element(e2, w2)
@@ -258,7 +270,7 @@ def predict_half_Ru_catalysts():
     TMP = 350
 
     def create_catalyst(e1, w1, e2, w2, e3, w3, tmp, reactnum, space_vel, ammonia_conc):
-        cat = Catalyst()
+        cat = CatalystObject()
         cat.ID = 'A'
         cat.add_element(e1, w1)
         cat.add_element(e2, w2)
@@ -584,11 +596,11 @@ def unsupervised_exploration(learner):
 
 
 if __name__ == '__main__':
-    unsupervised_first_batch_selection()
-    unsupervised_second_batch_selection()
-    unsupervised_third_batch_selection()
-    extract_final_kmedian()
-    exit()
+    # unsupervised_first_batch_selection()
+    # unsupervised_second_batch_selection()
+    # unsupervised_third_batch_selection()
+    # extract_final_kmedian()
+    # exit()
 
     # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
     # exit()
@@ -606,6 +618,10 @@ if __name__ == '__main__':
     # process_prediction_dataframes(skynet, df, svnm='half-ru')
     # exit()
 
+    # ***** *****
+    catcont = CatalystContainer()
+    load_nh3_catalysts(catcont=catcont)
+
     # ***** Begin Machine Learning *****
     skynet = Learner(
         average_data=True,
@@ -619,7 +635,7 @@ if __name__ == '__main__':
         regression=True
     )
 
-    load_nh3_catalysts(learner=skynet, featgen=0)  # 0 is elemental, 1 is statistics,  2 is statmech
+    # load_nh3_catalysts(learner=skynet, featgen=0)  # 0 is elemental, 1 is statistics,  2 is statmech
 
     # ***** Unsupervised Learning
     # unsupervised_pipline(skynet)

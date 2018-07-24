@@ -39,7 +39,64 @@ import seaborn as sns
 import os
 import time
 
-from TheKesselRun.Code.Catalyst import Catalyst
+from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
+
+
+class CatalystContainer(object):
+    def __init__(self):
+        self.catalyst_dictionary = dict()
+        self.master_container = pd.DataFrame()
+
+    def add_catalyst(self, index, catalyst):
+        """ Check if CatalystObject() exists in self.catalyst_dictionary.  Add if not.  Append if it does. """
+        if index in self.catalyst_dictionary:
+            for key, obs in self.catalyst_dictionary[index].observation_dict:
+                self.catalyst_dictionary[index].add_observation(
+                    temperature=obs.temerature,
+                    space_velocity=obs.space_velocity,
+                    gas=obs.gas,
+                    gas_concentration=obs.gas_concentration,
+                    pressure=obs.pressure,
+                    reactor_number=obs.reactor_number,
+                    activity=obs.activity,
+                    selectivity=obs.selectivity
+                )
+        else:
+            self.catalyst_dictionary[index] = catalyst
+
+    def build_master_container(self):
+        # Set up catalyst loading dictionary with loadings
+        loading_df = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
+        loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
+
+        for catid, catobj in self.catalyst_dictionary.items():
+            # Reset loading dictionary
+            load_df = loading_df.copy()
+
+            # Add elements and loading to loading dict
+            for ele, wt in catobj.elements.items():
+                load_df.loc[catid, '{} Loading'.format(ele)] = wt / 100
+
+            # Create DF from inputs
+            inputdf = pd.DataFrame.from_dict(catobj.input_dict, orient='index').transpose()
+            inputdf.index = [catid]
+
+            # Create DF from features
+            featdf = pd.DataFrame.from_dict(catobj.feature_dict, orient='index').transpose()
+            featdf.index = [catid]
+
+            # Create DF from activity
+            actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Measured Conversion'])
+
+            # Create element dictionary
+            eldictdf = pd.DataFrame(catobj.elements.items(), index=[catid], columns=['Element Dictionary'])
+
+            # Combine DFs
+            df = pd.concat([load_df, inputdf, featdf, actdf, eldictdf], axis=1)
+            self.master_container = pd.concat([self.master_container, df], axis=0)
+
+        self.master_container.dropna(how='all', axis=1, inplace=True)
+        self.master_container.fillna(value=0, inplace=True)
 
 
 class Learner():
@@ -686,7 +743,7 @@ class Learner():
         #             for key, val in x) for x in self.plot_df['Element Dictionary']
         # ]
         #
-        # # Catalyst ID
+        # # CatalystObject ID
         # self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
         #
         # # Remove Dictionary to avoid problems down the line

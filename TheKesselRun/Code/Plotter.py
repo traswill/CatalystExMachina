@@ -50,7 +50,7 @@ class Graphic():
                         self.graphdf.loc[index, 'Load{}'.format(i)] = val
                         i += 1
 
-                # Catalyst ID
+                # CatalystObject ID
                 self.graphdf['ID'] = [int(nm.split('_')[0]) for nm in self.graphdf.index.values]
 
                 # Remove Dictionary to avoid problems down the line

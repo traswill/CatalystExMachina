@@ -7,10 +7,9 @@
 import pandas as pd
 import numpy as np
 
-from TheKesselRun.Code.Observation import Observation
 
-class Catalyst():
-    """Catalyst will contain each individual training set"""
+class CatalystObject():
+    """CatalystObject will contain each individual training set"""
     def __init__(self):
         self.ID = None
         self.activity = None
@@ -23,7 +22,7 @@ class Catalyst():
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
                         reactor_number=None, activity=None, selectivity=None):
-        obs = Observation()
+        obs = CatalystObservation()
         obs.temperature = temperature
         obs.space_velocity = space_velocity
         obs.gas = gas
@@ -33,7 +32,7 @@ class Catalyst():
         obs.activity = activity
         obs.selectivity = selectivity
 
-        self.observation_dict['key'] = obs
+        self.observation_dict[len(self.observation_dict)] = obs
 
     def input_temperature(self, T): # TODO: deprecated, remove
         self.input_dict['temperature'] = T
@@ -252,3 +251,16 @@ class Catalyst():
 
     def feature_add_xrd_peak_FWHM(self, peak_nm, peak_fwhm):
         self.feature_add(key=peak_nm, value=peak_fwhm)
+
+
+class CatalystObservation():
+    def __init__(self):
+        self.temperature = None
+        self.pressure = None
+        self.space_velocity = None
+        self.gas = None
+        self.concentration = None
+        self.reactor = None
+
+        self.activity = None
+        self.selectivity = None

@@ -54,10 +54,10 @@ def extract_activity_information(df):
 def split_katies_ID(df):
     """
     This code parses Katie's IDs of the form "1,3,12 RuFeK" into a dataframe with columns:
-        Catalyst Index:     ##
+        CatalystObject Index:     ##
         Concentration:      [1, 3, 12]
         Elements:           [Ru, Fe, K]
-        Catalyst Object:    [*, *, *] (These are the objects from class Catalyst)
+        CatalystObject Object:    [*, *, *] (These are the objects from class CatalystObject)
 
     The code has been modified to especially handle '-' and '--' values, which are placeholders for monometallic and
     bimetallic catalysts.  A '-' replaces the second element in a trimetallic, whereas a '--' replaces the third metal,
@@ -66,7 +66,7 @@ def split_katies_ID(df):
     """
 
     output_list = list()
-    for catdat in df['Catalyst']:
+    for catdat in df['CatalystObject']:
         catlst = catdat.split(' ')
         if len(catlst) == 3:
             cat_index = int(catlst[0])
@@ -97,7 +97,7 @@ def split_katies_ID(df):
                        vals[2][0], vals[1][0],
                        vals[2][1], vals[1][1],
                        vals[2][2], vals[1][2]],
-                      index=['KatieID', 'Catalyst ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3']).T
+                      index=['KatieID', 'CatalystObject ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3']).T
          for vals in output_list],
         ignore_index=True
     )
@@ -105,7 +105,7 @@ def split_katies_ID(df):
 
 def merge_ids_flows(flowsdf, iddf):
     """ Concatinate data with parsed elements and concentrations from Katie's IDs """
-    df = pd.concat([flowsdf.set_index('Catalyst'), iddf.set_index('KatieID')], axis=1, join='inner')
+    df = pd.concat([flowsdf.set_index('CatalystObject'), iddf.set_index('KatieID')], axis=1, join='inner')
     return df
 
 

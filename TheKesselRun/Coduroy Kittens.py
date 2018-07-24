@@ -496,7 +496,7 @@ class Learner():
                     for key, val in x) for x in self.plot_df['Element Dictionary']
         ]
 
-        # Catalyst ID
+        # CatalystObject ID
         self.plot_df['ID'] = [int(nm.split('_')[0]) for nm in self.plot_df.index.values]
 
         # Remove Dictionary to avoid problems down the line
@@ -944,7 +944,7 @@ class Learner():
 
 
 class Catalyst():
-    """Catalyst will contain each individual training set"""
+    """CatalystObject will contain each individual training set"""
     def __init__(self):
         self.ID = None
         self.activity = None
