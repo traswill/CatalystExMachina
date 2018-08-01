@@ -33,7 +33,7 @@ class Graphic():
             self.graphdf['Predicted Conversion'] = self.learner.predictions
 
             if self.graphdf.empty:
-                print('Graphic Failed to initialize.  Learner does not contain valid plot dataframe.')
+                print('Graphic Failed to initialize.  SupervisedLearner does not contain valid plot dataframe.')
             else:
                 # Full descriptive name X(#)Y(#)Z(#)
                 self.graphdf['Name'] = [
@@ -51,7 +51,10 @@ class Graphic():
                         i += 1
 
                 # CatalystObject ID
-                self.graphdf['ID'] = [int(nm.split('_')[0]) for nm in self.graphdf.index.values]
+                try:
+                    self.graphdf['ID'] = [int(nm.split('_')[0]) for nm in self.graphdf.index.values]
+                except AttributeError:
+                    self.graphdf['ID'] = self.graphdf.index.values
 
                 # Remove Dictionary to avoid problems down the line
                 self.graphdf.drop(columns='Element Dictionary', inplace=True)

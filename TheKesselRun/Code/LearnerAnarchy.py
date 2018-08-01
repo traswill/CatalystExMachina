@@ -75,7 +75,7 @@ class Anarchy():
         self.features = self.catalyst_dataframe.copy()
 
     def kmeans(self, sv=None):
-        alg = MiniBatchKMeans(n_clusters=64)
+        alg = MiniBatchKMeans(n_clusters=64, compute_labels=False)
         alg.fit(self.features.values)
         self.cluster_results = pd.DataFrame(alg.cluster_centers_, columns=self.features.columns)
         if sv is None:

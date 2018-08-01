@@ -43,7 +43,7 @@ import time
 
 
 class Learner():
-    """Learner will use catalysts to construct feature-label set and perform machine learning"""
+    """SupervisedLearner will use catalysts to construct feature-label set and perform machine learning"""
 
     def __init__(self, average_data=True, element_filter=3, temperature_filter=None, group_style='blind', version='v00',
                  feature_generator=0, regression=True):
@@ -531,7 +531,7 @@ class Learner():
             for feat in feature_rank.sort_values(by='Feature Importance', ascending=False).head(10).index.values:
                 create_feature_hues(self, feat)
         except AttributeError:
-            print('Learner does not support feature extraction.')
+            print('SupervisedLearner does not support feature extraction.')
 
         # Process Second Element Colors
         uniq_eles = np.unique(self.plot_df['Ele2'])

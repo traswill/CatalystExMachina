@@ -1,7 +1,10 @@
-from TheKesselRun.Code.LearnerOrder import Learner, CatalystContainer
+from TheKesselRun.Code.LearnerOrder import SupervisedLearner, CatalystContainer
 from TheKesselRun.Code.LearnerAnarchy import Anarchy
 from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
 from TheKesselRun.Code.Plotter import Graphic
+
+from sklearn.metrics import r2_score, explained_variance_score, \
+        mean_absolute_error, roc_curve, recall_score, precision_score, mean_squared_error
 
 import itertools
 import pandas as pd
@@ -50,9 +53,7 @@ def load_nh3_catalysts(catcont):
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
             cat.input_group(dat['Groups'])
-            cat.input_n_Cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
-            cat.input_standard_error(dat['Standard Error'])
-            cat.input_n_averaged_samples(dat['nAveraged'])
+            cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -84,78 +85,62 @@ def load_nh3_catalysts(catcont):
 
     catcont.build_master_container()
 
-def prediction_pipeline(learner):
-    # def predict_catalysts(eles, svnm):
-    #     learner.set_temp_filter(None)
-    #     learner.filter_master_dataset()
-    #     learner.train_data()
-    #     learner.set_temp_filter('350orless')
-    #     learner.filter_master_dataset()
-    #     learner.parse_element_dictionary()
-    #     exit()
-    #
-    #     catlst = [1, 2, 3, 4, 5, 6, 29, 30, 31, 32, 43, 44, 45, 49, 50, 51, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 67,
-    #               68, 69, 73, 74, 75, 76, 77, 78, 85, 86, 87, 89, 90, 106, 107, 108]
-    #     learner.predict_from_masterfile(catids=catlst, svnm='CuMgMnPdReRh')
-    #
-    # predict_catalysts(eles=['Cu','Mg','Mn','Pd','Re','Rh'], svnm='CuMgMnPdReRh')
 
-    def setup():
-        learner.set_temp_filter(None)
+def prediction_pipeline(learner):
+    def setup(train, test):
+        learner.set_temperature_filter(train)
         learner.filter_master_dataset()
         learner.train_data()
-        learner.set_temp_filter('350orless')
+        learner.set_temperature_filter(test)
         learner.filter_master_dataset()
 
-    setup()
-    learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
+    # setup(None, '350orless')
+    # learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
+    #
+    # setup(None, '350orless')
+    # learner.predict_from_masterfile(catids=[84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
 
-    setup()
-    learner.predict_from_masterfile(catids=[84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
+    setup(None, '350orless')
+    learner.predict_all_from_elements(elements=['Cu', 'Mg', 'Mn', 'Pd', 'Re', 'Rh'], svnm='CuMgMnPdReRh')
 
-    # Predict all from Cu, Mg, Mn, Pd, Re, Rh
-    learner.set_temp_filter(None)
-    learner.filter_master_dataset()
-    learner.train_data()
-    learner.set_temp_filter('350orless')
-    learner.filter_master_dataset()
+    setup(None, '350orless')
+    learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt'], svnm='NiPdIrPt')
 
-    CuMgMnPdReRh = [1,2,3,4,5,6,29,30,31,32,43,44,45,49,50,51,55,56,57,58,59,60,61,62,63,64,67,68,69,73,74,75,76,77,
-                    78,85,86,87,89,90,106,107,108]
-    setup()
-    learner.predict_from_masterfile(catids=CuMgMnPdReRh, svnm='CuMgMnPdReRh')
+    setup(None, '350orless')
+    learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt', 'Cu'], svnm='NiPdIrPtCu')
 
-    NiPdIrPt = [1,2,3,4,5,6,15,16,17,25,27,28,29,30,31,32,33,34,35,36,37,38,39,43,44,45,49,50,51,55,56,57,58,59,60,
-                61,62,63,64,65,66,67,68,69,73,74,75,76,77,78,85,86,87,91,93,106,107,108,112,114,115,116,117,118,119,
-                121,123,124,125,126]
-    setup()
-    learner.predict_from_masterfile(catids=NiPdIrPt, svnm='NiPdIrPt')
+    setup(None, '350orless')
+    learner.predict_all_from_elements(elements=['Hf', 'Y', 'SC', 'Ca', 'Sr', 'Mg'], svnm='HfYScCaSrMg')
 
-    NiPdIrPtCu = [1,2,3,4,5,6,25,27,28,29,30,31,32,33,34,35,36,37,38,39,43,44,45,49,50,51,55,56,57,58,59,60,61,62,
-                  63,64,65,66,67,68,69,73,74,75,76,77,78,85,86,87,91,93,106,107,108,112,114,115,116,117,118,119,121,
-                  123,124,125,126]
-    setup()
-    learner.predict_from_masterfile(catids=NiPdIrPtCu, svnm='NiPdIrPtCu')
 
-    HfYScCaSrMg = [1,2,3,4,5,6,15,16,17,25,27,28,36,37,38,39,40,41,42,43,44,45,49,50,51,65,66,67,68,69,76,77,78,82,
-                   83,84,85,86,87,89,90,91,93,106,107,108,112,113,114,115,116,117,118,119,120,122,124,125]
-    setup()
-    learner.predict_from_masterfile(catids=HfYScCaSrMg, svnm='HfYScCaSrMg')
+    # CuMgMnPdReRh = [1,2,3,4,5,6,29,30,31,32,43,44,45,49,50,51,55,56,57,58,59,60,61,62,63,64,67,68,69,73,74,75,76,77,
+    #                 78,85,86,87,89,90,106,107,108]
+    # learner.predict_from_masterfile(catids=CuMgMnPdReRh, svnm='CuMgMnPdReRh')
+    # NiPdIrPt = [1,2,3,4,5,6,15,16,17,25,27,28,29,30,31,32,33,34,35,36,37,38,39,43,44,45,49,50,51,55,56,57,58,59,60,
+    #             61,62,63,64,65,66,67,68,69,73,74,75,76,77,78,85,86,87,91,93,106,107,108,112,114,115,116,117,118,119,
+    #             121,123,124,125,126]
+    # learner.predict_from_masterfile(catids=NiPdIrPt, svnm='NiPdIrPt')
+    # NiPdIrPtCu = [1,2,3,4,5,6,25,27,28,29,30,31,32,33,34,35,36,37,38,39,43,44,45,49,50,51,55,56,57,58,59,60,61,62,
+    #               63,64,65,66,67,68,69,73,74,75,76,77,78,85,86,87,91,93,106,107,108,112,114,115,116,117,118,119,121,
+    #               123,124,125,126]
+    # learner.predict_from_masterfile(catids=NiPdIrPtCu, svnm='NiPdIrPtCu')
+    # HfYScCaSrMg = [1,2,3,4,5,6,15,16,17,25,27,28,36,37,38,39,40,41,42,43,44,45,49,50,51,65,66,67,68,69,76,77,78,82,
+    #                    83,84,85,86,87,89,90,91,93,106,107,108,112,113,114,115,116,117,118,119,120,122,124,125]
+    # learner.predict_from_masterfile(catids=HfYScCaSrMg, svnm='HfYScCaSrMg')
+
 
 def temperature_slice(learner, tslice):
     for t in tslice:
-        learner.set_temp_filter(t)
+        learner.set_temperature_filter(t)
         learner.filter_master_dataset()
 
         learner.train_data()
         learner.extract_important_features(sv=True, prnt=True)
         learner.predict_crossvalidate(kfold=10)
-        if learner.regression:
-            learner.evaluate_regression_learner()
-        else:
-            learner.evaluate_classification_learner()
+        learner.evaluate_regression_learner()
         learner.preplot_processing()
         learner.save_predictions()
+
         g = Graphic(learner=learner)
         g.plot_important_features()
         g.plot_basic()
@@ -186,17 +171,6 @@ def temperature_slice(learner, tslice):
         # learner.bokeh_by_elements()
 
 
-def unsupervised_pipline(learner):
-    learner.filter_master_dataset()
-    learner.unsupervised_data_segmentation(n_clusters=2)
-    learner.set_learner(learner='etr', params='etr')
-    learner.train_data()
-    learner.predict_crossvalidate(kfold=3)
-    learner.evaluate_regression_learner()
-    learner.preplot_processing()
-    learner.plot_error(metadata=True)
-
-
 def predict_all_binaries():
     SV = 2000
     NH3 = 10
@@ -217,21 +191,20 @@ def predict_all_binaries():
 
         feature_generator = {
             0: cat.feature_add_elemental_properties,
-            1: cat.feature_add_statistics,
+            1: cat.add_unweighted_features,
             2: cat.feature_add_weighted_average
         }
         feature_generator.get(0, lambda: print('No Feature Generator Selected'))()
 
         return cat
 
-    skynet = Learner(
-        average_data=True,
+    skynet = SupervisedLearner(version='v24-pred')
+    catcontainer = CatalystContainer()
+    skynet.set_filters(
         element_filter=0,
         # temperature_filter=None,
         # ammonia_filter=1,
         # space_vel_filter=2000,
-        version='v24-pred',
-        regression=True
     )
 
     model = 'etr'
@@ -248,22 +221,24 @@ def predict_all_binaries():
     for vals in combos:
         cat1 = create_catalyst(e1=vals[0], w1=3, e2=vals[1], w2=1, e3='K', w3=12,
                                tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat1)
+        catcontainer.add_catalyst('Predict', cat1)
 
         cat2 = create_catalyst(e1=vals[0], w1=2, e2=vals[1], w2=2, e3='K', w3=12,
                                tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat2)
+        catcontainer.add_catalyst('Predict', cat2)
 
         cat3 = create_catalyst(e1=vals[0], w1=1, e2=vals[1], w2=3, e3='K', w3=12,
                                tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat3)
+        catcontainer.add_catalyst('Predict', cat3)
 
-    load_nh3_catalysts(skynet, featgen=0)
+    load_nh3_catalysts(catcontainer)
+
+    skynet.load_master_dataset(catalyst_container=catcontainer)
     skynet.filter_master_dataset()
     skynet.train_data()
     return skynet, skynet.predict_dataset()
 
-
+# TODO update this method
 def predict_half_Ru_catalysts():
     SV = 2000
     NH3 = 10
@@ -283,21 +258,20 @@ def predict_half_Ru_catalysts():
 
         feature_generator = {
             0: cat.feature_add_elemental_properties,
-            1: cat.feature_add_statistics,
+            1: cat.add_unweighted_features,
             2: cat.feature_add_weighted_average
         }
         feature_generator.get(0, lambda: print('No Feature Generator Selected'))()
 
         return cat
 
-    skynet = Learner(
-        average_data=True,
+    skynet = SupervisedLearner(version='v24-pred')
+    catcontainer = CatalystContainer()
+    skynet.set_filters(
         element_filter=0,
         # temperature_filter=None,
         # ammonia_filter=1,
         # space_vel_filter=2000,
-        version='v24-pred',
-        regression=True
     )
 
     model = 'etr'
@@ -313,16 +287,39 @@ def predict_half_Ru_catalysts():
     for val in eles:
         cat1 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=4, e3='K', w3=12,
                                tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat1)
+        catcontainer.add_catalyst('Predict', cat1)
 
         cat2 = create_catalyst(e1='Ru', w1=0.5, e2=val, w2=2, e3='K', w3=12,
                                tmp=TMP, reactnum=1, space_vel=SV, ammonia_conc=NH3)
-        skynet.add_catalyst('Predict', cat2)
+        catcontainer.add_catalyst('Predict', cat2)
 
-    load_nh3_catalysts(skynet, featgen=0)
+    load_nh3_catalysts(catcontainer)
+
+    skynet.load_master_dataset(catalyst_container=catcontainer)
     skynet.filter_master_dataset()
     skynet.train_data()
     return skynet, skynet.predict_dataset()
+
+
+def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
+    nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
+    df = pd.DataFrame(dat_df['Predictions'])
+
+    for inx, vals in nm_df.iterrows():
+        vals = vals[vals != 0]
+        if len(vals) == 2:
+            continue
+        vals.index = [item[0] for item in vals.index.str.split(' ').values]
+        df.loc[inx, 'Element 1'] = vals.index[0]
+        df.loc[inx, 'Loading 1'] = vals[0]
+        df.loc[inx, 'Element 2'] = vals.index[1]
+        df.loc[inx, 'Loading 2'] = vals[1]
+        df.loc[inx, 'Element 3'] = vals.index[2]
+        df.loc[inx, 'Loading 3'] = vals[2]
+        df.loc[inx, 'Name'] = '{}{} {}{} {}{}'.format(vals.index[0], vals[0], vals.index[1], vals[1], vals.index[2], vals[2])
+
+    df.to_csv('{}//{}-{}.csv'.format(learner.svfl, learner.version, svnm))
+
 
 def unsupervised_first_batch_selection():
     '''
@@ -373,7 +370,7 @@ def unsupervised_first_batch_selection():
     # Create a dataframe from all combinations, shuffle using .sample()
     catdf = pd.DataFrame(all_combinations, columns=['E1','W1','E2','W2','E3','W3','E4','W4','E5','W5']).sample(
         frac=1,
-        random_state=0
+        random_state=1
     )
 
     # Print df memory usage
@@ -486,41 +483,22 @@ def extract_final_kmedian():
     df.to_csv(r'..\Results\Unsupervised\Anarchy Results.csv')
 
 
-def process_prediction_dataframes(learner, dat_df, svnm='Processed'):
-    nm_df = dat_df.loc[:, dat_df.columns.str.contains('Loading')]
-    df = pd.DataFrame(dat_df['Predictions'])
-
-    for inx, vals in nm_df.iterrows():
-        vals = vals[vals != 0]
-        if len(vals) == 2:
-            continue
-        vals.index = [item[0] for item in vals.index.str.split(' ').values]
-        df.loc[inx, 'Element 1'] = vals.index[0]
-        df.loc[inx, 'Loading 1'] = vals[0]
-        df.loc[inx, 'Element 2'] = vals.index[1]
-        df.loc[inx, 'Loading 2'] = vals[1]
-        df.loc[inx, 'Element 3'] = vals.index[2]
-        df.loc[inx, 'Loading 3'] = vals[2]
-        df.loc[inx, 'Name'] = '{}{} {}{} {}{}'.format(vals.index[0], vals[0], vals.index[1], vals[1], vals.index[2], vals[2])
-
-    df.to_csv('{}//{}-{}.csv'.format(learner.svfl, learner.version, svnm))
 
 
+# Todo update this method
 def test_all_ML_models():
-    from sklearn.metrics import r2_score, explained_variance_score, \
-        mean_absolute_error, roc_curve, recall_score, precision_score, mean_squared_error
-
-    skynet = Learner(
-        average_data=True,
+    skynet = SupervisedLearner(version='v25')
+    catcontainer = CatalystContainer()
+    skynet.set_filters(
         element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
-        space_vel_filter=2000,
-        version='v25',
-        regression=True
+        space_vel_filter=2000
     )
 
-    load_nh3_catalysts(skynet, featgen=0)
+    load_nh3_catalysts(catcontainer)
+
+    skynet.load_master_dataset(catalyst_container=catcontainer)
     skynet.filter_master_dataset()
     eval_dict = dict()
 
@@ -551,12 +529,6 @@ def plot_all_ML_models(d):
         'ridge': 'Ridge Regressor',
         'lasso': 'Lasso Regressor'
     }
-
-    # names = ['Random Forest', 'Adaboost', 'Decision Tree', 'Neural Net', 'Support Vector Machine',
-    #          'k-Nearest Neighbor Regression', 'Kernel Ridge Regression', 'Extra Tree Regressor',
-    #          'Gradient Boosting Regressor', 'Ridge Regressor', 'Lasso Regressor']
-    # vals = [0.121, 0.158, 0.152, 0.327, 0.327, 0.245, 0.168, 0.109, 0.119, 0.170, 0.188]
-    # df = pd.DataFrame([names, vals],  index=['Algorithm', 'Mean Absolute Error']).T
 
     names = d.keys()
     vals = d.values()
@@ -593,59 +565,48 @@ def unsupervised_exploration(learner):
     plt.show()
 
 
-
-
 if __name__ == '__main__':
-    # unsupervised_first_batch_selection()
-    # unsupervised_second_batch_selection()
-    # unsupervised_third_batch_selection()
-    # extract_final_kmedian()
-    # exit()
-
-    # generate_kde_plots(feature='Second Ionization Energy_wt-mad')
-    # exit()
+    # ***** Unsupervised Machine Learning Parameter Definition *****
+    if False:
+        unsupervised_first_batch_selection()
+        unsupervised_second_batch_selection()
+        unsupervised_third_batch_selection()
+        extract_final_kmedian()
+        exit()
 
     # ***** Testing ML Models for Paper *****
-    # d = test_all_ML_models()
-    # plot_all_ML_models(d)
-    # exit()
+    if False:
+        d = test_all_ML_models()
+        plot_all_ML_models(d)
+        exit()
 
-    # ***** Predict Binaries and 0.5Ru Catalysts *****
-    # skynet, df = predict_all_binaries()
-    # process_prediction_dataframes(skynet, df, svnm='binaries')
-    #
-    # skynet, df = predict_half_Ru_catalysts()
-    # process_prediction_dataframes(skynet, df, svnm='half-ru')
-    # exit()
+    # ***** Predict Binaries and 0.5Ru Catalysts within original parameter space *****
+    if False:
+        skynet, df = predict_all_binaries()
+        process_prediction_dataframes(skynet, df, svnm='binaries')
 
-    # ***** *****
-    catcont = CatalystContainer()
-    load_nh3_catalysts(catcont=catcont)
+        skynet, df = predict_half_Ru_catalysts()
+        process_prediction_dataframes(skynet, df, svnm='half-ru')
+        exit()
+
+    # ***** Set up Catalyst Container*****
+    catcontainer = CatalystContainer()
+    load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = Learner(
-        average_data=True,
+    skynet = SupervisedLearner(version='v36')
+    skynet.set_filters(
         element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=None,
         ru_filter=None,
-        pressure_filter=None,
-        version='v35-predict-all-from-few',
-        regression=True
+        pressure_filter=None
     )
 
-    # load_nh3_catalysts(learner=skynet, featgen=0)  # 0 is elemental, 1 is statistics,  2 is statmech
-
-    # ***** Unsupervised Learning
-    # unsupervised_pipline(skynet)
-    # unsupervised_exploration(skynet)
-    # exit()
-
-    # ***** Load Learner *****
-    # Options: rfr, etr, gbr, rfc (not operational)
-    model = 'etr'
-    skynet.set_learner(learner=model, params=model)
+    # ***** Load SupervisedLearner *****
+    skynet.set_learner(learner='etr', params='etr')
+    skynet.load_master_dataset(catalyst_container=catcontainer)
 
     # ***** Tune Hyperparameters *****
     # skynet.filter_master_dataset()
@@ -653,5 +614,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    # temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350]) # ['350orless', 250, 300, 350, 400, 450, None]
+    # temperature_slice(learner=skynet, tslice=['350orless']) # ['350orless', 250, 300, 350, 400, 450, None]
     prediction_pipeline(learner=skynet)

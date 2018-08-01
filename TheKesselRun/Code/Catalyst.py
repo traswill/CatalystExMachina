@@ -16,7 +16,6 @@ class CatalystObject():
         self.group = None
 
         self.observation_dict = dict()
-        self.input_dict = dict() # TODO: deprecated, remove
         self.feature_dict = dict()
         self.elements = dict()
 
@@ -34,38 +33,20 @@ class CatalystObject():
 
         self.observation_dict[len(self.observation_dict)] = obs
 
-    def input_temperature(self, T): # TODO: deprecated, remove
-        self.input_dict['temperature'] = T
-
     def add_element(self, element, weight_loading):
         if (element != '-') & (element != '--'):
             self.elements[element] = weight_loading
 
-    def input_space_velocity(self, space_velocity): # TODO: deprecated, remove
-        self.input_dict['space_velocity'] = space_velocity
+    def input_n_cl_atoms(self, cl_atoms):
+        self.feature_dict['n_Cl_atoms'] = cl_atoms
 
-    def input_reactor_number(self, reactor_number): # TODO: deprecated, remove
-        self.input_dict['reactor_number'] = reactor_number
-
-    def input_ammonia_concentration(self, ammonia_concentration): # TODO: deprecated, remove
-        self.input_dict['ammonia_concentration'] = ammonia_concentration
-
-    def input_standard_error(self, error): # TODO: deprecated, remove
-        self.input_dict['standard error'] = error
-
-    def input_n_averaged_samples(self, n_avg): # TODO: deprecated, remove
-        self.input_dict['n_averaged'] = n_avg
-
-    def input_n_Cl_atoms(self, Cl_atoms):
-        self.input_dict['n_Cl_atoms'] = Cl_atoms
-
-    def input_group(self, group): # TODO: change this to reflect updated class structure (self.group)
-        self.input_dict['group'] = group
+    def input_group(self, group):
+        self.group = group
 
     def feature_add(self, key, value):
         self.feature_dict[key] = value
 
-    def feature_add_statistics(self):
+    def add_unweighted_features(self):
         # Load Elements.csv as DataFrame
         eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
 
@@ -264,3 +245,17 @@ class CatalystObservation():
 
         self.activity = None
         self.selectivity = None
+
+    def to_dict(self):
+        dict = {
+            'temperature': self.temperature,
+            'pressure': self.pressure,
+            'space_velocity': self.space_velocity,
+            'gas': self.gas,
+            'ammonia_concentration': self.concentration,
+            'reactor': self.reactor,
+            'Measured Conversion': self.activity,
+            'selectivity': self.selectivity
+        }
+
+        return dict
