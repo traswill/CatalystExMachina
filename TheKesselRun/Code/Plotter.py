@@ -219,6 +219,8 @@ class Graphic():
             plt.close()
 
     def plot_important_features(self, svnm=''):
+        """ Generate Feature Importance Plots for Random Forests (or other ML algorithms with .feature_importance """
+
         # Copy, sort, and clean up dataframe
         df = self.learner.feature_importance_df.copy()
         df.sort_values(by='Feature Importance', inplace=True, ascending=False)
@@ -226,8 +228,10 @@ class Graphic():
                          'n_elements':'Number of Elements', 'ammonia_concentration':'Ammonia Concentration',
                          }, inplace=True)
 
+        # Create plot dataframe and populate from data (this will be used to generate the bar graph)
+        # This code splits the index from "feature_stattype" to "feature" and "stattype" as columns, where
+        # stattype is the statistical method used for this value, such as max (_mx) or a weighted average (_mean)
         pltdf = pd.DataFrame()
-
         for idx in df.index.values:
             spidx = idx.split('_')
 
@@ -237,18 +241,25 @@ class Graphic():
                 df.loc[idx, 'Type'] = spidx[1]
                 pltdf.loc[spidx[0], spidx[1]] = df.loc[idx, 'Feature Importance']
             else:
-                df.loc[idx, 'Type'] = 'N/A'
-                pltdf.loc[spidx[0], 'N/A'] = df.loc[idx, 'Feature Importance']
+                df.loc[idx, 'Type'] = 'Unweighted'
+                pltdf.loc[spidx[0], 'Unweighted'] = df.loc[idx, 'Feature Importance']
+
+        category_count = len(df['Type'].unique())
+
+        # Sort the plot dataframe by the sum of all components
+        pltdf['sum'] = pltdf.sum(axis=1).values
+        pltdf.sort_values(by='sum', ascending=False, inplace=True)
+        pltdf.drop(columns=['sum'], inplace=True)
 
         f, ax = plt.subplots(figsize=(8,20))
-        pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', 3))
+        pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', category_count))
         plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.savefig('{}//Figures//features-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
         plt.close()
 
         f, ax = plt.subplots()
-        pltdf.iloc[:10].plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', 3))
+        pltdf.iloc[:10].plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', category_count))
         plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.savefig('{}//Figures//top10-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)

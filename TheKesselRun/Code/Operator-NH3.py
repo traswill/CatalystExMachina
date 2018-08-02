@@ -56,7 +56,8 @@ def load_nh3_catalysts(catcont):
             cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_elemental_properties()
+            # cat.feature_add_elemental_properties()
+            cat.feature_add_unsupervised_properties()
 
             # cat.feature_add_oxidation_states()
 
@@ -100,17 +101,21 @@ def prediction_pipeline(learner):
     # setup(None, '350orless')
     # learner.predict_from_masterfile(catids=[84, 85, 86, 87, 89, 90, 91, 93], svnm='SS9')
 
-    setup(None, '350orless')
-    learner.predict_all_from_elements(elements=['Cu', 'Mg', 'Mn', 'Pd', 'Re', 'Rh'], svnm='CuMgMnPdReRh')
+    tmp = '350orless'
+    setup(None, tmp)
+    learner.predict_all_from_elements(elements=['Cu', 'Mg', 'Mn', 'Pd', 'Re', 'Rh'], svnm='CuMgMnPdReRh_{}'.format(tmp))
+    learner.predict_within_elements(elements=['Cu', 'Mg', 'Mn', 'Pd', 'Re', 'Rh'], svnm='CuMgMnPdReRh-self_{}'.format(tmp))
 
-    setup(None, '350orless')
-    learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt'], svnm='NiPdIrPt')
+    setup(None, tmp)
+    learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt'], svnm='NiPdIrPt_{}'.format(tmp))
+    learner.predict_within_elements(elements=['Ni', 'Pd', 'Ir', 'Pt'], svnm='NiPdIrPt-self_{}'.format(tmp))
 
-    setup(None, '350orless')
-    learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt', 'Cu'], svnm='NiPdIrPtCu')
+    setup(None, tmp)
+    learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt', 'Cu'], svnm='NiPdIrPtCu_{}'.format(tmp))
+    learner.predict_within_elements(elements=['Ni', 'Pd', 'Ir', 'Pt', 'Cu'], svnm='NiPdIrPtCu-self_{}'.format(tmp))
 
-    setup(None, '350orless')
-    learner.predict_all_from_elements(elements=['Hf', 'Y', 'SC', 'Ca', 'Sr', 'Mg'], svnm='HfYScCaSrMg')
+    # setup(None, '350orless')
+    # learner.predict_all_from_elements(elements=['Hf', 'Y', 'SC', 'Ca', 'Sr', 'Mg'], svnm='HfYScCaSrMg')
 
 
     # CuMgMnPdReRh = [1,2,3,4,5,6,29,30,31,32,43,44,45,49,50,51,55,56,57,58,59,60,61,62,63,64,67,68,69,73,74,75,76,77,
@@ -594,7 +599,7 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v36')
+    skynet = SupervisedLearner(version='v36-unsup')
     skynet.set_filters(
         element_filter=3,
         temperature_filter=None,

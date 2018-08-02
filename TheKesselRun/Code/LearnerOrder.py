@@ -424,6 +424,8 @@ class SupervisedLearner():
             axis=1
         )
 
+        self.groups = element_dataframe['group'].values
+
         self.train_data()
         self.predict_crossvalidate(kfold=3)
 
@@ -437,7 +439,7 @@ class SupervisedLearner():
         comparison_df['ID'] = comparison_df.index
         comparison_df['Name'] = [
             ''.join('{}({})'.format(key, str(int(val)))
-                    for key, val in x) for x in self.features_df['Element Dictionary']
+                    for key, val in x) for x in element_dataframe['Element Dictionary']
         ]
         comparison_df['temperature'] = self.features_df['temperature']
 
@@ -562,8 +564,12 @@ class SupervisedLearner():
         """ Use k-fold validation with grouping by catalyst ID to determine  """
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(kfold))
-        self.slave_dataset['predictions'] = self.predictions
-        self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+
+        try:
+            self.slave_dataset['predictions'] = self.predictions
+            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+        except ValueError:
+            pass # TODO This is a stupid quick fix.  To allow this here permanently will bring shame upon your family.
 
     def preplot_processing(self):
         """ Prepare all data for plotting """
