@@ -109,6 +109,7 @@ class SupervisedLearner():
         self.master_dataset = pd.DataFrame()  # From Catalyst Container
         self.slave_dataset = pd.DataFrame()
         self.tester_dataset = pd.DataFrame()
+        self.features_to_drop = None
 
         '''Initialize sub-functions from the slave dataset.'''
         self.features_df = pd.DataFrame()
@@ -182,6 +183,7 @@ class SupervisedLearner():
 
     def set_temperature_filter(self, T):
         self.temperature_filter = T
+        self.set_name_paths()
 
     def load_master_dataset(self, catalyst_container):
         self.master_dataset = catalyst_container.master_container
@@ -234,7 +236,7 @@ class SupervisedLearner():
                                    (self.slave_dataset.loc[:, 'ammonia_concentration'] < 5.2)]
         }
 
-        self.slave_dataset = filter_dict_ammonia.get(self.element_filter, self.slave_dataset)
+        self.slave_dataset = filter_dict_ammonia.get(self.ammonia_filter, self.slave_dataset)
 
     def filter_space_velocities(self):
         filter_dict_sv = {
@@ -281,14 +283,15 @@ class SupervisedLearner():
         self.group_for_training()
         # self.trim_slave_dataset()
 
-    # TODO make each of these filters separate functions that could be called on their own
     def filter_master_dataset(self):
+        self.reset_slave_dataset()
         self.filter_temperatures()
         self.filter_elements()
         self.filter_pressure()
         self.filter_concentrations()
         self.filter_ruthenium_loading()
         self.filter_space_velocities()
+        self.drop_features()
         self.shuffle_slave()
 
     def set_training_data(self):
@@ -310,8 +313,18 @@ class SupervisedLearner():
                                ]
                            ].copy()
 
+    def set_drop_features(self, features):
+        self.features_to_drop = features
+
     def drop_features(self):
-        pass
+        if self.features_to_drop is not None:
+            cols = self.slave_dataset.columns
+            feature_list = list()
+            for col in cols:
+                if col.split('_')[0] in self.features_to_drop:
+                    feature_list += [col]
+
+            self.slave_dataset.drop(columns=feature_list, inplace=True)
 
     def hyperparameter_tuning(self, grid=False):
         """ Method Used to tune hyperparameters and increase accuracy of the model """
@@ -560,16 +573,14 @@ class SupervisedLearner():
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
         return data
 
-    def predict_crossvalidate(self, kfold=10):
+    def predict_crossvalidate(self, kfold=10, add_to_slave=False):
         """ Use k-fold validation with grouping by catalyst ID to determine  """
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=GroupKFold(kfold))
 
-        try:
+        if add_to_slave:
             self.slave_dataset['predictions'] = self.predictions
             self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
-        except ValueError:
-            pass # TODO This is a stupid quick fix.  To allow this here permanently will bring shame upon your family.
 
     def preplot_processing(self):
         """ Prepare all data for plotting """

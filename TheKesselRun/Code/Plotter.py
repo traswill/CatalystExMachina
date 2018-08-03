@@ -6,6 +6,7 @@
 
 import pandas as pd
 import numpy as np
+import operator
 
 import seaborn as sns
 
@@ -224,9 +225,10 @@ class Graphic():
         # Copy, sort, and clean up dataframe
         df = self.learner.feature_importance_df.copy()
         df.sort_values(by='Feature Importance', inplace=True, ascending=False)
-        df.rename(index={'reactor_number':'Reactor', 'temperature':'Temperature','space_velocity':'Space Velocity',
+        df.rename(index={'reactor':'Reactor', 'temperature':'Temperature','space_velocity':'Space Velocity',
                          'n_elements':'Number of Elements', 'ammonia_concentration':'Ammonia Concentration',
-                         }, inplace=True)
+                         'n_Cl_atoms':'Number of Cl Atoms'},
+                  inplace=True)
 
         # Create plot dataframe and populate from data (this will be used to generate the bar graph)
         # This code splits the index from "feature_stattype" to "feature" and "stattype" as columns, where
@@ -251,8 +253,14 @@ class Graphic():
         pltdf.sort_values(by='sum', ascending=False, inplace=True)
         pltdf.drop(columns=['sum'], inplace=True)
 
+        # TODO get legend to be the same color for all plots...
         f, ax = plt.subplots(figsize=(8,20))
         pltdf.plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', category_count))
+        # handles, labels = ax.get_legend_handles_labels()
+        # hl = sorted(zip(handles, labels),
+        #             key=operator.itemgetter(1))
+        # handles2, labels2 = zip(*hl)
+        # ax.legend(handles2, labels2)
         plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.savefig('{}//Figures//features-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
@@ -260,15 +268,15 @@ class Graphic():
 
         f, ax = plt.subplots()
         pltdf.iloc[:10].plot(kind='barh', stacked='True', legend=True, ax=ax, color=sns.color_palette('muted', category_count))
+        # handles, labels = ax.get_legend_handles_labels()
+        # hl = sorted(zip(handles, labels),
+        #             key=operator.itemgetter(1))
+        # handles2, labels2 = zip(*hl)
+        # ax.legend(handles2, labels2)
         plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.savefig('{}//Figures//top10-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
         plt.close()
-
-
-
-
-        # sns.set_palette('plasma')
 
 # TODO Implement Bokeh
     def bokeh_predictions(self, svnm=None):

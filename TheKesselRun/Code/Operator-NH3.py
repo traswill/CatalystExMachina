@@ -56,8 +56,8 @@ def load_nh3_catalysts(catcont):
             cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            # cat.feature_add_elemental_properties()
-            cat.feature_add_unsupervised_properties()
+            cat.feature_add_elemental_properties()
+            # cat.feature_add_unsupervised_properties()
 
             # cat.feature_add_oxidation_states()
 
@@ -104,14 +104,17 @@ def prediction_pipeline(learner):
     tmp = '350orless'
     setup(None, tmp)
     learner.predict_all_from_elements(elements=['Cu', 'Mg', 'Mn', 'Pd', 'Re', 'Rh'], svnm='CuMgMnPdReRh_{}'.format(tmp))
+    setup(None, tmp)
     learner.predict_within_elements(elements=['Cu', 'Mg', 'Mn', 'Pd', 'Re', 'Rh'], svnm='CuMgMnPdReRh-self_{}'.format(tmp))
 
     setup(None, tmp)
     learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt'], svnm='NiPdIrPt_{}'.format(tmp))
+    setup(None, tmp)
     learner.predict_within_elements(elements=['Ni', 'Pd', 'Ir', 'Pt'], svnm='NiPdIrPt-self_{}'.format(tmp))
 
     setup(None, tmp)
     learner.predict_all_from_elements(elements=['Ni', 'Pd', 'Ir', 'Pt', 'Cu'], svnm='NiPdIrPtCu_{}'.format(tmp))
+    setup(None, tmp)
     learner.predict_within_elements(elements=['Ni', 'Pd', 'Ir', 'Pt', 'Cu'], svnm='NiPdIrPtCu-self_{}'.format(tmp))
 
     # setup(None, '350orless')
@@ -151,22 +154,22 @@ def temperature_slice(learner, tslice):
         g.plot_basic()
         g.plot_err()
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
-        g.plot_kernel_density(feat_list=['temperature',
-                                         'Ru Loading',
-                                         'Rh Loading',
-                                         'Second Ionization Energy_wt-mad',
-                                         'Second Ionization Energy_wt-mean',
-                                         'Number d-shell Valence Electrons_wt-mean',
-                                         'Number d-shell Valence Electrons_wt-mad',
-                                         'Periodic Table Column_wt-mean',
-                                         'Periodic Table Column_wt-mad',
-                                         'Electronegativity_wt-mean',
-                                         'Electronegativity_wt-mad',
-                                         'Number Valence Electrons_wt-mean',
-                                         'Number Valence Electrons_wt-mad',
-                                         'Conductivity_wt-mean',
-                                         'Conductivity_wt-mad',
-                                         ], margins=False, element=None)
+        # g.plot_kernel_density(feat_list=['temperature',
+        #                                  'Ru Loading',
+        #                                  'Rh Loading',
+        #                                  'Second Ionization Energy_mad',
+        #                                  'Second Ionization Energy_mean',
+        #                                  'Number d-shell Valence Electrons_mean',
+        #                                  'Number d-shell Valence Electrons_mad',
+        #                                  'Periodic Table Column_mean',
+        #                                  'Periodic Table Column_mad',
+        #                                  'Electronegativity_mean',
+        #                                  'Electronegativity_mad',
+        #                                  'Number Valence Electrons_mean',
+        #                                  'Number Valence Electrons_mad',
+        #                                  'Conductivity_mean',
+        #                                  'Conductivity_mad',
+        #                                  ], margins=False, element=None)
 
         # g.plot_err(color_bounds=(250, 450))
         # g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm), color_bounds=(250, 450))
@@ -599,12 +602,12 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v36-unsup')
+    skynet = SupervisedLearner(version='v36')
     skynet.set_filters(
         element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
-        space_vel_filter=None,
+        space_vel_filter=2000,
         ru_filter=None,
         pressure_filter=None
     )
@@ -612,6 +615,7 @@ if __name__ == '__main__':
     # ***** Load SupervisedLearner *****
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_master_dataset(catalyst_container=catcontainer)
+    skynet.set_drop_features(features=['reactor'])
 
     # ***** Tune Hyperparameters *****
     # skynet.filter_master_dataset()
@@ -619,5 +623,5 @@ if __name__ == '__main__':
     # exit()
 
     # ***** General Opreation *****
-    # temperature_slice(learner=skynet, tslice=['350orless']) # ['350orless', 250, 300, 350, 400, 450, None]
-    prediction_pipeline(learner=skynet)
+    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350]) # ['350orless', 250, 300, 350, 400, 450, None]
+    # prediction_pipeline(learner=skynet)

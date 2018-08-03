@@ -107,16 +107,10 @@ class CatalystObject():
             pass
 
         def calc_statistics(self, values, weights, feature_name):
-            # self.feature_add('{}_mean'.format(feature_name), np.mean(values))
-            # self.feature_add('{}_mad'.format(feature_name), np.mean(np.abs(values-np.mean(values))))
             fwmean = np.sum(values * weights)/np.sum(weights)
             avgdev = np.sum(weights * np.abs(values - np.mean(values)))/np.sum(weights) #(v25)
-            # avgdev = np.sum(np.abs(weights * values - fwmean)) / np.sum(weights)
-            self.feature_add('{}_wt-mean'.format(feature_name), fwmean)
-            self.feature_add('{}_wt-mad'.format(feature_name), avgdev)
-            # self.feature_add('{}_min'.format(feature_name), np.max(values))
-            # self.feature_add('{}_max'.format(feature_name), np.min(values))
-            # self.feature_add('{}_rng'.format(feature_name), np.max(values)-np.min(values))
+            self.feature_add('{}_mean'.format(feature_name), fwmean)
+            self.feature_add('{}_mad'.format(feature_name), avgdev)
 
         # Create Dictionary to process each feature differently
         process_dict = {
@@ -165,7 +159,7 @@ class CatalystObject():
             'Number Valence Electrons': calc_statistics,
             'Polarizability': calc_statistics,
             'Periodic Table Row': calc_statistics,
-            'phi': calc_statistics,
+            'Phi': calc_statistics,
             'Zunger Pseudopotential (d)': calc_statistics,
             'Zunger Pseudopotential (p)': calc_statistics,
             'Zunger Pseudopotential (pi)': calc_statistics,
