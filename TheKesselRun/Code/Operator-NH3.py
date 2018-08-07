@@ -572,6 +572,164 @@ def unsupervised_exploration(learner):
     sns.swarmplot(x='Wt1', y='Wt2', data=df_new, hue='group')
     plt.show()
 
+def swarmplot_paper1():
+    def create_catalyst(catcont, ele, atnum):
+        # Import Cl atoms during synthesis
+        cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
+
+        cat1 = CatalystObject()
+        cat1.ID = 'A_{}'.format(atnum)
+        cat1.add_element('Ru', 1)
+        cat1.add_element(ele, 3)
+        cat1.add_element('K', 12)
+        cat1.input_group(atnum)
+        cat1.feature_add_n_elements()
+        cat1.feature_add_Lp_norms()
+        cat1.feature_add_elemental_properties()
+
+        cat1.add_observation(
+            temperature=250,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        cat1.add_observation(
+            temperature=300,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        cat1.add_observation(
+            temperature=350,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        catcont.add_catalyst(index=cat1.ID, catalyst=cat1)
+
+        cat2 = CatalystObject()
+        cat2.ID = 'B_{}'.format(atnum)
+        cat2.add_element('Ru', 2)
+        cat2.add_element(ele, 2)
+        cat2.add_element('K', 12)
+        cat2.input_group(atnum)
+        cat2.feature_add_n_elements()
+        cat2.feature_add_Lp_norms()
+        cat2.feature_add_elemental_properties()
+
+        cat2.add_observation(
+            temperature=250,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        cat2.add_observation(
+            temperature=300,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        cat2.add_observation(
+            temperature=350,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        catcont.add_catalyst(index=cat2.ID, catalyst=cat2)
+
+        cat3 = CatalystObject()
+        cat3.ID = 'C_{}'.format(atnum)
+        cat3.add_element('Ru', 3)
+        cat3.add_element(ele, 1)
+        cat3.add_element('K', 12)
+        cat3.input_group(atnum)
+        cat3.feature_add_n_elements()
+        cat3.feature_add_Lp_norms()
+        cat3.feature_add_elemental_properties()
+
+        cat3.add_observation(
+            temperature=250,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        cat3.add_observation(
+            temperature=300,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        cat3.add_observation(
+            temperature=350,
+            space_velocity=2000,
+            gas_concentration=1,
+            reactor_number=0
+        )
+
+        catcont.add_catalyst(index=cat3.ID, catalyst=cat3)
+
+    # ***** Set up Catalyst Container*****
+    catcontainer = CatalystContainer()
+    load_nh3_catalysts(catcont=catcontainer)
+
+    elements = ['Ni', 'Pd', 'Ir']
+    df = catcontainer.master_container
+    element_dataframe = pd.DataFrame()
+
+    for ele in elements:
+        dat = df.loc[(df['{} Loading'.format(ele)] > 0) & (df['n_elements'] == 3)]
+        element_dataframe = pd.concat([element_dataframe, dat])
+
+    catcontainer.master_container = element_dataframe
+
+    # ***** Begin Machine Learning *****
+    skynet = SupervisedLearner(version='v36')
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter=None,
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=None,
+        pressure_filter=None
+    )
+
+    # ***** Load SupervisedLearner *****
+    skynet.set_learner(learner='etr', params='etr')
+    skynet.load_master_dataset(catalyst_container=catcontainer)
+    skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
+    skynet.set_training_data()
+    skynet.train_data()
+
+    # generate another container with all combinations
+    eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
+               list(range(44, 51)) + list(range(74, 80)) + [56, 72, 82, 83]
+
+    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
+    eles = ele_df.index.values
+    eles = list(zip(eles, ele_list))
+
+    testcatcontainer = CatalystContainer()
+
+    for nm, atnum in eles:
+        create_catalyst(catcont=testcatcontainer, ele=nm, atnum=atnum)
+
+    testcatcontainer.build_master_container()
+    skynet.load_master_dataset(testcatcontainer)
+    skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
+    skynet.set_training_data()
+
+
+
+    # run them through a prediction
 
 if __name__ == '__main__':
     # ***** Unsupervised Machine Learning Parameter Definition *****
@@ -586,6 +744,11 @@ if __name__ == '__main__':
     if False:
         d = test_all_ML_models()
         plot_all_ML_models(d)
+        exit()
+
+    # ***** Predict all elements from Ni, Pd, Ir bimetallics (Ru-M-K) *****
+    if True:
+        swarmplot_paper1()
         exit()
 
     # ***** Predict Binaries and 0.5Ru Catalysts within original parameter space *****
@@ -615,7 +778,7 @@ if __name__ == '__main__':
     # ***** Load SupervisedLearner *****
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_master_dataset(catalyst_container=catcontainer)
-    skynet.set_drop_features(features=['reactor'])
+    skynet.set_features_to_drop(features=['reactor'])
 
     # ***** Tune Hyperparameters *****
     # skynet.filter_master_dataset()

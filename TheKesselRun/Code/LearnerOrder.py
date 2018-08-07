@@ -169,6 +169,43 @@ class SupervisedLearner():
             os.makedirs('{}\\{}'.format(self.svfl, 'features'))
             os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
 
+    def set_learner(self, learner, params='default'):
+        """ Select which ML algorithm the learner should use.  Also selects appropriate parameters. """
+        learn_selector = {
+            'rfr': RandomForestRegressor,
+            'adaboost': AdaBoostRegressor,
+            'tree': tree.DecisionTreeRegressor,
+            'SGD': SGDRegressor,
+            'neuralnet': MLPRegressor,
+            'svr': SVR,
+            'knnr': KNeighborsRegressor,
+            'krr': KernelRidge,
+            'etr': ExtraTreesRegressor,
+            'gbr': GradientBoostingRegressor,
+            'ridge': Ridge,
+            'lasso': Lasso,
+        }
+
+        param_selector = {
+            'rfr': {'n_estimators':25, 'max_depth':10, 'max_leaf_nodes':50, 'min_samples_leaf':1,
+                        'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
+                        'criterion':'mae'},
+            'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+            'etr-old': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                    'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
+            'gbr': {'subsample': 0.5, 'n_estimators': 500, 'min_samples_split': 10, 'min_samples_leaf': 3,
+                    'min_impurity_decrease': 0, 'max_leaf_nodes': 5, 'max_features': 'sqrt', 'max_depth': 5,
+                    'loss': 'ls', 'learning_rate': 0.05, 'criterion': 'mae'},
+            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
+            'nnet': {'hidden_layer_sizes':1, 'solver':'lbfgs'},
+            'empty': {},
+            'SGD': {'alpha': 0.01, 'tol': 1e-4, 'max_iter': 1000}
+        }
+
+        self.machina = learn_selector.get(learner, lambda: 'Error')()
+        self.machina.set_params(**param_selector.get(params))
+
     def set_filters(self, element_filter=None, temperature_filter=None, ammonia_filter=None, space_vel_filter=None,
                  ru_filter=None, pressure_filter=None):
         # TODO add "if...not None, do" syntax
@@ -188,6 +225,25 @@ class SupervisedLearner():
     def load_master_dataset(self, catalyst_container):
         self.master_dataset = catalyst_container.master_container
         self.slave_dataset = self.master_dataset.copy()
+
+    def filter_master_dataset(self):
+        self.reset_slave_dataset()
+        self.filter_temperatures()
+        self.filter_elements()
+        self.filter_pressure()
+        self.filter_concentrations()
+        self.filter_ruthenium_loading()
+        self.filter_space_velocities()
+        self.drop_features()
+        self.shuffle_slave()
+
+    def set_training_data(self):
+        ''' Use the slave dataframe to set other dataframe properties '''
+        self.features_df = self.slave_dataset.drop(
+            labels=['Measured Conversion', 'Element Dictionary', 'group'],
+            axis=1
+        )
+        self.labels_df = self.slave_dataset['Measured Conversion'].copy()
 
     def reset_slave_dataset(self):
         self.slave_dataset = self.master_dataset.copy()
@@ -283,24 +339,9 @@ class SupervisedLearner():
         self.group_for_training()
         # self.trim_slave_dataset()
 
-    def filter_master_dataset(self):
-        self.reset_slave_dataset()
-        self.filter_temperatures()
-        self.filter_elements()
-        self.filter_pressure()
-        self.filter_concentrations()
-        self.filter_ruthenium_loading()
-        self.filter_space_velocities()
-        self.drop_features()
-        self.shuffle_slave()
 
-    def set_training_data(self):
-        ''' Use the slave dataframe to set other dataframe properties '''
-        self.features_df = self.slave_dataset.drop(
-            labels=['Measured Conversion', 'Element Dictionary', 'group'],
-            axis=1
-        )
-        self.labels_df = self.slave_dataset['Measured Conversion'].copy()
+
+
 
     def group_for_training(self):
         """ Set groups parameter AFTER shuffling the slave dataset """
@@ -313,7 +354,7 @@ class SupervisedLearner():
                                ]
                            ].copy()
 
-    def set_drop_features(self, features):
+    def set_features_to_drop(self, features):
         self.features_to_drop = features
 
     def drop_features(self):
@@ -326,92 +367,29 @@ class SupervisedLearner():
 
             self.slave_dataset.drop(columns=feature_list, inplace=True)
 
-    def hyperparameter_tuning(self, grid=False):
-        """ Method Used to tune hyperparameters and increase accuracy of the model """
-        rfr_tuning_params = {
-            'n_estimators': [10, 25, 50, 100],
-            'max_features': ['auto', 'sqrt'],
-            'max_depth': [None, 3, 5, 10],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 3, 5],
-            'max_leaf_nodes': [None, 5, 20, 50],
-            'min_impurity_decrease': [0, 0.1, 0.4]
-        }
-
-        gbr_tuning_params = {
-            'loss': ['ls', 'lad', 'quantile', 'huber'],
-            'learning_rate': [0.05, 0.1, 0.2],
-            'subsample': [0.5, 1],
-            'n_estimators': [25, 100, 500],
-            'max_depth': [None, 3, 5, 10],
-            'criterion': ['friedman_mse', 'mae'],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 3, 5],
-            'max_features': ['auto', 'sqrt'],
-            'max_leaf_nodes': [None, 5, 20, 50],
-            'min_impurity_decrease': [0, 0.1, 0.4]
-        }
-
-        etr_tuning_params = {
-            'n_estimators': [10, 25, 50, 100, 200, 400],
-            'criterion': ['mae'],
-            'max_features': ['auto', 'sqrt', 'log2', 0.2, 0.1, 0.05, 0.01],
-            'max_depth': [None, 3, 5, 10],
-            'min_samples_split': [2, 5, 10],
-            'min_samples_leaf': [1, 2, 3, 5],
-            'max_leaf_nodes': [None, 5, 20, 50],
-            'min_impurity_decrease': [0, 0.1, 0.4]
-        }
-
-        if grid:
-            gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
-        else:
-            gs = RandomizedSearchCV(self.machina, etr_tuning_params, cv=GroupKFold(3),
-                                return_train_score=True, n_iter=1000)
-
-        gs.fit(self.features_df.values, self.labels_df.values, groups=self.groups)
-        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune-gbr_{}.csv'.format(self.svfl, self.svnm))
-
-    def set_learner(self, learner, params='default'):
-        """ Select which ML algorithm the learner should use.  Also selects appropriate parameters. """
-        learn_selector = {
-            'rfr': RandomForestRegressor,
-            'adaboost': AdaBoostRegressor,
-            'tree': tree.DecisionTreeRegressor,
-            'SGD': SGDRegressor,
-            'neuralnet': MLPRegressor,
-            'svr': SVR,
-            'knnr': KNeighborsRegressor,
-            'krr': KernelRidge,
-            'etr': ExtraTreesRegressor,
-            'gbr': GradientBoostingRegressor,
-            'ridge': Ridge,
-            'lasso': Lasso,
-        }
-
-        param_selector = {
-            'rfr': {'n_estimators':25, 'max_depth':10, 'max_leaf_nodes':50, 'min_samples_leaf':1,
-                        'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
-                        'criterion':'mae'},
-            'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
-                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
-            'etr-old': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
-                    'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
-            'gbr': {'subsample': 0.5, 'n_estimators': 500, 'min_samples_split': 10, 'min_samples_leaf': 3,
-                    'min_impurity_decrease': 0, 'max_leaf_nodes': 5, 'max_features': 'sqrt', 'max_depth': 5,
-                    'loss': 'ls', 'learning_rate': 0.05, 'criterion': 'mae'},
-            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
-            'nnet': {'hidden_layer_sizes':1, 'solver':'lbfgs'},
-            'empty': {},
-            'SGD': {'alpha': 0.01, 'tol': 1e-4, 'max_iter': 1000}
-        }
-
-        self.machina = learn_selector.get(learner, lambda: 'Error')()
-        self.machina.set_params(**param_selector.get(params))
-
     def train_data(self):
         """ Train the model on feature/label datasets """
         self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
+
+    def predict_data(self):
+        self.predictions = self.machina.predict(self.features_df.values, self.labels_df.values)
+
+    def evaluate_regression_learner(self):
+        """ Comment """
+        r2 = r2_score(self.labels_df.values, self.predictions)
+        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
+        rmse = np.sqrt(mean_squared_error(self.labels_df.values, self.predictions))
+
+        print('\n----- Model {} -----'.format(self.svnm))
+        print('R2: {:0.3f}'.format(r2))
+        print('Mean Average Error: {:0.3f}'.format(mean_abs_err))
+        print('Mean Squared Error: {:0.3f}'.format(rmse))
+        print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
+        print('\n')
+
+        pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
+                     index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
+                     ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
 
     # TODO Depricated - Remove when predict_from_catalyst_ids is working
     def create_test_dataset(self, catids):
@@ -648,22 +626,51 @@ class SupervisedLearner():
         else:
             return df
 
-    def evaluate_regression_learner(self):
-        """ Comment """
-        r2 = r2_score(self.labels_df.values, self.predictions)
-        mean_abs_err = mean_absolute_error(self.labels_df.values, self.predictions)
-        rmse = np.sqrt(mean_squared_error(self.labels_df.values, self.predictions))
+    def hyperparameter_tuning(self, grid=False):
+        """ Method Used to tune hyperparameters and increase accuracy of the model """
+        rfr_tuning_params = {
+            'n_estimators': [10, 25, 50, 100],
+            'max_features': ['auto', 'sqrt'],
+            'max_depth': [None, 3, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 3, 5],
+            'max_leaf_nodes': [None, 5, 20, 50],
+            'min_impurity_decrease': [0, 0.1, 0.4]
+        }
 
-        print('\n----- Model {} -----'.format(self.svnm))
-        print('R2: {:0.3f}'.format(r2))
-        print('Mean Average Error: {:0.3f}'.format(mean_abs_err))
-        print('Mean Squared Error: {:0.3f}'.format(rmse))
-        print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
-        print('\n')
+        gbr_tuning_params = {
+            'loss': ['ls', 'lad', 'quantile', 'huber'],
+            'learning_rate': [0.05, 0.1, 0.2],
+            'subsample': [0.5, 1],
+            'n_estimators': [25, 100, 500],
+            'max_depth': [None, 3, 5, 10],
+            'criterion': ['friedman_mse', 'mae'],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 3, 5],
+            'max_features': ['auto', 'sqrt'],
+            'max_leaf_nodes': [None, 5, 20, 50],
+            'min_impurity_decrease': [0, 0.1, 0.4]
+        }
 
-        pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
-                     index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
-                     ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
+        etr_tuning_params = {
+            'n_estimators': [10, 25, 50, 100, 200, 400],
+            'criterion': ['mae'],
+            'max_features': ['auto', 'sqrt', 'log2', 0.2, 0.1, 0.05, 0.01],
+            'max_depth': [None, 3, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 3, 5],
+            'max_leaf_nodes': [None, 5, 20, 50],
+            'min_impurity_decrease': [0, 0.1, 0.4]
+        }
+
+        if grid:
+            gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
+        else:
+            gs = RandomizedSearchCV(self.machina, etr_tuning_params, cv=GroupKFold(3),
+                                return_train_score=True, n_iter=1000)
+
+        gs.fit(self.features_df.values, self.labels_df.values, groups=self.groups)
+        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune-gbr_{}.csv'.format(self.svfl, self.svnm))
 
     def visualize_tree(self, n=1):
         """ Comment """
