@@ -22,7 +22,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.utils import shuffle
 
@@ -49,7 +49,7 @@ class CatalystContainer(object):
         else:
             self.catalyst_dictionary[index] = catalyst
 
-    def build_master_container(self):
+    def build_master_container(self, drop_empty_columns=True):
         # Set up catalyst loading dictionary with loadings
         loading_df = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
         loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
@@ -85,7 +85,8 @@ class CatalystContainer(object):
                 catdf = pd.concat([df, inputdf], axis=1)
                 self.master_container = pd.concat([self.master_container, catdf], axis=0)
 
-        self.master_container.dropna(how='all', axis=1, inplace=True)
+        if drop_empty_columns:
+            self.master_container.dropna(how='all', axis=1, inplace=True)
         self.master_container.fillna(value=0, inplace=True)
 
         # This code overwrites the groups provided to the ML model to force all similar-element catalyst into the same group
@@ -191,6 +192,8 @@ class SupervisedLearner():
                         'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
                         'criterion':'mae'},
             'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+            'etr-CaMnIn': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
                     'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
             'etr-old': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
                     'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
@@ -339,10 +342,6 @@ class SupervisedLearner():
         self.group_for_training()
         # self.trim_slave_dataset()
 
-
-
-
-
     def group_for_training(self):
         """ Set groups parameter AFTER shuffling the slave dataset """
         self.groups = self.slave_dataset['group'].values
@@ -362,7 +361,7 @@ class SupervisedLearner():
             cols = self.slave_dataset.columns
             feature_list = list()
             for col in cols:
-                if col.split('_')[0] in self.features_to_drop:
+                if (col.split('_')[0] in self.features_to_drop) | (col in self.features_to_drop):
                     feature_list += [col]
 
             self.slave_dataset.drop(columns=feature_list, inplace=True)
@@ -372,7 +371,24 @@ class SupervisedLearner():
         self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
 
     def predict_data(self):
-        self.predictions = self.machina.predict(self.features_df.values, self.labels_df.values)
+        self.predictions = self.machina.predict(self.features_df.values)
+
+    def predict_crossvalidate(self, kfold=10, add_to_slave=False):
+        """ Use k-fold validation with grouping by catalyst ID to determine  """
+        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+                                             groups=self.groups, cv=GroupKFold(kfold))
+
+        if add_to_slave:
+            self.slave_dataset['predictions'] = self.predictions
+            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+
+    def predict_leaveoneout(self, add_to_slave=False):
+        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+                                             groups=self.groups, cv=LeaveOneGroupOut())
+
+        if add_to_slave:
+            self.slave_dataset['predictions'] = self.predictions
+            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
     def evaluate_regression_learner(self):
         """ Comment """
@@ -443,7 +459,7 @@ class SupervisedLearner():
         g.plot_important_features(svnm=svnm)
         g.bokeh_predictions(svnm='{}_predict-self_{}'.format(self.version, svnm))
 
-    def predict_all_from_elements(self, elements, svnm='data'):
+    def predict_all_from_elements(self, elements, svnm='data', save_plots=True, save_features=True):
         element_dataframe = pd.DataFrame()
 
         for ele in elements:
@@ -479,14 +495,18 @@ class SupervisedLearner():
         ]
         comparison_df['temperature'] = test_data['temperature']
 
-        feat_df = self.extract_important_features()
-        feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
+        if save_features:
+            feat_df = self.extract_important_features()
+            feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
 
-        g = Graphic(learner=self, df=comparison_df)
-        g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
-        g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
-        g.plot_important_features(svnm=svnm)
-        g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
+        if save_plots:
+            g = Graphic(learner=self, df=comparison_df)
+            g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
+            g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
+            g.plot_important_features(svnm=svnm)
+            g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
+
+        return comparison_df
 
     def predict_from_catalyst_ids(self):
         pass
@@ -537,7 +557,7 @@ class SupervisedLearner():
         g.plot_important_features(svnm=svnm)
         g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
 
-    def predict_dataset(self):
+    def predict_from_master_dataset(self):
         """ Description """
         # Note: This may break due to significant changes in the learner methods
 
@@ -550,15 +570,6 @@ class SupervisedLearner():
         data['Predictions'] = predvals
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
         return data
-
-    def predict_crossvalidate(self, kfold=10, add_to_slave=False):
-        """ Use k-fold validation with grouping by catalyst ID to determine  """
-        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
-                                             groups=self.groups, cv=GroupKFold(kfold))
-
-        if add_to_slave:
-            self.slave_dataset['predictions'] = self.predictions
-            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
     def preplot_processing(self):
         """ Prepare all data for plotting """
