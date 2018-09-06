@@ -22,7 +22,7 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, LeaveOneOut
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.utils import shuffle
 
@@ -70,12 +70,12 @@ class CatalystContainer(object):
             featdf.index = [catid]
 
             # Create DF from activity
-            actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Measured Conversion'])
+            # actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Selectivity', 'Measured Conversion'])
 
             # Create element dictionary
             eldictdf = pd.DataFrame(catobj.elements.items(), index=[catid], columns=['Element Dictionary'])
 
-            df = pd.concat([load_df, featdf, actdf, eldictdf, groupdf], axis=1)
+            df = pd.concat([load_df, featdf, eldictdf, groupdf], axis=1)
 
             # Iterate through observations and add catalysts
             for key, obs in catobj.observation_dict.items():
@@ -83,7 +83,7 @@ class CatalystContainer(object):
                 inputdf.index = [catid]
 
                 catdf = pd.concat([df, inputdf], axis=1)
-                self.master_container = pd.concat([self.master_container, catdf], axis=0)
+                self.master_container = pd.concat([self.master_container, catdf], axis=0, sort=True)
 
         if drop_empty_columns:
             self.master_container.dropna(how='all', axis=1, inplace=True)
@@ -232,7 +232,7 @@ class SupervisedLearner():
     def filter_master_dataset(self):
         self.reset_slave_dataset()
         self.filter_temperatures()
-        self.filter_elements()
+        self.filter_n_elements()
         self.filter_pressure()
         self.filter_concentrations()
         self.filter_ruthenium_loading()
@@ -242,16 +242,13 @@ class SupervisedLearner():
 
     def set_training_data(self):
         ''' Use the slave dataframe to set other dataframe properties '''
-        self.features_df = self.slave_dataset.drop(
-            labels=['Measured Conversion', 'Element Dictionary', 'group'],
-            axis=1
-        )
+        self.features_df = self.slave_dataset.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1)
         self.labels_df = self.slave_dataset['Measured Conversion'].copy()
 
     def reset_slave_dataset(self):
         self.slave_dataset = self.master_dataset.copy()
 
-    def filter_elements(self):
+    def filter_n_elements(self):
         filter_dict_neles = {
             1: self.slave_dataset[self.slave_dataset['n_elements'] == 1],
             2: self.slave_dataset[self.slave_dataset['n_elements'] == 2],
@@ -310,6 +307,10 @@ class SupervisedLearner():
             1: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.01)],
             2: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.02)],
             3: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.03)],
+            32: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.03) |
+                                   (self.slave_dataset.loc[:, 'Ru Loading'] == 0.02)],
+            31: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.03) |
+                                   (self.slave_dataset.loc[:, 'Ru Loading'] == 0.01)],
         }
 
         self.slave_dataset = filter_dict_ruthenium.get(self.ru_filter, self.slave_dataset)
@@ -320,9 +321,12 @@ class SupervisedLearner():
     def filter_out_elements(self, eles):
         if isinstance(eles, list):
             for ele in eles:
-                self.slave_dataset = self.slave_dataset.drop(columns=['{} Loading'.format(ele)])
+                self.slave_dataset.drop(self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] > 0].index,
+                                        inplace=True)
         else:
-            self.slave_dataset = self.slave_dataset.drop(columns=['{} Loading'.format(eles)])
+            self.slave_dataset.drop(columns=['{} Loading'.format(eles)], inplace=True)
+
+        self.shuffle_slave()
 
     def filter_out_ids(self, ids):
         if isinstance(ids, list):
@@ -330,6 +334,8 @@ class SupervisedLearner():
                 self.slave_dataset = self.slave_dataset.drop(index=catid)
         else:
             self.slave_dataset = self.slave_dataset.drop(index=ids)
+
+        self.shuffle_slave()
 
     def shuffle_slave(self, sv=False):
         self.slave_dataset = shuffle(self.slave_dataset)
@@ -366,6 +372,9 @@ class SupervisedLearner():
 
             self.slave_dataset.drop(columns=feature_list, inplace=True)
 
+    def set_training_set(self, training_elements=None):
+        pass # I want to come up with a clever way to segment into training and test sets...
+
     def train_data(self):
         """ Train the model on feature/label datasets """
         self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
@@ -390,6 +399,14 @@ class SupervisedLearner():
             self.slave_dataset['predictions'] = self.predictions
             self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
+    def predict_leave_yoself_out(self, add_to_slave=False):
+        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+                                             cv=LeaveOneOut())
+
+        if add_to_slave:
+            self.slave_dataset['predictions'] = self.predictions
+            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+
     def evaluate_regression_learner(self):
         """ Comment """
         r2 = r2_score(self.labels_df.values, self.predictions)
@@ -398,8 +415,8 @@ class SupervisedLearner():
 
         print('\n----- Model {} -----'.format(self.svnm))
         print('R2: {:0.3f}'.format(r2))
-        print('Mean Average Error: {:0.3f}'.format(mean_abs_err))
-        print('Mean Squared Error: {:0.3f}'.format(rmse))
+        print('Mean Absolute Error: {:0.3f}'.format(mean_abs_err))
+        print('Root Mean Squared Error: {:0.3f}'.format(rmse))
         print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
         print('\n')
 
@@ -459,11 +476,15 @@ class SupervisedLearner():
         g.plot_important_features(svnm=svnm)
         g.bokeh_predictions(svnm='{}_predict-self_{}'.format(self.version, svnm))
 
-    def predict_all_from_elements(self, elements, svnm='data', save_plots=True, save_features=True):
+    def predict_all_from_elements(self, elements, loads=None, svnm='data', save_plots=True, save_features=True):
         element_dataframe = pd.DataFrame()
 
-        for ele in elements:
-            dat = self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] > 0]
+        for jj, ele in enumerate(elements):
+            if loads is None:
+                dat = self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] > 0]
+            else:
+                dat = self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] == loads[jj]]
+
             element_dataframe = pd.concat([element_dataframe, dat])
 
         drop_ids = np.unique(element_dataframe.index)
@@ -601,11 +622,22 @@ class SupervisedLearner():
     def save_predictions(self):
         """ Comment """
         if not self.plot_df.empty:
-            df = pd.DataFrame(np.array([self.plot_df.index, self.predictions, self.labels_df.values, self.groups, self.plot_df['Name']]).T,
-                              columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups', 'Name'])
+            df = pd.DataFrame(
+                np.array([
+                    self.plot_df.index,
+                    self.predictions,
+                    self.labels_df.values,
+                    self.groups,
+                    self.plot_df['Name'],
+                    self.plot_df['temperature']]).T,
+                columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups', 'Name', 'Temperature'])
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
+
+    def save_slave(self):
+        """ Comment """
+        self.slave_dataset.to_csv('{}\slavedata-{}.csv'.format(self.svfl, self.svnm))
 
     def extract_important_features(self, sv=False, prnt=False):
         """ Save all feature importance, print top 10 """
@@ -723,3 +755,4 @@ class SupervisedLearner():
         print(df)
 
         exit()
+

@@ -480,3 +480,5 @@ class Graphic():
         output_file("{}\\{}{}.html".format(self.svfl, self.svnm, '-{}'.format(svtag) if svtag is not '' else ''), title="stats.py")
         save(p)
 
+    def plot_bar_graph(self):
+        self.graphdf.to_csv('..//graphdf.csv')

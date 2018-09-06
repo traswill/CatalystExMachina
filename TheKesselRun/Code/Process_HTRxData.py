@@ -64,9 +64,8 @@ def split_katies_ID(df):
     typically K.
 
     """
-
     output_list = list()
-    for catdat in df['CatalystObject']:
+    for catdat in df['Catalyst']:
         catlst = catdat.split(' ')
         if len(catlst) == 3:
             cat_index = int(catlst[0])
@@ -97,7 +96,7 @@ def split_katies_ID(df):
                        vals[2][0], vals[1][0],
                        vals[2][1], vals[1][1],
                        vals[2][2], vals[1][2]],
-                      index=['KatieID', 'CatalystObject ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3']).T
+                      index=['KatieID', 'ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3']).T
          for vals in output_list],
         ignore_index=True
     )
@@ -105,7 +104,7 @@ def split_katies_ID(df):
 
 def merge_ids_flows(flowsdf, iddf):
     """ Concatinate data with parsed elements and concentrations from Katie's IDs """
-    df = pd.concat([flowsdf.set_index('CatalystObject'), iddf.set_index('KatieID')], axis=1, join='inner')
+    df = pd.concat([flowsdf.set_index('Catalyst'), iddf.set_index('KatieID')], axis=1, join='inner')
     return df
 
 
@@ -129,15 +128,21 @@ def merge_activity_catalysts(actdf, catdf, nh3scale=100):
         output_df = pd.concat([output_df, df])
 
     output_df.loc[output_df['Pred Value'] < 0, 'Pred Value'] = 0
+
+    # Use nominal NH3 concentration
     output_df['NH3'] = 1
-    output_df['Concentration'] = (1 - output_df['Pred Value']) / 1
-    # output_df['Concentration'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
-    output_df.loc[output_df['Concentration'] < 0,  'Concentration'] = 0
+    output_df['Conversion'] = (1 - output_df['Pred Value']) / 1
+
+    # Use reported NH3 concentration
+    # output_df['NH3'] = output_df['NH3'] * nh3scale
+    # output_df['Conversion'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
+
+    output_df.loc[output_df['Conversion'] < 0,  'Conversion'] = 0
 
     # output_df.drop(['Reactor(2)','KTag'] ,inplace=True)
     output_df = output_df[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3',
                            'Reactor', 'Wt(g)', 'NH3', 'Space Velocity',
-                           'Ramp Direction', 'Temperature', 'Pred Value', 'Concentration']]
+                           'Ramp Direction', 'Temperature', 'Pred Value', 'Conversion']]
     output_df.reset_index(drop=True, inplace=True)
     return output_df
 
@@ -248,7 +253,6 @@ def read_v4_data_8():
 
     # Katie said to drop the down ramp because they were exposed to a higher concentration of NH3
     actdf.drop(actdf[actdf.loc[:, 'Ramp Direction'] == 'down'].index, inplace=True)
-
     catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
 
     df = merge_activity_catalysts(actdf, catdf, nh3scale=100)
@@ -306,17 +310,17 @@ def read_data_9_updated():
 
     output_df.loc[output_df['Pred Value'] < 0, 'Pred Value'] = 0
     output_df['NH3'] = 5
-    output_df['Concentration'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
-    output_df.loc[output_df['Concentration'] < 0, 'Concentration'] = 0
+    output_df['Conversion'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
+    output_df.loc[output_df['Conversion'] < 0, 'Conversion'] = 0
 
     output_df.columns = ['Reactor', 'Wt(g)', 'ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3',
-                         'Reactor', 'Temperature', 'Pred Value', 'Space Velocity', 'NH3', 'Concentration']
+                         'Reactor', 'Temperature', 'Pred Value', 'Space Velocity', 'NH3', 'Conversion']
 
     output_df['Ramp Direction'] = np.nan
 
     output_df = output_df[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3',
                            'Reactor', 'Wt(g)', 'NH3', 'Space Velocity',
-                           'Ramp Direction', 'Temperature', 'Pred Value', 'Concentration']]
+                           'Ramp Direction', 'Temperature', 'Pred Value', 'Conversion']]
     output_df.reset_index(drop=True, inplace=True)
     output_df.to_csv('..//Data//Processed//SS9_u.csv')
 
@@ -348,14 +352,14 @@ def create_super_monster_file():
                 continue
 
             add_df = temporary_df.iloc[0, :].copy()
-            add_df['Concentration'] = temporary_df['Concentration'].mean()
-            add_df['Standard Error'] = temporary_df['Concentration'].sem()
-            add_df['nAveraged'] = temporary_df['Concentration'].count()
+            add_df['Conversion'] = temporary_df['Conversion'].mean()
+            add_df['Standard Error'] = temporary_df['Conversion'].sem()
+            add_df['nAveraged'] = temporary_df['Conversion'].count()
 
-            final_df = pd.concat([final_df, add_df], axis=1)
+            final_df = pd.concat([final_df, add_df], axis=1, sort=True)
 
     final_df = final_df.transpose()[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3', 'Reactor', 'NH3',
-                                     'Space Velocity', 'Temperature', 'Concentration', 'Standard Error', 'nAveraged']]
+                                     'Space Velocity', 'Temperature', 'Conversion', 'Standard Error', 'nAveraged']]
 
     ele2 = final_df['Ele2'].copy()
     ele_dict = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation', 'Atomic Number'], index_col='Abbreviation').transpose().to_dict(orient='list')
@@ -369,13 +373,13 @@ def read_data0_data1():
     pth = r'../Data/RAW/NH3_v0_data1_data2.xlsx'
     df = pd.read_excel(pth)
     df = df[['ID','Ele1','Wt1','Ele2','Wt2','Ele3','Wt3','Reactor','Weight','NH3','Space Velocity','Ramp Direction','Temperature','Pred Value','Conversion']]
-    df.columns = ['ID','Ele1','Wt1','Ele2','Wt2','Ele3','Wt3','Reactor','Wt(g)','NH3','Space Velocity','Ramp Direction','Temperature','Pred Value','Concentration']
+    df.columns = ['ID','Ele1','Wt1','Ele2','Wt2','Ele3','Wt3','Reactor','Wt(g)','NH3','Space Velocity','Ramp Direction','Temperature','Pred Value','Conversion']
     df.to_csv('..//Data//Processed//SS1.csv')
 
 if __name__ == '__main__':
-    # read_data0_data1()
-    # read_v4_data()
-    # read_v4_data_8()
-    # read_data_9()
-    # read_data_9_updated()
+    read_data0_data1()
+    read_v4_data()
+    read_v4_data_8()
+    read_data_9()
+    read_data_9_updated()
     create_super_monster_file()
