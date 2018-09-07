@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import MiniBatchKMeans, DBSCAN, SpectralClustering, AgglomerativeClustering, KMeans
 from sklearn.metrics.pairwise import pairwise_distances_argmin
 
 import seaborn as sns
@@ -74,14 +74,58 @@ class Anarchy():
         # self.features = self.catalyst_dataframe.drop(columns=['E1','E2','E3','E4','E5','W1','W2','W3','W4','W5'])
         self.features = self.catalyst_dataframe.copy()
 
-    def kmeans(self, sv=None):
-        alg = MiniBatchKMeans(n_clusters=64, compute_labels=False)
+    def set_features(self, df):
+        self.features = df.copy()
+
+    def kmeans(self, clusters=64, sv=None):
+        alg = MiniBatchKMeans(n_clusters=clusters, compute_labels=False)
         alg.fit(self.features.values)
         self.cluster_results = pd.DataFrame(alg.cluster_centers_, columns=self.features.columns)
         if sv is None:
             self.cluster_results.to_csv('..\\Results\\Unsupervised\\Anarchy_Batch {}_kmeans_res.csv'.format(self.index))
         else:
             self.cluster_results.to_csv(sv)
+
+    def dbscan(self, sv=None):
+        alg = DBSCAN()
+        alg.fit(self.features.values)
+        core = alg.core_sample_indices_
+        lbls = alg.labels_
+
+        print(core)
+        print(lbls)
+
+    def ammonia_kmeans(self, clusters=3):
+        alg = KMeans(n_clusters=clusters, n_init=50, init='random')
+        alg.fit(self.features.values)
+        lbls = alg.labels_
+        self.cluster_results = alg.cluster_centers_
+        centroids = self.find_closest_centroid()
+        inertia = alg.inertia_
+
+        return lbls, centroids, inertia
+
+    def all_cluster_labels(self, clusters=3):
+        alg = AgglomerativeClustering(n_clusters=clusters)
+        alg.fit(self.features.values)
+        print(alg.labels_)
+        agglom = alg.labels_
+
+        alg = SpectralClustering(n_clusters=clusters)
+        alg.fit(self.features.values)
+        print(alg.labels_)
+        spectr = alg.labels_
+
+        alg = KMeans(n_clusters=clusters, n_init=50, init='random')
+        alg.fit(self.features.values)
+        print(alg.labels_)
+        kmeans = alg.labels_
+        self.cluster_results = alg.cluster_centers_
+        cent = self.find_closest_centroid()
+        print(cent)
+        print(alg.inertia_)
+
+        return agglom, spectr, kmeans
 
     def find_closest_centroid(self, sv=None):
         centroids_index = pairwise_distances_argmin(self.cluster_results, self.features)
@@ -90,3 +134,5 @@ class Anarchy():
             res.to_csv('..\\Results\\Unsupervised\\Anarchy_Batch {}_kmedian_res.csv'.format(self.index))
         else:
             res.to_csv(sv)
+
+        return res

@@ -571,6 +571,7 @@ def unsupervised_exploration(learner):
     sns.swarmplot(x='Wt1', y='Wt2', data=df_new, hue='group')
     plt.show()
 
+
 def swarmplot_paper1():
     def create_catalyst(catcont, ele, atnum):
         def add_obs(cat):
@@ -718,6 +719,101 @@ def swarmplot_paper1():
     catdf.to_csv(r'../Results/3Ru_prediction_data_{}.csv'.format(''.join(train_elements)))
     print(df[df['temperature'] == 300.0].sort_values('Predicted', ascending=False).head())
 
+
+def unsupervised_paper_1_training_set_selection():
+    def create_catalyst(catcont, ele, atnum):
+        def add_obs(cat):
+            # cat.add_observation(
+            #     temperature=250,
+            #     space_velocity=2000,
+            #     gas_concentration=1,
+            #     reactor_number=0
+            # )
+
+            cat.add_observation(
+                temperature=300,
+                space_velocity=2000,
+                gas_concentration=1,
+                reactor_number=0
+            )
+
+            # cat.add_observation(
+            #     temperature=350,
+            #     space_velocity=2000,
+            #     gas_concentration=1,
+            #     reactor_number=0
+            # )
+        # Create a catalyst of 3,1,12 Ru-ele-K for testing
+        cat = CatalystObject()
+        cat.ID = 'A_{}'.format(atnum)
+        cat.add_element('Ru', 3)
+        cat.add_element(ele, 1)
+        cat.add_element('K', 12)
+        cat.input_group(atnum)
+        cat.feature_add_n_elements()
+        cat.feature_add_Lp_norms()
+        cat.feature_add_elemental_properties()
+        add_obs(cat)
+
+        catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    start_time = time.time()
+    skynet = Anarchy()
+
+    # Create Element List, elements selected by Katie
+    eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+    ele_list = [12] + list(range(20, 31)) + list(range(38, 43)) + \
+               list(range(45, 51)) + list(range(74, 80)) + [72, 82, 83]
+
+    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
+    eles = ele_df.index.values
+    edf = pd.DataFrame([eles, ele_list], index=['Ele', 'Atnum']).T
+    eles = edf.values.tolist()
+
+    testcatcontainer = CatalystContainer()
+
+    for nm, atnum in eles:
+        create_catalyst(catcont=testcatcontainer, ele=nm, atnum=atnum)
+
+    testcatcontainer.build_master_container(drop_empty_columns=False)
+    catdf = testcatcontainer.master_container
+    edict = catdf['Element Dictionary'].copy()
+    catdf.drop(columns=[
+        '- Loading', '-- Loading', 'Element Dictionary', 'group', 'Periodic Table Column_mean',
+        'Periodic Table Column_mad', 'Periodic Table Row_mean', 'Periodic Table Row_mad',
+        'Mendeleev Number_mean', 'Mendeleev Number_mad'
+    ], inplace=True)
+    catdf = catdf.loc[:, (catdf != 0).any(axis=0)]
+
+    skynet.set_features(catdf)
+
+    # Test all possible cluster sizes
+    # inertia_list = list()
+    # for i in range(2, 20):
+    #     _, _, inertia = skynet.ammonia_kmeans(clusters=i)
+    #     inertia_list += [inertia]
+    #     print(inertia)
+    #
+    # pd.DataFrame(inertia_list).to_csv('..\\Results\\v39-Paper1\\inertia_per_cluster.csv')
+
+    _, _, kmeans = skynet.all_cluster_labels(clusters=5)
+    df = pd.DataFrame(edict)
+    df['Kmeans'] = kmeans
+    df.to_csv('..\\Results\\v39-Paper1\\Anarchy_cluster_results.csv')
+    featdf = catdf.copy()
+    featdf['Kmeans'] = kmeans
+    featdf.to_csv('..\\Results\\v39-Paper1\\Anarchy_features_cluster_results.csv')
+
+    exit()
+    skynet.kmeans(clusters=3, sv='..\\Results\\v39-Paper1\\Anarchy_FirstPaperPredictions_kmeans_res.csv')
+    res = skynet.find_closest_centroid(
+        '..\\Results\\v39-Paper1\\Anarchy_FirstPaperPredictions_kmedians_res.csv')
+
+    res = res.loc[:, ['Loading' in x for x in res.columns]]
+    res = res.loc[:, (res != 0).any(axis=0)]
+    print(res)
+
+    print('Time for first batch completion: {:0.1f} s'.format(time.time() - start_time))
 
 def categorize_data_from_swarmpredictions():
     # ***** Set up Catalyst Container to only include specified elements*****
@@ -932,14 +1028,15 @@ if __name__ == '__main__':
         exit()
 
     # ***** Predict all elements from Ca, Mn, In bimetallics (Ru-M-K) *****
-    if True:
+    if False:
         # determine_algorithm_learning_rate()
         read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v44-learning-rate\figures\learning_rate.csv")
         # generate_feature_changes_from_learning_rate()
         exit()
 
-    if False:
-        swarmplot_paper1()
+    if True:
+        unsupervised_paper_1_training_set_selection()
+        # swarmplot_paper1()
         # categorize_data_from_swarmpredictions()
         # plot_pred_meas_swarm()
         exit()
