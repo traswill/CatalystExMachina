@@ -60,9 +60,10 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
+            cat.feature_add_Norskov_dband()
             cat.feature_add_elemental_properties()
-            # cat.feature_add_unsupervised_properties()
 
+            # cat.feature_add_unsupervised_properties()
             # cat.feature_add_oxidation_states()
 
             # if row['ID'] in xrd_intensity_lst:
@@ -90,20 +91,22 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
 
     catcont.build_master_container(drop_empty_columns=drop_empty_columns)
 
+
 def relearn_with_temps(learner, train_temps, test_temps):
-    learner.set_temperature_filter(train_temps)
+    learner.set_filters(temperature_filter=train_temps)
     learner.filter_master_dataset()
     learner.train_data()
-    learner.set_temperature_filter(test_temps)
+    learner.set_filters(temperature_filter=test_temps)
     learner.filter_master_dataset()
+
 
 # TODO this is going the way of the dodo
 def prediction_pipeline(learner, elements, temps='350orless'):
     def setup(train, test):
-        learner.set_temperature_filter(train)
+        learner.set_filters(temperature_filter=train)
         learner.filter_master_dataset()
         learner.train_data()
-        learner.set_temperature_filter(test)
+        learner.set_filters(temperature_filter=test)
         learner.filter_master_dataset()
 
     # setup(None, '350orless')
@@ -119,7 +122,7 @@ def prediction_pipeline(learner, elements, temps='350orless'):
 
 def temperature_slice(learner, tslice, kde=False, fold=10):
     for t in tslice:
-        learner.set_temperature_filter(t)
+        learner.set_filters(temperature_filter=t)
         learner.filter_master_dataset()
 
         learner.train_data()
@@ -127,9 +130,9 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         if fold > 1:
             learner.predict_crossvalidate(kfold=fold, add_to_slave=True)
         elif fold == -1:
-            learner.predict_leave_yoself_out(add_to_slave=True)
+            learner.predict_leave_self_out(add_to_slave=True)
         else:
-            learner.predict_leaveoneout(add_to_slave=True)
+            learner.predict_leave_one_out(add_to_slave=True)
         learner.evaluate_regression_learner()
         learner.preplot_processing()
         learner.save_predictions()
@@ -142,23 +145,47 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
         if kde:
             g.plot_kernel_density(feat_list=['temperature',
-                                             'Ru Loading',
-                                             'Rh Loading',
                                              'Second Ionization Energy_mad',
                                              'Second Ionization Energy_mean',
                                              'Number d-shell Valence Electrons_mean',
                                              'Number d-shell Valence Electrons_mad',
-                                             'Periodic Table Column_mean',
-                                             'Periodic Table Column_mad',
+                                             'Dipole Polarizability_mean',
+                                             'Dipole Polarizability_mad',
                                              'Electronegativity_mean',
                                              'Electronegativity_mad',
                                              'Number Valence Electrons_mean',
                                              'Number Valence Electrons_mad',
                                              'Conductivity_mean',
                                              'Conductivity_mad',
+                                             'Covalent Radius_mean',
+                                             'Covalent Radius_mad',
+                                             'Phi_mean',
+                                             'Phi_mad',
+                                             'Heat Fusion_mean',
+                                             'Heat Fusion_mad',
+                                             'Polarizability_mean',
+                                             'Polarizability_mad',
+                                             'Melting Temperature_mean',
+                                             'Melting Temperature_mad',
                                              ], margins=False, element=None)
 
-        # TODO: Re-add these html generators once moved to Graphic
+            # g.plot_kernel_density(feat_list=['temperature',
+            #                                  'Ru Loading',
+            #                                  'Rh Loading',
+            #                                  'Second Ionization Energy_mad',
+            #                                  'Second Ionization Energy_mean',
+            #                                  'Number d-shell Valence Electrons_mean',
+            #                                  'Number d-shell Valence Electrons_mad',
+            #                                  'Periodic Table Column_mean',
+            #                                  'Periodic Table Column_mad',
+            #                                  'Electronegativity_mean',
+            #                                  'Electronegativity_mad',
+            #                                  'Number Valence Electrons_mean',
+            #                                  'Number Valence Electrons_mad',
+            #                                  'Conductivity_mean',
+            #                                  'Conductivity_mad',
+            #                                  ], margins=False, element=None)
+
         g.bokeh_predictions()
         # learner.bokeh_by_elements()
 
@@ -475,8 +502,6 @@ def extract_final_kmedian():
 
     df = pd.DataFrame(output_list)
     df.to_csv(r'..\Results\Unsupervised\Anarchy Results.csv')
-
-
 
 
 # Todo update this method
@@ -1028,13 +1053,13 @@ if __name__ == '__main__':
         exit()
 
     # ***** Predict all elements from Ca, Mn, In bimetallics (Ru-M-K) *****
-    if True:
+    if False:
         # determine_algorithm_learning_rate()
         read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v44-learning-rate\figures\learning_rate2.csv")
         # generate_feature_changes_from_learning_rate()
         exit()
 
-    if True:
+    if False:
         # unsupervised_paper_1_training_set_selection()
         swarmplot_paper1()
         # categorize_data_from_swarmpredictions()
@@ -1104,20 +1129,33 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v44')
+    skynet = SupervisedLearner(version='v46-Katies Orders')
     skynet.set_filters(
         element_filter=3,
         temperature_filter=None,
         ammonia_filter=1,
         space_vel_filter=2000,
-        ru_filter=3,
+        ru_filter=0,
         pressure_filter=None
     )
 
     # ***** Load SupervisedLearner *****
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_master_dataset(catalyst_container=catcontainer)
-    skynet.set_features_to_drop(features=['reactor', 'Periodic Table Column', 'Mendeleev Number'])
+
+    # v45-Without Zpp added
+    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                                          'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                                          'Zunger Pseudopotential (sigma)']
+
+    load_list = ['{} Loading'.format(x) for x in
+                 ['Ru','Cu', 'Y', 'Mg', 'Mn',
+                  'Ni', 'Cr', 'W', 'Ca', 'Hf',
+                  'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
+                  'Mo', 'In', 'Rh', 'K']]
+
+    skynet.set_features_to_drop(features=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
+
 
     # ***** Tune Hyperparameters *****
     # skynet.filter_master_dataset()
@@ -1126,7 +1164,7 @@ if __name__ == '__main__':
 
     # ***** General Opreation *****
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=-1) # ['350orless', 250, 300, 350, 400, 450, None]
-    temperature_slice(learner=skynet, tslice=['350orless'], fold=0)
+    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=True)
 
     # relearn_with_temps(learner=skynet, train_temps='350orless', test_temps='350orless')
     # skynet.predict_all_from_elements(elements=['Ca', 'In', 'Mn'], svnm='CaInMn_350orless')

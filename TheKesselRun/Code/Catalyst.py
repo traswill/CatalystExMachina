@@ -108,9 +108,61 @@ class CatalystObject():
 
         def calc_statistics(self, values, weights, feature_name):
             fwmean = np.sum(values * weights)/np.sum(weights)
-            avgdev = np.sum(weights * np.abs(values - np.mean(values)))/np.sum(weights) #(v25)
+            avgdev = np.sum(weights * np.abs(values - np.mean(values)))/np.sum(weights)  # (v25)
             self.feature_add('{}_mean'.format(feature_name), fwmean)
             self.feature_add('{}_mad'.format(feature_name), avgdev)
+
+        def calc_zunger(self, values, weights, feature_name):
+            # Attempt to set Ru value, flag -1 if no Ru
+            try:
+                Ru_Zpp = values['Ru']
+                values.drop(index=['Ru'], inplace=True)
+            except KeyError:
+                Ru_Zpp = -1
+
+            # Attempt to set K value, flag -1 if no K
+            try:
+                K_Zpp = values['K']
+                values.drop(index=['K'], inplace=True)
+            except KeyError:
+                K_Zpp = -1
+
+            # Try to set SE value, flag -1 if no SE
+            try:
+                SE_Zpp = values.values[0]
+            except IndexError:
+                SE_Zpp = -1
+
+            # if no Ru, just ignore the sample (TODO: this is temporary for current project, but dumb in general)
+            if Ru_Zpp == -1:
+                return
+
+            # if both flags are thrown, Zpp is futile
+            if (SE_Zpp == -1) & (K_Zpp == -1):
+                return
+
+            if feature_name == 'Zunger Pseudopotential (pi)':
+                if SE_Zpp == -1:
+                    self.feature_add('Zunger Pseudopotential (pi)_Ru+K', Ru_Zpp + K_Zpp)
+                elif K_Zpp == -1:
+                    self.feature_add('Zunger Pseudopotential (pi)_Ru+SE', Ru_Zpp + SE_Zpp)
+                else:
+                    self.feature_add('Zunger Pseudopotential (pi)_Ru+SE', Ru_Zpp+SE_Zpp)
+                    self.feature_add('Zunger Pseudopotential (pi)_Ru+K', Ru_Zpp + K_Zpp)
+                    self.feature_add('Zunger Pseudopotential (pi)_SE+K', SE_Zpp+K_Zpp)
+
+            elif feature_name == 'Zunger Pseudopotential (sigma)':
+                if SE_Zpp == -1:
+                    self.feature_add('Zunger Pseudopotential (sigma)_Ru-K', np.abs(Ru_Zpp - K_Zpp))
+                elif K_Zpp == -1:
+                    self.feature_add('Zunger Pseudopotential (sigma)_Ru-SE', np.abs(Ru_Zpp - SE_Zpp))
+                else:
+                    self.feature_add('Zunger Pseudopotential (sigma)_Ru-SE', np.abs(Ru_Zpp-SE_Zpp))
+                    self.feature_add('Zunger Pseudopotential (sigma)_Ru-K', np.abs(Ru_Zpp-K_Zpp))
+                    self.feature_add('Zunger Pseudopotential (sigma)_SE-K', np.abs(SE_Zpp-K_Zpp))
+
+            else:
+                print('Error adding Zpp')
 
         # Create Dictionary to process each feature differently
         process_dict = {
@@ -162,9 +214,9 @@ class CatalystObject():
             'Phi': calc_statistics,
             'Zunger Pseudopotential (d)': calc_statistics,
             'Zunger Pseudopotential (p)': calc_statistics,
-            'Zunger Pseudopotential (pi)': calc_statistics,
+            'Zunger Pseudopotential (pi)': calc_zunger,
             'Zunger Pseudopotential (s)': calc_statistics,
-            'Zunger Pseudopotential (sigma)': calc_statistics,
+            'Zunger Pseudopotential (sigma)': calc_zunger,
         }
 
         for feature_name, feature_values in eledf.T.iterrows():
@@ -226,6 +278,18 @@ class CatalystObject():
 
     def feature_add_xrd_peak_FWHM(self, peak_nm, peak_fwhm):
         self.feature_add(key=peak_nm, value=peak_fwhm)
+
+    def feature_add_Norskov_dband(self):
+        if len(self.elements) == 3:
+            dband_df = pd.read_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Processed\Norskov Data Processed.csv', index_col=0)
+            eles = list(self.elements.keys())
+
+            for idx, rw in dband_df.iterrows():
+                e1, e2 = rw[0].replace('1% ', '').split(' on ')
+
+                if (e1 == eles[1]) & (e2 == eles[0]):
+                    self.feature_add(key='Norskov d-band', value=rw[1])
+                    return
 
 
 class CatalystObservation():

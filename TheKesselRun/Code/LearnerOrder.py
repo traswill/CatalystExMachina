@@ -211,13 +211,29 @@ class SupervisedLearner():
 
     def set_filters(self, element_filter=None, temperature_filter=None, ammonia_filter=None, space_vel_filter=None,
                  ru_filter=None, pressure_filter=None):
-        # TODO add "if...not None, do" syntax
-        self.element_filter = element_filter
-        self.temperature_filter = temperature_filter
-        self.ammonia_filter = ammonia_filter
-        self.ru_filter = ru_filter
-        self.pressure_filter = pressure_filter
-        self.sv_filter = space_vel_filter
+
+        if element_filter is not None:
+            self.element_filter = element_filter
+        if temperature_filter is not None:
+            self.temperature_filter = temperature_filter
+        if ammonia_filter is not None:
+            self.ammonia_filter = ammonia_filter
+        if ru_filter is not None:
+            self.ru_filter = ru_filter
+        if pressure_filter is not None:
+            self.pressure_filter = pressure_filter
+        if space_vel_filter is not None:
+            self.sv_filter = space_vel_filter
+
+        self.set_name_paths()
+
+    def reset_filters(self):
+        self.element_filter = None
+        self.temperature_filter = None
+        self.ammonia_filter = None
+        self.ru_filter = None
+        self.pressure_filter = None
+        self.sv_filter = None
 
         self.set_name_paths()
 
@@ -391,7 +407,7 @@ class SupervisedLearner():
             self.slave_dataset['predictions'] = self.predictions
             self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
-    def predict_leaveoneout(self, add_to_slave=False):
+    def predict_leave_one_out(self, add_to_slave=False):
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=LeaveOneGroupOut())
 
@@ -399,7 +415,7 @@ class SupervisedLearner():
             self.slave_dataset['predictions'] = self.predictions
             self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
-    def predict_leave_yoself_out(self, add_to_slave=False):
+    def predict_leave_self_out(self, add_to_slave=False):
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              cv=LeaveOneOut())
 
@@ -423,16 +439,6 @@ class SupervisedLearner():
         pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
                      index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
                      ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
-
-    # TODO Depricated - Remove when predict_from_catalyst_ids is working
-    def create_test_dataset(self, catids):
-        """
-        Create a test dataset from slave, drop catalysts from slave
-        This allows for the ML algorithm to be trained on slave and predict the test dataset blindly
-        """
-        self.tester_dataset = self.slave_dataset[self.slave_dataset.index.isin(catids)].copy()
-        self.slave_dataset.drop(labels=self.tester_dataset.index, inplace=True)
-        self.set_training_data() # This rewrites features and labels dataframes with slave
 
     def predict_within_elements(self, elements, svnm='data'):
         element_dataframe = pd.DataFrame()
@@ -532,61 +538,14 @@ class SupervisedLearner():
     def predict_from_catalyst_ids(self):
         pass
 
-    # TODO Depricated - Remove when predict_from_catalyst_ids is working
-    def predict_from_masterfile(self, catids, svnm='data', temp_slice=True):
-        """ Description """
-        # Note: This may break due to significant changes in the learner methods
 
-        self.create_test_dataset(catids)
-        self.train_data()
-
-        """ Comment - Work in Progress """
-        data = self.tester_dataset.drop(
-            labels=['Measured Conversion', 'Element Dictionary', 'group'],
-            axis=1
-        ).values
-
-        print(self.tester_dataset)
-        print(data)
-
-        predvals = self.machina.predict(data)
-
-        original_test_df = self.slave_dataset.loc[self.tester_dataset.index].copy()
-        measvals = original_test_df.loc[:, 'Measured Conversion'].values
-
-        comparison_df = pd.DataFrame([predvals, measvals],
-                           index=['Predicted Conversion','Measured Conversion'],
-                           columns=original_test_df.index).T
-
-        comparison_df['ID'] = comparison_df.index   #[x.split('_')[0] for x in comparison_df.index]
-        comparison_df['Name'] = [
-            ''.join('{}({})'.format(key, str(int(val)))
-                    for key, val in x) for x in self.tester_dataset['Element Dictionary']
-        ]
-        comparison_df['temperature'] = original_test_df['temperature']
-
-        # I'm not entirely sure why I'm dropping 400 and 450, unless it's because I arbitrarily want to see 350orless
-        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 450].index, inplace=True)
-        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 400].index, inplace=True)
-
-        feat_df = self.extract_important_features()
-        feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
-
-        g = Graphic(learner=self, df=comparison_df)
-        g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
-        g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
-        g.plot_important_features(svnm=svnm)
-        g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
 
     def predict_from_master_dataset(self):
         """ Description """
         # Note: This may break due to significant changes in the learner methods
 
         data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
-        data = data.drop(
-            labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1
-        )
-
+        data = data.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1)
         predvals = self.machina.predict(data.values)
         data['Predictions'] = predvals
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
@@ -619,6 +578,9 @@ class SupervisedLearner():
 
         self.save_predictions()
 
+    def generate_output_dataframe(self):
+        pass # TODO
+
     def save_predictions(self):
         """ Comment """
         if not self.plot_df.empty:
@@ -634,6 +596,11 @@ class SupervisedLearner():
             df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
         else:
             print('No predictions to save...')
+
+    def save_features(self):
+        pass
+
+
 
     def save_slave(self):
         """ Comment """
@@ -756,3 +723,58 @@ class SupervisedLearner():
 
         exit()
 
+    # TODO Depricated - Remove when predict_from_catalyst_ids is working
+    def create_test_dataset(self, catids):
+        """
+        Create a test dataset from slave, drop catalysts from slave
+        This allows for the ML algorithm to be trained on slave and predict the test dataset blindly
+        """
+        self.tester_dataset = self.slave_dataset[self.slave_dataset.index.isin(catids)].copy()
+        self.slave_dataset.drop(labels=self.tester_dataset.index, inplace=True)
+        self.set_training_data()  # This rewrites features and labels dataframes with slave
+
+    # TODO Depricated - Remove when predict_from_catalyst_ids is working
+    def predict_from_masterfile(self, catids, svnm='data', temp_slice=True):
+        """ Description """
+        # Note: This may break due to significant changes in the learner methods
+
+        self.create_test_dataset(catids)
+        self.train_data()
+
+        """ Comment - Work in Progress """
+        data = self.tester_dataset.drop(
+            labels=['Measured Conversion', 'Element Dictionary', 'group'],
+            axis=1
+        ).values
+
+        print(self.tester_dataset)
+        print(data)
+
+        predvals = self.machina.predict(data)
+
+        original_test_df = self.slave_dataset.loc[self.tester_dataset.index].copy()
+        measvals = original_test_df.loc[:, 'Measured Conversion'].values
+
+        comparison_df = pd.DataFrame([predvals, measvals],
+                                     index=['Predicted Conversion', 'Measured Conversion'],
+                                     columns=original_test_df.index).T
+
+        comparison_df['ID'] = comparison_df.index  # [x.split('_')[0] for x in comparison_df.index]
+        comparison_df['Name'] = [
+            ''.join('{}({})'.format(key, str(int(val)))
+                    for key, val in x) for x in self.tester_dataset['Element Dictionary']
+        ]
+        comparison_df['temperature'] = original_test_df['temperature']
+
+        # I'm not entirely sure why I'm dropping 400 and 450, unless it's because I arbitrarily want to see 350orless
+        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 450].index, inplace=True)
+        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 400].index, inplace=True)
+
+        feat_df = self.extract_important_features()
+        feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
+
+        g = Graphic(learner=self, df=comparison_df)
+        g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
+        g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
+        g.plot_important_features(svnm=svnm)
+        g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
