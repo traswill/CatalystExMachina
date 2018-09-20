@@ -22,8 +22,9 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, LeaveOneOut
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
+    LeaveOneOut, learning_curve
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, make_scorer
 from sklearn.utils import shuffle
 
 
@@ -369,11 +370,13 @@ class SupervisedLearner():
         self.groups = self.slave_dataset['group'].values
 
     def reduce_feature_set(self):
-        self.features_df = self.features_df.loc[
-                           :, ['temperature',
-                               'Number d-shell Valence Electrons_wt-mean', 'Number d-shell Valence Electrons_wt-mad',
-                               ]
-                           ].copy()
+        reduced_features = [
+            'temperature', 'Number d-shell Valence Electrons_mean', 'Number d-shell Valence Electrons_mad'
+        ]
+
+        keepers = reduced_features + ['Measured Conversion', 'Element Dictionary', 'group']
+
+        self.features_to_drop = [x for x in list(self.slave_dataset.columns) if x not in keepers]
 
     def set_features_to_drop(self, features):
         self.features_to_drop = features
@@ -722,6 +725,43 @@ class SupervisedLearner():
         print(df)
 
         exit()
+
+    def generate_learning_curve(self):
+        train_sizes, train_scores, test_scores = learning_curve(
+            estimator=self.machina,
+            X=self.features_df.values,
+            y=self.labels_df.values,
+            groups=self.groups,
+            scoring=make_scorer(score_func=mean_absolute_error, greater_is_better=True),
+            train_sizes=np.linspace(0.05,1.0,20),
+            cv=GroupKFold(10),
+        )
+
+        train_scores_mean = np.mean(train_scores, axis=1)
+        train_scores_std = np.std(train_scores, axis=1)
+        test_scores_mean = np.mean(test_scores, axis=1)
+        test_scores_std = np.std(test_scores, axis=1)
+
+        plt.figure()
+        plt.grid()
+
+        plt.xlabel("Training Set Size")
+        plt.ylabel("Mean Absolute Error")
+
+        plt.fill_between(train_sizes, train_scores_mean - train_scores_std,
+                         train_scores_mean + train_scores_std, alpha=0.1,
+                         color="r")
+        plt.fill_between(train_sizes, test_scores_mean - test_scores_std,
+                         test_scores_mean + test_scores_std, alpha=0.1, color="g")
+        # plt.plot(train_sizes, train_scores_mean, 'o-', color="r",
+        #          label="Training score")
+        plt.plot(train_sizes, test_scores_mean, 'o-', color="g",
+                 label="Cross-validation score")
+
+        plt.ylim(0, 0.4)
+
+        plt.legend(loc="best")
+        plt.show()
 
     # TODO Depricated - Remove when predict_from_catalyst_ids is working
     def create_test_dataset(self, catids):

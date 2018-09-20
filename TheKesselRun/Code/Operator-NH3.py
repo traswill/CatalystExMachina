@@ -144,47 +144,29 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         g.plot_err()
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
         if kde:
-            g.plot_kernel_density(feat_list=['temperature',
-                                             'Second Ionization Energy_mad',
-                                             'Second Ionization Energy_mean',
-                                             'Number d-shell Valence Electrons_mean',
-                                             'Number d-shell Valence Electrons_mad',
-                                             'Dipole Polarizability_mean',
-                                             'Dipole Polarizability_mad',
-                                             'Electronegativity_mean',
-                                             'Electronegativity_mad',
-                                             'Number Valence Electrons_mean',
-                                             'Number Valence Electrons_mad',
-                                             'Conductivity_mean',
-                                             'Conductivity_mad',
-                                             'Covalent Radius_mean',
-                                             'Covalent Radius_mad',
-                                             'Phi_mean',
-                                             'Phi_mad',
-                                             'Heat Fusion_mean',
-                                             'Heat Fusion_mad',
-                                             'Polarizability_mean',
-                                             'Polarizability_mad',
-                                             'Melting Temperature_mean',
-                                             'Melting Temperature_mad',
-                                             ], margins=False, element=None)
+            normal_feats = ['temperature', 'space_velocity', 'n_Cl_atoms']
+            stat_feats = [
+                'Second Ionization Energy',
+                'Number d-shell Valence Electrons',
+                'Dipole Polarizability',
+                'Electronegativity',
+                'Number Valence Electrons',
+                'Conductivity',
+                'Covalent Radius',
+                'Phi',
+                'Heat Fusion',
+                'Polarizability',
+                'Melting Temperature',
+                'Number d-shell Unfilled Electrons',
+                'Number Unfilled Electrons',
+                'Fusion Enthalpy'
+            ]
 
-            # g.plot_kernel_density(feat_list=['temperature',
-            #                                  'Ru Loading',
-            #                                  'Rh Loading',
-            #                                  'Second Ionization Energy_mad',
-            #                                  'Second Ionization Energy_mean',
-            #                                  'Number d-shell Valence Electrons_mean',
-            #                                  'Number d-shell Valence Electrons_mad',
-            #                                  'Periodic Table Column_mean',
-            #                                  'Periodic Table Column_mad',
-            #                                  'Electronegativity_mean',
-            #                                  'Electronegativity_mad',
-            #                                  'Number Valence Electrons_mean',
-            #                                  'Number Valence Electrons_mad',
-            #                                  'Conductivity_mean',
-            #                                  'Conductivity_mad',
-            #                                  ], margins=False, element=None)
+            mod_stat_feats = list()
+            for x in stat_feats:
+                mod_stat_feats += ['{}_mean'.format(x), '{}_mad'.format(x)]
+
+            g.plot_kernel_density(feat_list=normal_feats+mod_stat_feats, margins=False, element=None)
 
         g.bokeh_predictions()
         # learner.bokeh_by_elements()
@@ -1129,10 +1111,10 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v46-Katies Orders')
+    skynet = SupervisedLearner(version='v48-only-ndband')
     skynet.set_filters(
         element_filter=3,
-        temperature_filter=None,
+        temperature_filter=300,
         ammonia_filter=1,
         space_vel_filter=2000,
         ru_filter=0,
@@ -1155,6 +1137,11 @@ if __name__ == '__main__':
                   'Mo', 'In', 'Rh', 'K']]
 
     skynet.set_features_to_drop(features=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
+    skynet.reduce_feature_set()
+    skynet.filter_master_dataset()
+
+    # skynet.generate_learning_curve()
+    # exit()
 
 
     # ***** Tune Hyperparameters *****
@@ -1162,9 +1149,13 @@ if __name__ == '__main__':
     # skynet.hyperparameter_tuning()
     # exit()
 
-    # ***** General Opreation *****
+    # ***** General Opreation: temperature_slice method *****
+    # fold: k-fold cv if greater than 0, leave-one-out if 0, leave-self-out if -1
+    # kde: true or false to generate graphs (false by default to save time)
+    #
+
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=-1) # ['350orless', 250, 300, 350, 400, 450, None]
-    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=True)
+    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350, 400], fold=0, kde=False)
 
     # relearn_with_temps(learner=skynet, train_temps='350orless', test_temps='350orless')
     # skynet.predict_all_from_elements(elements=['Ca', 'In', 'Mn'], svnm='CaInMn_350orless')
