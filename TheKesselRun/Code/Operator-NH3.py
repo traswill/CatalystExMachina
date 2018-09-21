@@ -1111,7 +1111,7 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v48-only-ndband')
+    skynet = SupervisedLearner(version='v49-addLanthanides')
     skynet.set_filters(
         element_filter=3,
         temperature_filter=300,
@@ -1126,18 +1126,20 @@ if __name__ == '__main__':
     skynet.load_master_dataset(catalyst_container=catcontainer)
 
     # v45-Without Zpp added
-    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-                                          'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-                                          'Zunger Pseudopotential (sigma)']
+    # zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+    #                                       'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+    #                                       'Zunger Pseudopotential (sigma)']
+    #
+    # load_list = ['{} Loading'.format(x) for x in
+    #              ['Ru','Cu', 'Y', 'Mg', 'Mn',
+    #               'Ni', 'Cr', 'W', 'Ca', 'Hf',
+    #               'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
+    #               'Mo', 'In', 'Rh', 'K']]
 
-    load_list = ['{} Loading'.format(x) for x in
-                 ['Ru','Cu', 'Y', 'Mg', 'Mn',
-                  'Ni', 'Cr', 'W', 'Ca', 'Hf',
-                  'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
-                  'Mo', 'In', 'Rh', 'K']]
-
+    zpp_list = []
+    load_list = []
     skynet.set_features_to_drop(features=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
-    skynet.reduce_feature_set()
+    # skynet.reduce_feature_set()
     skynet.filter_master_dataset()
 
     # skynet.generate_learning_curve()
