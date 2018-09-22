@@ -1125,6 +1125,10 @@ if __name__ == '__main__':
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_static_dataset(catalyst_container=catcontainer)
 
+    skynet.set_target_columns(cols=['Measured Conversion'])
+    skynet.set_group_columns(cols=['group'])
+    skynet.set_hold_columns(cols=['Element Dictionary'])
+
     # v45-Without Zpp added
     # zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
     #                                       'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
@@ -1138,7 +1142,7 @@ if __name__ == '__main__':
 
     zpp_list = []
     load_list = []
-    skynet.set_features_to_drop(features=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
+    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
     # skynet.reduce_feature_set()
     skynet.filter_static_dataset()
 

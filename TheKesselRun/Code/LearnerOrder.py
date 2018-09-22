@@ -433,20 +433,14 @@ class SupervisedLearner():
         reduced_features = [
             'temperature', 'Number d-shell Valence Electrons_mean', 'Number d-shell Valence Electrons_mad'
         ]
-
-        keepers = reduced_features + ['Measured Conversion', 'Element Dictionary', 'group']
-
-        self.features_to_drop = [x for x in list(self.dynamic_dataset.columns) if x not in keepers]
-
-    def set_features_to_drop(self, features):
-        self.features_to_drop = features
+        self.drop_columns = [x for x in list(self.dynamic_dataset.columns) if x not in reduced_features]
 
     def drop_features(self):
-        if self.features_to_drop is not None:
+        if self.drop_columns is not None:
             cols = self.features_df.columns
             feature_list = list()
             for col in cols:
-                if (col.split('_')[0] in self.features_to_drop) | (col in self.features_to_drop):
+                if (col.split('_')[0] in self.drop_columns) | (col in self.drop_columns):
                     feature_list += [col]
 
             self.features_df.drop(columns=feature_list, inplace=True)
