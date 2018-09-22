@@ -102,7 +102,7 @@ class SupervisedLearner():
     """SupervisedLearner will use catalysts to construct feature-label set and perform machine learning"""
 
     def __init__(self, version='v00'):
-        """ Put Words Here """
+        """ Initialize Everything """
 
         '''Initialize Main Dataframes'''
         self.static_dataset = pd.DataFrame() # Dataset that is never changed and used to reset
@@ -115,26 +115,30 @@ class SupervisedLearner():
         self.hold_columns = list() # list of columns to remove from the feature set during training
         self.drop_columns = list() # features to drop from training dataset permanently
 
-
-
-        '''-----Under here is old as of 9/22-----'''
-
-        '''Initialize DataFrames for unchanging data (master) and sorting/filtering (slave)'''
-        self.static_dataset = pd.DataFrame()  # From Catalyst Container
-        self.dynamic_dataset = pd.DataFrame()
-        self.tester_dataset = pd.DataFrame()
-        self.features_to_drop = None
-
-        '''Initialize sub-functions from the worker dataset.'''
+        self.hold_df = pd.DataFrame()
         self.features_df = pd.DataFrame()
         self.labels_df = pd.DataFrame()
-        self.plot_df = pd.DataFrame()
-        self.feature_importance_df = pd.DataFrame()
-        self.predictions = list()
-        self.groups = None
 
-        self.test_df = pd.DataFrame()
-        self.train_df = pd.DataFrame()
+        self.features = list()
+        self.labels = list()
+        self.groups = list()
+        self.predictions = list()
+
+        self.features_to_drop = None
+
+        # '''Initialize DataFrames for unchanging data (master) and sorting/filtering (slave)'''
+        # self.static_dataset = pd.DataFrame()  # From Catalyst Container
+        # self.dynamic_dataset = pd.DataFrame()
+        # self.tester_dataset = pd.DataFrame()
+        # self.features_to_drop = None
+        #
+        # '''Initialize sub-functions from the worker dataset.'''
+        # self.features_df = pd.DataFrame()
+        # self.labels_df = pd.DataFrame()
+        # self.plot_df = pd.DataFrame()
+        # self.feature_importance_df = pd.DataFrame()
+        # self.predictions = list()
+        # self.groups = None
 
         '''Initialize ML algorithm'''
         self.machina = None
@@ -168,6 +172,8 @@ class SupervisedLearner():
         self.start_time = time.time()
 
     def set_name_paths(self):
+        """ These paths are used by all methods to save files to the proper location """
+
         self.svfl = '..//Results//{version}'.format(version=self.version)
         self.svnm = '{nm}-{nele}-{temp}'.format(
             nm=self.version,
@@ -254,27 +260,67 @@ class SupervisedLearner():
         self.temperature_filter = T
         self.set_name_paths()
 
-    def load_master_dataset(self, catalyst_container):
+    def load_static_dataset(self, catalyst_container):
+        """ Handoff from catalyst container to supervised learner """
         self.static_dataset = catalyst_container.master_container
         self.dynamic_dataset = self.static_dataset.copy()
 
-    def filter_master_dataset(self):
-        self.reset_slave_dataset()
+    def filter_static_dataset(self, reset_training_data=True,  shuffle_dataset=True):
+        """ Apply all filters to the dataset """
+        self.reset_dynamic_dataset()
         self.filter_temperatures()
         self.filter_n_elements()
         self.filter_pressure()
         self.filter_concentrations()
         self.filter_ruthenium_loading()
         self.filter_space_velocities()
-        self.drop_features()
-        self.shuffle_slave()
+
+        if shuffle_dataset:
+            self.shuffle_dynamic_dataset()
+
+        if reset_training_data:
+            self.set_training_data()
+            self.drop_features()
+
+    def set_target_columns(self, cols):
+        if isinstance(cols, list):
+            self.target_columns = cols
+        else:
+            self.target_columns = list(cols)
+
+    def set_group_columns(self, cols):
+        if isinstance(cols, list):
+            self.group_columns = cols
+        else:
+            self.group_columns = list(cols)
+
+    def set_hold_columns(self, cols):
+        if isinstance(cols, list):
+            self.hold_columns = cols
+        else:
+            self.hold_columns = list(cols)
+
+    def set_drop_columns(self, cols):
+        if isinstance(cols, list):
+            self.drop_columns = cols
+        else:
+            self.drop_columns = list(cols)
 
     def set_training_data(self):
-        ''' Use the slave dataframe to set other dataframe properties '''
-        self.features_df = self.dynamic_dataset.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1)
-        self.labels_df = self.dynamic_dataset['Measured Conversion'].copy()
+        """ Use all specified columns to sort data into correct dataframes """
 
-    def reset_slave_dataset(self):
+        self.features_df = self.dynamic_dataset.drop(
+            labels=self.target_columns + self.group_columns + self.hold_columns, axis=1)
+        self.features = self.features_df.values
+
+        self.labels_df = self.dynamic_dataset[self.target_columns].copy()
+        self.labels = self.labels_df.values
+
+        self.groups = self.dynamic_dataset[self.group_columns].values
+
+        self.hold_df = self.dynamic_dataset[self.hold_columns].copy()
+
+    def reset_dynamic_dataset(self):
         self.dynamic_dataset = self.static_dataset.copy()
 
     def filter_n_elements(self):
@@ -350,37 +396,39 @@ class SupervisedLearner():
     def filter_out_elements(self, eles):
         if isinstance(eles, list):
             for ele in eles:
-                self.dynamic_dataset.drop(self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] > 0].index,
-                                          inplace=True)
+                self.dynamic_dataset.drop(
+                    self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] > 0].index,
+                    inplace=True
+                )
         else:
             self.dynamic_dataset.drop(columns=['{} Loading'.format(eles)], inplace=True)
 
-        self.shuffle_slave()
+        self.shuffle_dynamic_dataset()
 
     def filter_out_ids(self, ids):
         if isinstance(ids, list):
             for catid in ids:
-                self.dynamic_dataset = self.dynamic_dataset.drop(index=catid)
+                self.dynamic_dataset = self.dynamic_dataset[self.dynamic_dataset['ID'] != catid]
         else:
             self.dynamic_dataset = self.dynamic_dataset.drop(index=ids)
 
-        self.shuffle_slave()
+        self.shuffle_dynamic_dataset()
 
-    def shuffle_slave(self, sv=False):
+    def shuffle_dynamic_dataset(self, sv=False):
         self.dynamic_dataset = shuffle(self.dynamic_dataset)
 
         if sv:
-            pd.DataFrame(self.dynamic_dataset).to_csv('..\\SlaveTest.csv')
+            pd.DataFrame(self.dynamic_dataset).to_csv('..\\Dynamic_df.csv')
 
         # Set up training data and apply grouping
         self.set_training_data()
-        self.group_for_training()
-        # self.trim_slave_dataset()
+    #     self.group_for_training()
+    #
+    # def group_for_training(self):
+    #     """ Set groups parameter AFTER shuffling the slave dataset """
+    #     self.groups = self.dynamic_dataset[self.group_columns].values
 
-    def group_for_training(self):
-        """ Set groups parameter AFTER shuffling the slave dataset """
-        self.groups = self.dynamic_dataset['group'].values
-
+    # TODO this method should be offloaded to an operator
     def reduce_feature_set(self):
         reduced_features = [
             'temperature', 'Number d-shell Valence Electrons_mean', 'Number d-shell Valence Electrons_mad'
@@ -395,48 +443,37 @@ class SupervisedLearner():
 
     def drop_features(self):
         if self.features_to_drop is not None:
-            cols = self.dynamic_dataset.columns
+            cols = self.features_df.columns
             feature_list = list()
             for col in cols:
                 if (col.split('_')[0] in self.features_to_drop) | (col in self.features_to_drop):
                     feature_list += [col]
 
-            self.dynamic_dataset.drop(columns=feature_list, inplace=True)
+            self.features_df.drop(columns=feature_list, inplace=True)
+            self.features = self.features_df.values
 
     def set_training_set(self, training_elements=None):
-        pass # I want to come up with a clever way to segment into training and test sets...
+        pass # TODO I want to come up with a clever way to segment into training and test sets...
 
     def train_data(self):
         """ Train the model on feature/label datasets """
-        self.machina = self.machina.fit(self.features_df.values, self.labels_df.values)
+        self.machina = self.machina.fit(self.features, self.labels)
 
     def predict_data(self):
-        self.predictions = self.machina.predict(self.features_df.values)
+        self.predictions = self.machina.predict(self.features)
 
-    def predict_crossvalidate(self, kfold=10, add_to_slave=False):
+    def predict_crossvalidate(self, kfold=10):
         """ Use k-fold validation with grouping by catalyst ID to determine  """
-        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+        self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              groups=self.groups, cv=GroupKFold(kfold))
 
-        if add_to_slave:
-            self.dynamic_dataset['predictions'] = self.predictions
-            self.dynamic_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
-
-    def predict_leave_one_out(self, add_to_slave=False):
-        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+    def predict_leave_one_out(self):
+        self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              groups=self.groups, cv=LeaveOneGroupOut())
 
-        if add_to_slave:
-            self.dynamic_dataset['predictions'] = self.predictions
-            self.dynamic_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
-
-    def predict_leave_self_out(self, add_to_slave=False):
-        self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
+    def predict_leave_self_out(self):
+        self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              cv=LeaveOneOut())
-
-        if add_to_slave:
-            self.dynamic_dataset['predictions'] = self.predictions
-            self.dynamic_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
     def evaluate_regression_learner(self):
         """ Comment """
@@ -456,6 +493,7 @@ class SupervisedLearner():
                      ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
 
     def predict_within_elements(self, elements, svnm='data'):
+        # TODO rework this method
         element_dataframe = pd.DataFrame()
 
         for ele in elements:
@@ -498,6 +536,7 @@ class SupervisedLearner():
         g.bokeh_predictions(svnm='{}_predict-self_{}'.format(self.version, svnm))
 
     def predict_all_from_elements(self, elements, loads=None, svnm='data', save_plots=True, save_features=True):
+        # TODO rework this method
         element_dataframe = pd.DataFrame()
 
         for jj, ele in enumerate(elements):
@@ -550,11 +589,6 @@ class SupervisedLearner():
 
         return comparison_df
 
-    def predict_from_catalyst_ids(self):
-        pass
-
-
-
     def predict_from_master_dataset(self):
         """ Description """
         # Note: This may break due to significant changes in the learner methods
@@ -566,58 +600,59 @@ class SupervisedLearner():
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
         return data
 
-    def preplot_processing(self):
+    def compile_results(self):
         """ Prepare all data for plotting """
 
-        # Ensure Predictions Exist
         if self.predictions is None:
-            self.predict_crossvalidate()
+            print('WARNING: No predictions have been made.')
 
-        # Set up the plot dataframe for easy plotting
-        self.plot_df = self.dynamic_dataset.copy()
-        self.plot_df['Predicted Conversion'] = self.predictions
+        self.result_dataset = self.dynamic_dataset.copy()
+        self.result_dataset['Predictions'] = self.predictions
 
-        self.plot_df['Name'] = [
-            ''.join('{}({})'.format(key, str(int(val)))
-                    for key, val in x) for x in self.plot_df['Element Dictionary']
-        ]
+        # TODO parse element dictionary to reasonable name
 
-        for index, edict in self.plot_df['Element Dictionary'].iteritems():
-            self.plot_df.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
+        # TODO save
+        #
+        # # Set up the plot dataframe for easy plotting
+        # self.plot_df = self.dynamic_dataset.copy()
+        # self.plot_df['Predicted Conversion'] = self.predictions
+        #
+        # self.plot_df['Name'] = [
+        #     ''.join('{}({})'.format(key, str(int(val)))
+        #             for key, val in x) for x in self.plot_df['Element Dictionary']
+        # ]
+        #
+        # for index, edict in self.plot_df['Element Dictionary'].iteritems():
+        #     self.plot_df.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
+        #
+        #     i = 1
+        #     for key, val in edict:
+        #         self.plot_df.loc[index, 'Ele{}'.format(i)] = key
+        #         self.plot_df.loc[index, 'Load{}'.format(i)] = val
+        #         i += 1
+        #
+        # self.save_predictions()
+    #
+    # def save_predictions(self):
+    #     """ Comment """
+    #     if not self.plot_df.empty:
+    #         df = pd.DataFrame(
+    #             np.array([
+    #                 self.plot_df.index,
+    #                 self.predictions,
+    #                 self.labels_df.values,
+    #                 self.groups,
+    #                 self.plot_df['Name'],
+    #                 self.plot_df['temperature']]).T,
+    #             columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups', 'Name', 'Temperature'])
+    #         df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
+    #     else:
+    #         print('No predictions to save...')
+    #
+    # def save_features(self):
+    #     pass
 
-            i = 1
-            for key, val in edict:
-                self.plot_df.loc[index, 'Ele{}'.format(i)] = key
-                self.plot_df.loc[index, 'Load{}'.format(i)] = val
-                i += 1
-
-        self.save_predictions()
-
-    def generate_output_dataframe(self):
-        pass # TODO
-
-    def save_predictions(self):
-        """ Comment """
-        if not self.plot_df.empty:
-            df = pd.DataFrame(
-                np.array([
-                    self.plot_df.index,
-                    self.predictions,
-                    self.labels_df.values,
-                    self.groups,
-                    self.plot_df['Name'],
-                    self.plot_df['temperature']]).T,
-                columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups', 'Name', 'Temperature'])
-            df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
-        else:
-            print('No predictions to save...')
-
-    def save_features(self):
-        pass
-
-
-
-    def save_slave(self):
+    def save_dynamic(self):
         """ Comment """
         self.dynamic_dataset.to_csv('{}\slavedata-{}.csv'.format(self.svfl, self.svnm))
 
@@ -625,31 +660,29 @@ class SupervisedLearner():
         """ Save all feature importance, print top 10 """
 
         try:
-            df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
+            feature_importance_df = pd.DataFrame(self.machina.feature_importances_, index=self.features_df.columns,
                           columns=['Feature Importance'])
-
-            self.feature_importance_df = df
         except AttributeError:
             return
 
         if prnt:
-            print(df.sort_values(by='Feature Importance', ascending=False).head(10))
+            print(feature_importance_df.sort_values(by='Feature Importance', ascending=False).head(10))
 
         if sv:
-            df.to_csv('{}//features//feature_importance-{}.csv'.format(self.svfl, self.svnm))
+            feature_importance_df.to_csv('{}//features//feature_importance-{}.csv'.format(self.svfl, self.svnm))
 
             new_df = pd.DataFrame()
 
-            for nm in df.index:
-                df.loc[nm, 'Feature'] = nm.split('_')[0]
+            for nm in feature_importance_df.index:
+                feature_importance_df.loc[nm, 'Feature'] = nm.split('_')[0]
 
-            for feat in df.Feature.unique():
-                new_df.loc[feat, 'Feature Importance'] = df[df['Feature'] == feat]['Feature Importance'].sum()
+            for feat in feature_importance_df.Feature.unique():
+                new_df.loc[feat, 'Feature Importance'] = feature_importance_df[feature_importance_df['Feature'] == feat]['Feature Importance'].sum()
 
             new_df.sort_values('Feature Importance', ascending=False, inplace=True)
             new_df.to_csv('{}//features//feature_importance-{}-summed.csv'.format(self.svfl, self.svnm))
         else:
-            return df
+            return feature_importance_df
 
     def hyperparameter_tuning(self, grid=False):
         """ Method Used to tune hyperparameters and increase accuracy of the model """
@@ -775,58 +808,3 @@ class SupervisedLearner():
         plt.legend(loc="best")
         plt.show()
 
-    # TODO Depricated - Remove when predict_from_catalyst_ids is working
-    def create_test_dataset(self, catids):
-        """
-        Create a test dataset from slave, drop catalysts from slave
-        This allows for the ML algorithm to be trained on slave and predict the test dataset blindly
-        """
-        self.tester_dataset = self.dynamic_dataset[self.dynamic_dataset.index.isin(catids)].copy()
-        self.dynamic_dataset.drop(labels=self.tester_dataset.index, inplace=True)
-        self.set_training_data()  # This rewrites features and labels dataframes with slave
-
-    # TODO Depricated - Remove when predict_from_catalyst_ids is working
-    def predict_from_masterfile(self, catids, svnm='data', temp_slice=True):
-        """ Description """
-        # Note: This may break due to significant changes in the learner methods
-
-        self.create_test_dataset(catids)
-        self.train_data()
-
-        """ Comment - Work in Progress """
-        data = self.tester_dataset.drop(
-            labels=['Measured Conversion', 'Element Dictionary', 'group'],
-            axis=1
-        ).values
-
-        print(self.tester_dataset)
-        print(data)
-
-        predvals = self.machina.predict(data)
-
-        original_test_df = self.dynamic_dataset.loc[self.tester_dataset.index].copy()
-        measvals = original_test_df.loc[:, 'Measured Conversion'].values
-
-        comparison_df = pd.DataFrame([predvals, measvals],
-                                     index=['Predicted Conversion', 'Measured Conversion'],
-                                     columns=original_test_df.index).T
-
-        comparison_df['ID'] = comparison_df.index  # [x.split('_')[0] for x in comparison_df.index]
-        comparison_df['Name'] = [
-            ''.join('{}({})'.format(key, str(int(val)))
-                    for key, val in x) for x in self.tester_dataset['Element Dictionary']
-        ]
-        comparison_df['temperature'] = original_test_df['temperature']
-
-        # I'm not entirely sure why I'm dropping 400 and 450, unless it's because I arbitrarily want to see 350orless
-        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 450].index, inplace=True)
-        comparison_df.drop(comparison_df[comparison_df.loc[:, 'temperature'] == 400].index, inplace=True)
-
-        feat_df = self.extract_important_features()
-        feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
-
-        g = Graphic(learner=self, df=comparison_df)
-        g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
-        g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
-        g.plot_important_features(svnm=svnm)
-        g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))

@@ -1123,7 +1123,7 @@ class Catalyst():
 
 
 def standard_pipeline(learner):
-    learner.filter_master_dataset()
+    learner.filter_static_dataset()
     learner.train_data()
     learner.extract_important_features(sv=True, prnt=True)
     learner.predict_crossvalidate()
@@ -1131,7 +1131,7 @@ def standard_pipeline(learner):
         learner.evaluate_regression_learner()
     else:
         learner.evaluate_classification_learner()
-    learner.preplot_processing()
+    learner.compile_results()
     learner.plot_basic()
     learner.plot_error()
 
@@ -1139,7 +1139,7 @@ def standard_pipeline(learner):
 def temperature_slice(learner):
     for t in [250, 300, 350, 400, 450, None, 'not450']:
         learner.set_temp_filter(t)
-        learner.filter_master_dataset()
+        learner.filter_static_dataset()
         learner.train_data()
         learner.extract_important_features(sv=True, prnt=True)
         learner.predict_crossvalidate()
@@ -1148,7 +1148,7 @@ def temperature_slice(learner):
         else:
             learner.evaluate_classification_learner()
         learner.save_predictions()
-        learner.preplot_processing()
+        learner.compile_results()
         learner.plot_basic()
         learner.plot_error()
         learner.plot_features_colorbar(x_feature='Predicted Conversion', c_feature='ammonia_concentration')

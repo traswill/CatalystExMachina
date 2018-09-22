@@ -94,20 +94,20 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
 
 def relearn_with_temps(learner, train_temps, test_temps):
     learner.set_filters(temperature_filter=train_temps)
-    learner.filter_master_dataset()
+    learner.filter_static_dataset()
     learner.train_data()
     learner.set_filters(temperature_filter=test_temps)
-    learner.filter_master_dataset()
+    learner.filter_static_dataset()
 
 
 # TODO this is going the way of the dodo
 def prediction_pipeline(learner, elements, temps='350orless'):
     def setup(train, test):
         learner.set_filters(temperature_filter=train)
-        learner.filter_master_dataset()
+        learner.filter_static_dataset()
         learner.train_data()
         learner.set_filters(temperature_filter=test)
-        learner.filter_master_dataset()
+        learner.filter_static_dataset()
 
     # setup(None, '350orless')
     # learner.predict_from_masterfile(catids=[65, 66, 67, 68, 69, 73, 74, 75, 76, 77, 78, 82, 83], svnm='SS8')
@@ -123,7 +123,7 @@ def prediction_pipeline(learner, elements, temps='350orless'):
 def temperature_slice(learner, tslice, kde=False, fold=10):
     for t in tslice:
         learner.set_filters(temperature_filter=t)
-        learner.filter_master_dataset()
+        learner.filter_static_dataset()
 
         learner.train_data()
         learner.extract_important_features(sv=True, prnt=True)
@@ -134,9 +134,9 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         else:
             learner.predict_leave_one_out(add_to_slave=True)
         learner.evaluate_regression_learner()
-        learner.preplot_processing()
+        learner.compile_results()
         learner.save_predictions()
-        learner.save_slave()
+        learner.save_dynamic()
 
         g = Graphic(learner=learner)
         g.plot_important_features()
@@ -235,8 +235,8 @@ def predict_all_binaries():
 
     load_nh3_catalysts(catcontainer)
 
-    skynet.load_master_dataset(catalyst_container=catcontainer)
-    skynet.filter_master_dataset()
+    skynet.load_static_dataset(catalyst_container=catcontainer)
+    skynet.filter_static_dataset()
     skynet.train_data()
     return skynet, skynet.predict_from_master_dataset()
 
@@ -298,8 +298,8 @@ def predict_half_Ru_catalysts():
 
     load_nh3_catalysts(catcontainer)
 
-    skynet.load_master_dataset(catalyst_container=catcontainer)
-    skynet.filter_master_dataset()
+    skynet.load_static_dataset(catalyst_container=catcontainer)
+    skynet.filter_static_dataset()
     skynet.train_data()
     return skynet, skynet.predict_from_master_dataset()
 
@@ -511,8 +511,8 @@ def test_all_ML_models():
 
     catcontainer.master_container = element_dataframe
 
-    skynet.load_master_dataset(catalyst_container=catcontainer)
-    skynet.filter_master_dataset()
+    skynet.load_static_dataset(catalyst_container=catcontainer)
+    skynet.filter_static_dataset()
     eval_dict = dict()
 
     for algs in ['rfr','adaboost','tree','neuralnet','svr','knnr','krr','etr','gbr','ridge','lasso']:
@@ -676,9 +676,9 @@ def swarmplot_paper1():
 
     # ***** Train the learner *****
     skynet.set_learner(learner='etr', params='etr')
-    skynet.load_master_dataset(catalyst_container=catcontainer)
+    skynet.load_static_dataset(catalyst_container=catcontainer)
     skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
-    skynet.filter_master_dataset()
+    skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
 
@@ -700,7 +700,7 @@ def swarmplot_paper1():
         create_catalyst(catcont=testcatcontainer, ele=nm, atnum=atnum)
 
     testcatcontainer.build_master_container(drop_empty_columns=False)
-    skynet.load_master_dataset(testcatcontainer)
+    skynet.load_static_dataset(testcatcontainer)
     skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
     skynet.drop_features()
     skynet.set_training_data()
@@ -850,15 +850,15 @@ def categorize_data_from_swarmpredictions():
 
     # ***** Train the learner *****
     skynet.set_learner(learner='etr', params='etr')
-    skynet.load_master_dataset(catalyst_container=catcontainer)
+    skynet.load_static_dataset(catalyst_container=catcontainer)
     skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
-    skynet.filter_master_dataset()
+    skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
 
     testcatcontainer = CatalystContainer()
     load_nh3_catalysts(testcatcontainer, drop_empty_columns=False)
-    skynet.load_master_dataset(testcatcontainer)
+    skynet.load_static_dataset(testcatcontainer)
 
     skynet.set_filters(
         element_filter=3,
@@ -869,10 +869,10 @@ def categorize_data_from_swarmpredictions():
         pressure_filter=None
     )
     skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
-    skynet.filter_master_dataset()
+    skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.predict_data()
-    skynet.preplot_processing()
+    skynet.compile_results()
     skynet.save_predictions()
 
 
@@ -921,7 +921,7 @@ def determine_algorithm_learning_rate():
     )
 
     skynet.set_learner(learner='etr', params='etr')
-    skynet.load_master_dataset(catalyst_container=catcontainer)
+    skynet.load_static_dataset(catalyst_container=catcontainer)
     skynet.set_features_to_drop(features=['reactor'])
 
     results = pd.DataFrame()
@@ -1013,8 +1013,8 @@ def tune_ert_for_3catalysts():
         pressure_filter=None
     )
 
-    skynet.load_master_dataset(catcontainer)
-    skynet.filter_master_dataset()
+    skynet.load_static_dataset(catcontainer)
+    skynet.filter_static_dataset()
     skynet.set_learner(learner='etr', params='etr')
     skynet.hyperparameter_tuning()
 
@@ -1076,10 +1076,10 @@ if __name__ == '__main__':
 
         # ***** Load SupervisedLearner *****
         skynet.set_learner(learner='etr', params='etr')
-        skynet.load_master_dataset(catalyst_container=catcontainer)
+        skynet.load_static_dataset(catalyst_container=catcontainer)
         skynet.set_features_to_drop(features=['reactor'])
 
-        skynet.filter_master_dataset()
+        skynet.filter_static_dataset()
         skynet.train_data()
         skynet.extract_important_features(sv=True, prnt=True)
 
@@ -1091,10 +1091,10 @@ if __name__ == '__main__':
             ru_filter=2,
             pressure_filter=None
         )
-        skynet.filter_master_dataset()
+        skynet.filter_static_dataset()
 
         skynet.predict_data()
-        skynet.preplot_processing()
+        skynet.compile_results()
         skynet.save_predictions()
 
         g = Graphic(learner=skynet)
@@ -1123,7 +1123,7 @@ if __name__ == '__main__':
 
     # ***** Load SupervisedLearner *****
     skynet.set_learner(learner='etr', params='etr')
-    skynet.load_master_dataset(catalyst_container=catcontainer)
+    skynet.load_static_dataset(catalyst_container=catcontainer)
 
     # v45-Without Zpp added
     # zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
@@ -1140,7 +1140,7 @@ if __name__ == '__main__':
     load_list = []
     skynet.set_features_to_drop(features=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
     # skynet.reduce_feature_set()
-    skynet.filter_master_dataset()
+    skynet.filter_static_dataset()
 
     # skynet.generate_learning_curve()
     # exit()
