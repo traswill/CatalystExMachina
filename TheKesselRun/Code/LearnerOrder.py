@@ -103,10 +103,6 @@ class SupervisedLearner():
 
     def __init__(self, version='v00'):
         """ Put Words Here """
-
-        '''Initialize dictionary to hold import data'''
-        self.catalyst_dictionary = dict()  # TODO Remove
-
         '''Initialize DataFrames for unchanging data (master) and sorting/filtering (slave)'''
         self.master_dataset = pd.DataFrame()  # From Catalyst Container
         self.slave_dataset = pd.DataFrame()
