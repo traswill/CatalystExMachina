@@ -70,9 +70,6 @@ class CatalystContainer(object):
             featdf = pd.DataFrame.from_dict(catobj.feature_dict, orient='index').transpose()
             featdf.index = [catid]
 
-            # Create DF from activity
-            # actdf = pd.DataFrame(catobj.activity, index=[catid], columns=['Selectivity', 'Measured Conversion'])
-
             # Create element dictionary
             eldictdf = pd.DataFrame(catobj.elements.items(), index=[catid], columns=['Element Dictionary'])
 
@@ -97,19 +94,38 @@ class CatalystContainer(object):
         df['group'] = df.groupby([0,1,2]).ngroup()
         self.master_container['group'] = df['group'].values
 
+        # Transfer catalyst ID to column so each index is unique
+        self.master_container['ID'] = self.master_container.index
+        self.master_container.reset_index(inplace=True, drop=True)
 
 class SupervisedLearner():
     """SupervisedLearner will use catalysts to construct feature-label set and perform machine learning"""
 
     def __init__(self, version='v00'):
         """ Put Words Here """
+
+        '''Initialize Main Dataframes'''
+        self.static_dataset = pd.DataFrame() # Dataset that is never changed and used to reset
+        self.dynamic_dataset = pd.DataFrame() # Dataset that is always used as the working dataset
+        self.result_dataset = pd.DataFrame() # Dataset for use after testing model
+
+        '''Initialize Column Identifiers'''
+        self.target_columns = list() # list of columns in master_dataset with target values to be predicted
+        self.group_columns = list() # list of column in master_dataset to use for grouping catalysts
+        self.hold_columns = list() # list of columns to remove from the feature set during training
+        self.drop_columns = list() # features to drop from training dataset permanently
+
+
+
+        '''-----Under here is old as of 9/22-----'''
+
         '''Initialize DataFrames for unchanging data (master) and sorting/filtering (slave)'''
-        self.master_dataset = pd.DataFrame()  # From Catalyst Container
-        self.slave_dataset = pd.DataFrame()
+        self.static_dataset = pd.DataFrame()  # From Catalyst Container
+        self.dynamic_dataset = pd.DataFrame()
         self.tester_dataset = pd.DataFrame()
         self.features_to_drop = None
 
-        '''Initialize sub-functions from the slave dataset.'''
+        '''Initialize sub-functions from the worker dataset.'''
         self.features_df = pd.DataFrame()
         self.labels_df = pd.DataFrame()
         self.plot_df = pd.DataFrame()
@@ -120,7 +136,7 @@ class SupervisedLearner():
         self.test_df = pd.DataFrame()
         self.train_df = pd.DataFrame()
 
-        '''Initialize ML algorithm and tuning parameters'''
+        '''Initialize ML algorithm'''
         self.machina = None
 
         '''Initialize all options for the algorithm.  These are used in naming files.'''
@@ -239,8 +255,8 @@ class SupervisedLearner():
         self.set_name_paths()
 
     def load_master_dataset(self, catalyst_container):
-        self.master_dataset = catalyst_container.master_container
-        self.slave_dataset = self.master_dataset.copy()
+        self.static_dataset = catalyst_container.master_container
+        self.dynamic_dataset = self.static_dataset.copy()
 
     def filter_master_dataset(self):
         self.reset_slave_dataset()
@@ -255,78 +271,78 @@ class SupervisedLearner():
 
     def set_training_data(self):
         ''' Use the slave dataframe to set other dataframe properties '''
-        self.features_df = self.slave_dataset.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1)
-        self.labels_df = self.slave_dataset['Measured Conversion'].copy()
+        self.features_df = self.dynamic_dataset.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1)
+        self.labels_df = self.dynamic_dataset['Measured Conversion'].copy()
 
     def reset_slave_dataset(self):
-        self.slave_dataset = self.master_dataset.copy()
+        self.dynamic_dataset = self.static_dataset.copy()
 
     def filter_n_elements(self):
         filter_dict_neles = {
-            1: self.slave_dataset[self.slave_dataset['n_elements'] == 1],
-            2: self.slave_dataset[self.slave_dataset['n_elements'] == 2],
-            3: self.slave_dataset[self.slave_dataset['n_elements'] == 3],
-            23: self.slave_dataset[(self.slave_dataset['n_elements'] == 2) |
-                                    (self.slave_dataset['n_elements'] == 3)],
+            1: self.dynamic_dataset[self.dynamic_dataset['n_elements'] == 1],
+            2: self.dynamic_dataset[self.dynamic_dataset['n_elements'] == 2],
+            3: self.dynamic_dataset[self.dynamic_dataset['n_elements'] == 3],
+            23: self.dynamic_dataset[(self.dynamic_dataset['n_elements'] == 2) |
+                                     (self.dynamic_dataset['n_elements'] == 3)],
         }
 
-        self.slave_dataset = filter_dict_neles.get(self.element_filter, self.slave_dataset)
+        self.dynamic_dataset = filter_dict_neles.get(self.element_filter, self.dynamic_dataset)
 
     def filter_temperatures(self):
         if self.temperature_filter is None:
-            self.slave_dataset = self.slave_dataset[self.slave_dataset.loc[:, 'temperature'] != 150]
+            self.dynamic_dataset = self.dynamic_dataset[self.dynamic_dataset.loc[:, 'temperature'] != 150]
         elif isinstance(self.temperature_filter, str):
             temp_dict = {
-                'not450': self.slave_dataset[(self.slave_dataset.loc[:, 'temperature'] != 450) &
-                                              (self.slave_dataset.loc[:, 'temperature'] != 150)],
-                'not400': self.slave_dataset[(self.slave_dataset.loc[:, 'temperature'] != 400) &
-                                              (self.slave_dataset.loc[:, 'temperature'] != 150)],
-                'not350': self.slave_dataset[(self.slave_dataset.loc[:, 'temperature'] != 350) &
-                                              (self.slave_dataset.loc[:, 'temperature'] != 150)],
-                '350orless': self.slave_dataset[(self.slave_dataset.loc[:, 'temperature'] != 450) &
-                                                 (self.slave_dataset.loc[:, 'temperature'] != 400) &
-                                                 (self.slave_dataset.loc[:, 'temperature'] != 150)],
-                '300orless': self.slave_dataset[(self.slave_dataset.loc[:, 'temperature'] != 450) &
-                                                 (self.slave_dataset.loc[:, 'temperature'] != 400) &
-                                                 (self.slave_dataset.loc[:, 'temperature'] != 350) &
-                                                 (self.slave_dataset.loc[:, 'temperature'] != 150)],
-                None: self.slave_dataset[self.slave_dataset.loc[:, 'temperature'] != 150]
+                'not450': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'temperature'] != 450) &
+                                               (self.dynamic_dataset.loc[:, 'temperature'] != 150)],
+                'not400': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'temperature'] != 400) &
+                                               (self.dynamic_dataset.loc[:, 'temperature'] != 150)],
+                'not350': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'temperature'] != 350) &
+                                               (self.dynamic_dataset.loc[:, 'temperature'] != 150)],
+                '350orless': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'temperature'] != 450) &
+                                                  (self.dynamic_dataset.loc[:, 'temperature'] != 400) &
+                                                  (self.dynamic_dataset.loc[:, 'temperature'] != 150)],
+                '300orless': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'temperature'] != 450) &
+                                                  (self.dynamic_dataset.loc[:, 'temperature'] != 400) &
+                                                  (self.dynamic_dataset.loc[:, 'temperature'] != 350) &
+                                                  (self.dynamic_dataset.loc[:, 'temperature'] != 150)],
+                None: self.dynamic_dataset[self.dynamic_dataset.loc[:, 'temperature'] != 150]
             }
 
-            self.slave_dataset = temp_dict.get(self.temperature_filter)
+            self.dynamic_dataset = temp_dict.get(self.temperature_filter)
         else:
-            self.slave_dataset = self.slave_dataset[self.slave_dataset.loc[:, 'temperature'] == self.temperature_filter]
+            self.dynamic_dataset = self.dynamic_dataset[self.dynamic_dataset.loc[:, 'temperature'] == self.temperature_filter]
 
     def filter_concentrations(self):
         filter_dict_ammonia = {
-            1: self.slave_dataset[(self.slave_dataset.loc[:, 'ammonia_concentration'] > 0.5) &
-                                   (self.slave_dataset.loc[:, 'ammonia_concentration'] < 1.5)],
-            5: self.slave_dataset[(self.slave_dataset.loc[:, 'ammonia_concentration'] > 4.8) &
-                                   (self.slave_dataset.loc[:, 'ammonia_concentration'] < 5.2)]
+            1: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'ammonia_concentration'] > 0.5) &
+                                    (self.dynamic_dataset.loc[:, 'ammonia_concentration'] < 1.5)],
+            5: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'ammonia_concentration'] > 4.8) &
+                                    (self.dynamic_dataset.loc[:, 'ammonia_concentration'] < 5.2)]
         }
 
-        self.slave_dataset = filter_dict_ammonia.get(self.ammonia_filter, self.slave_dataset)
+        self.dynamic_dataset = filter_dict_ammonia.get(self.ammonia_filter, self.dynamic_dataset)
 
     def filter_space_velocities(self):
         filter_dict_sv = {
-            2000: self.slave_dataset[(self.slave_dataset.loc[:, 'space_velocity'] > 1400) &
-                                      (self.slave_dataset.loc[:, 'space_velocity'] < 2600)]
+            2000: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'space_velocity'] > 1400) &
+                                       (self.dynamic_dataset.loc[:, 'space_velocity'] < 2600)]
         }
 
-        self.slave_dataset = filter_dict_sv.get(self.sv_filter, self.slave_dataset)
+        self.dynamic_dataset = filter_dict_sv.get(self.sv_filter, self.dynamic_dataset)
 
     def filter_ruthenium_loading(self):
         filter_dict_ruthenium = {
-            1: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.01)],
-            2: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.02)],
-            3: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.03)],
-            32: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.03) |
-                                   (self.slave_dataset.loc[:, 'Ru Loading'] == 0.02)],
-            31: self.slave_dataset[(self.slave_dataset.loc[:, 'Ru Loading'] == 0.03) |
-                                   (self.slave_dataset.loc[:, 'Ru Loading'] == 0.01)],
+            1: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
+            2: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02)],
+            3: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03)],
+            32: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03) |
+                                     (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02)],
+            31: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03) |
+                                     (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
         }
 
-        self.slave_dataset = filter_dict_ruthenium.get(self.ru_filter, self.slave_dataset)
+        self.dynamic_dataset = filter_dict_ruthenium.get(self.ru_filter, self.dynamic_dataset)
 
     def filter_pressure(self):
         pass
@@ -334,27 +350,27 @@ class SupervisedLearner():
     def filter_out_elements(self, eles):
         if isinstance(eles, list):
             for ele in eles:
-                self.slave_dataset.drop(self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] > 0].index,
-                                        inplace=True)
+                self.dynamic_dataset.drop(self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] > 0].index,
+                                          inplace=True)
         else:
-            self.slave_dataset.drop(columns=['{} Loading'.format(eles)], inplace=True)
+            self.dynamic_dataset.drop(columns=['{} Loading'.format(eles)], inplace=True)
 
         self.shuffle_slave()
 
     def filter_out_ids(self, ids):
         if isinstance(ids, list):
             for catid in ids:
-                self.slave_dataset = self.slave_dataset.drop(index=catid)
+                self.dynamic_dataset = self.dynamic_dataset.drop(index=catid)
         else:
-            self.slave_dataset = self.slave_dataset.drop(index=ids)
+            self.dynamic_dataset = self.dynamic_dataset.drop(index=ids)
 
         self.shuffle_slave()
 
     def shuffle_slave(self, sv=False):
-        self.slave_dataset = shuffle(self.slave_dataset)
+        self.dynamic_dataset = shuffle(self.dynamic_dataset)
 
         if sv:
-            pd.DataFrame(self.slave_dataset).to_csv('..\\SlaveTest.csv')
+            pd.DataFrame(self.dynamic_dataset).to_csv('..\\SlaveTest.csv')
 
         # Set up training data and apply grouping
         self.set_training_data()
@@ -363,7 +379,7 @@ class SupervisedLearner():
 
     def group_for_training(self):
         """ Set groups parameter AFTER shuffling the slave dataset """
-        self.groups = self.slave_dataset['group'].values
+        self.groups = self.dynamic_dataset['group'].values
 
     def reduce_feature_set(self):
         reduced_features = [
@@ -372,20 +388,20 @@ class SupervisedLearner():
 
         keepers = reduced_features + ['Measured Conversion', 'Element Dictionary', 'group']
 
-        self.features_to_drop = [x for x in list(self.slave_dataset.columns) if x not in keepers]
+        self.features_to_drop = [x for x in list(self.dynamic_dataset.columns) if x not in keepers]
 
     def set_features_to_drop(self, features):
         self.features_to_drop = features
 
     def drop_features(self):
         if self.features_to_drop is not None:
-            cols = self.slave_dataset.columns
+            cols = self.dynamic_dataset.columns
             feature_list = list()
             for col in cols:
                 if (col.split('_')[0] in self.features_to_drop) | (col in self.features_to_drop):
                     feature_list += [col]
 
-            self.slave_dataset.drop(columns=feature_list, inplace=True)
+            self.dynamic_dataset.drop(columns=feature_list, inplace=True)
 
     def set_training_set(self, training_elements=None):
         pass # I want to come up with a clever way to segment into training and test sets...
@@ -403,24 +419,24 @@ class SupervisedLearner():
                                              groups=self.groups, cv=GroupKFold(kfold))
 
         if add_to_slave:
-            self.slave_dataset['predictions'] = self.predictions
-            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+            self.dynamic_dataset['predictions'] = self.predictions
+            self.dynamic_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
     def predict_leave_one_out(self, add_to_slave=False):
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              groups=self.groups, cv=LeaveOneGroupOut())
 
         if add_to_slave:
-            self.slave_dataset['predictions'] = self.predictions
-            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+            self.dynamic_dataset['predictions'] = self.predictions
+            self.dynamic_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
     def predict_leave_self_out(self, add_to_slave=False):
         self.predictions = cross_val_predict(self.machina, self.features_df.values, self.labels_df.values,
                                              cv=LeaveOneOut())
 
         if add_to_slave:
-            self.slave_dataset['predictions'] = self.predictions
-            self.slave_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
+            self.dynamic_dataset['predictions'] = self.predictions
+            self.dynamic_dataset.to_csv('{}//{}-slave.csv'.format(self.svfl, self.svnm))
 
     def evaluate_regression_learner(self):
         """ Comment """
@@ -443,7 +459,7 @@ class SupervisedLearner():
         element_dataframe = pd.DataFrame()
 
         for ele in elements:
-            dat = self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] > 0]
+            dat = self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] > 0]
             element_dataframe = pd.concat([element_dataframe, dat])
 
         self.labels_df = element_dataframe.loc[:, 'Measured Conversion'].copy()
@@ -486,9 +502,9 @@ class SupervisedLearner():
 
         for jj, ele in enumerate(elements):
             if loads is None:
-                dat = self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] > 0]
+                dat = self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] > 0]
             else:
-                dat = self.slave_dataset.loc[self.slave_dataset['{} Loading'.format(ele)] == loads[jj]]
+                dat = self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] == loads[jj]]
 
             element_dataframe = pd.concat([element_dataframe, dat])
 
@@ -503,7 +519,7 @@ class SupervisedLearner():
 
         self.train_data()
 
-        test_data = self.slave_dataset.drop(index=drop_ids).copy()
+        test_data = self.dynamic_dataset.drop(index=drop_ids).copy()
 
         predvals = self.machina.predict(test_data.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'],
             axis=1))
@@ -543,7 +559,7 @@ class SupervisedLearner():
         """ Description """
         # Note: This may break due to significant changes in the learner methods
 
-        data = self.master_dataset[self.master_dataset.index.str.contains('Predict') == True]
+        data = self.static_dataset[self.static_dataset.index.str.contains('Predict') == True]
         data = data.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'], axis=1)
         predvals = self.machina.predict(data.values)
         data['Predictions'] = predvals
@@ -558,7 +574,7 @@ class SupervisedLearner():
             self.predict_crossvalidate()
 
         # Set up the plot dataframe for easy plotting
-        self.plot_df = self.slave_dataset.copy()
+        self.plot_df = self.dynamic_dataset.copy()
         self.plot_df['Predicted Conversion'] = self.predictions
 
         self.plot_df['Name'] = [
@@ -603,7 +619,7 @@ class SupervisedLearner():
 
     def save_slave(self):
         """ Comment """
-        self.slave_dataset.to_csv('{}\slavedata-{}.csv'.format(self.svfl, self.svnm))
+        self.dynamic_dataset.to_csv('{}\slavedata-{}.csv'.format(self.svfl, self.svnm))
 
     def extract_important_features(self, sv=False, prnt=False):
         """ Save all feature importance, print top 10 """
@@ -706,7 +722,7 @@ class SupervisedLearner():
                                                                                                   ind=index))
 
     def parse_element_dictionary(self):
-        df = self.master_dataset[['Element Dictionary']].copy()
+        df = self.static_dataset[['Element Dictionary']].copy()
         df['index'] = [idx.split('_')[0] for idx in df.index]
         things = [list(x) for x in df['Element Dictionary'].values]
         for idx, elements in df[['Element Dictionary']]:
@@ -765,8 +781,8 @@ class SupervisedLearner():
         Create a test dataset from slave, drop catalysts from slave
         This allows for the ML algorithm to be trained on slave and predict the test dataset blindly
         """
-        self.tester_dataset = self.slave_dataset[self.slave_dataset.index.isin(catids)].copy()
-        self.slave_dataset.drop(labels=self.tester_dataset.index, inplace=True)
+        self.tester_dataset = self.dynamic_dataset[self.dynamic_dataset.index.isin(catids)].copy()
+        self.dynamic_dataset.drop(labels=self.tester_dataset.index, inplace=True)
         self.set_training_data()  # This rewrites features and labels dataframes with slave
 
     # TODO Depricated - Remove when predict_from_catalyst_ids is working
@@ -788,7 +804,7 @@ class SupervisedLearner():
 
         predvals = self.machina.predict(data)
 
-        original_test_df = self.slave_dataset.loc[self.tester_dataset.index].copy()
+        original_test_df = self.dynamic_dataset.loc[self.tester_dataset.index].copy()
         measvals = original_test_df.loc[:, 'Measured Conversion'].values
 
         comparison_df = pd.DataFrame([predvals, measvals],

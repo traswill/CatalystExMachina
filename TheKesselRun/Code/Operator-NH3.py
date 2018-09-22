@@ -23,15 +23,15 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
     df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
 
     # Import Cl atoms during synthesis
-    cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
+    # cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
 
     # Import XRD Peak locations
-    xrd_intensity_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_Peak_Extraction.csv', index_col=0)
-    xrd_intensity_lst = np.array(xrd_intensity_df.columns.values, dtype=int).tolist()
-
+    # xrd_intensity_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_Peak_Extraction.csv', index_col=0)
+    # xrd_intensity_lst = np.array(xrd_intensity_df.columns.values, dtype=int).tolist()
+    #
     # Import XRD Peak FWHMs
-    xrd_fwhm_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_FWHM_Extraction.csv', index_col=0)
-    xrd_fwhm_lst = np.array(xrd_fwhm_df.index.values, dtype=int).tolist()
+    # xrd_fwhm_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_FWHM_Extraction.csv', index_col=0)
+    # xrd_fwhm_lst = np.array(xrd_fwhm_df.index.values, dtype=int).tolist()
 
     # Loop through all data
     for index, dat in df.iterrows():
@@ -54,13 +54,13 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
             cat.input_group(dat['Groups'])
-            try:
-                cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
-            except KeyError:
-                print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
+            # try:
+            #     cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+            # except KeyError:
+            #     print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_Norskov_dband()
+            # cat.feature_add_Norskov_dband()
             cat.feature_add_elemental_properties()
 
             # cat.feature_add_unsupervised_properties()
