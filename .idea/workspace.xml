@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Remove catalyst_dictionary">
-      <change beforePath="$PROJECT_DIR$/.idea/CatalystExMachina.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CatalystExMachina.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Housekeeping after flagging rework">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/TheKesselRun/Results/Storage/" />
     <ignored path="$PROJECT_DIR$/TheKesselRun/Results/Unsupervised/" />
@@ -39,37 +35,46 @@
       </usages-collector>
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
-          <entry key="py" value="1166" />
-          <entry key="txt" value="26" />
+          <entry key="py" value="2833" />
+          <entry key="txt" value="143" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="PLAIN_TEXT" value="26" />
-          <entry key="Python" value="1166" />
+          <entry key="PLAIN_TEXT" value="143" />
+          <entry key="Python" value="2833" />
         </counts>
       </usages-collector>
     </session>
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="296">
-              <caret line="67" selection-start-line="67" selection-end-line="67" />
+            <state relative-caret-position="600">
+              <caret line="1144" column="46" selection-start-line="1144" selection-start-column="46" selection-end-line="1144" selection-end-column="46" />
               <folding>
                 <element signature="e#0#79#0" expanded="true" />
+                <element signature="e#38301#38475#0" />
+                <element signature="e#38545#38614#0" />
+                <element signature="e#38714#38972#0" />
+                <element signature="e#38996#39168#0" />
+                <element signature="e#39279#39512#0" />
+                <element signature="e#39573#41008#0" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="208">
-              <caret line="98" column="66" selection-start-line="98" selection-start-column="66" selection-end-line="98" selection-end-column="66" />
+            <state relative-caret-position="409">
+              <caret line="447" lean-forward="true" selection-start-line="447" selection-end-line="447" />
+              <folding>
+                <marker date="1537643037175" expanded="true" signature="13079:13214" ph="..." />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -121,6 +126,19 @@
               <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
               <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
               <item name="Code" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
+              <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
+              <item name="Data" type="462c0819:PsiDirectoryNode" />
+            </path>
+            <path>
+              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
+              <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
+              <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
+              <item name="Data" type="462c0819:PsiDirectoryNode" />
+              <item name="RAW" type="462c0819:PsiDirectoryNode" />
             </path>
             <path>
               <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
@@ -201,18 +219,38 @@
       <option name="project" value="LOCAL" />
       <updated>1537629670533</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Added unique ID for each catalyst">
+      <created>1537640106838</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1537640106838</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Rework methods to use column flags">
+      <created>1537642776360</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1537642776360</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Housekeeping after flagging rework">
+      <created>1537643057256</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1537643057256</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
-    <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info content_ui="combo" id="Project" order="1" visible="true" weight="0.18603411" />
+      <window_info active="true" content_ui="combo" id="Project" order="1" visible="true" weight="0.18603411" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.29577464" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.32936078" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.29577464" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -232,23 +270,35 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Remove catalyst_dictionary" />
-    <option name="LAST_COMMIT_MESSAGE" value="Remove catalyst_dictionary" />
+    <MESSAGE value="Added unique ID for each catalyst" />
+    <MESSAGE value="Rework methods to use column flags" />
+    <MESSAGE value="Housekeeping after flagging rework" />
+    <option name="LAST_COMMIT_MESSAGE" value="Housekeeping after flagging rework" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py">
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="296">
-          <caret line="67" selection-start-line="67" selection-end-line="67" />
+        <state relative-caret-position="409">
+          <caret line="447" lean-forward="true" selection-start-line="447" selection-end-line="447" />
           <folding>
-            <element signature="e#0#79#0" expanded="true" />
+            <marker date="1537643037175" expanded="true" signature="13079:13214" ph="..." />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="208">
-          <caret line="98" column="66" selection-start-line="98" selection-start-column="66" selection-end-line="98" selection-end-column="66" />
+        <state relative-caret-position="600">
+          <caret line="1144" column="46" selection-start-line="1144" selection-start-column="46" selection-end-line="1144" selection-end-column="46" />
+          <folding>
+            <element signature="e#0#79#0" expanded="true" />
+            <element signature="e#38301#38475#0" />
+            <element signature="e#38545#38614#0" />
+            <element signature="e#38714#38972#0" />
+            <element signature="e#38996#39168#0" />
+            <element signature="e#39279#39512#0" />
+            <element signature="e#39573#41008#0" />
+          </folding>
         </state>
       </provider>
     </entry>
