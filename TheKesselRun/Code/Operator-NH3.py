@@ -21,9 +21,16 @@ import random
 def load_nh3_catalysts(catcont, drop_empty_columns=True):
     """ Import NH3 data from Katie's HiTp dataset(cleaned). """
     df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
+    df.dropna(axis=0, inplace=True, how='all')
+
+    # Drop RuK data that is inconsistent from file 5
+    df.drop(index=df[df['ID'] == 20].index, inplace=True)
+    df.drop(index=df[df['ID'] == 21].index, inplace=True)
+    df.drop(index=df[df['ID'] == 22].index, inplace=True)
+    # Using catalyst #24 for RuK (20ml)
 
     # Import Cl atoms during synthesis
-    # cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
+    cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
 
     # Import XRD Peak locations
     # xrd_intensity_df = pd.read_csv(r'../Data/Processed/WAXS/WAXS_Peak_Extraction.csv', index_col=0)
@@ -54,13 +61,13 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
             cat.input_group(dat['Groups'])
-            # try:
-            #     cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
-            # except KeyError:
-            #     print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
+            try:
+                cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+            except KeyError:
+                print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            # cat.feature_add_Norskov_dband()
+            cat.feature_add_Norskov_dband()
             cat.feature_add_elemental_properties()
 
             # cat.feature_add_unsupervised_properties()
@@ -126,20 +133,19 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         learner.filter_static_dataset()
 
         learner.train_data()
-        learner.extract_important_features(sv=True, prnt=True)
+        featdf = learner.extract_important_features(sv=True, prnt=True)
         if fold > 1:
-            learner.predict_crossvalidate(kfold=fold, add_to_slave=True)
+            learner.predict_crossvalidate(kfold=fold)
         elif fold == -1:
-            learner.predict_leave_self_out(add_to_slave=True)
+            learner.predict_crossvalidate(kfold='LSO')
         else:
-            learner.predict_leave_one_out(add_to_slave=True)
+            learner.predict_crossvalidate(kfold='LOO')
+
         learner.evaluate_regression_learner()
         learner.compile_results()
-        learner.save_predictions()
-        learner.save_dynamic()
 
-        g = Graphic(learner=learner)
-        g.plot_important_features()
+        g = Graphic(learner=learner, df=learner.result_dataset)
+        g.plot_important_features(df=featdf)
         g.plot_basic()
         g.plot_err()
         g.plot_err(metadata=False, svnm='{}_nometa'.format(learner.svnm))
@@ -148,13 +154,11 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
             stat_feats = [
                 'Second Ionization Energy',
                 'Number d-shell Valence Electrons',
-                'Dipole Polarizability',
                 'Electronegativity',
                 'Number Valence Electrons',
                 'Conductivity',
                 'Covalent Radius',
                 'Phi',
-                'Heat Fusion',
                 'Polarizability',
                 'Melting Temperature',
                 'Number d-shell Unfilled Electrons',
@@ -651,9 +655,8 @@ def swarmplot_paper1():
         # We had an idea to see how predictions would work using only Ru, RuK, and Al2O3.  This makes that happen.
         pass
 
-
     else:
-        train_elements = ['Ca', 'Mn', 'Rh', 'W', 'Bi']
+        train_elements = ['Ca', 'Mn', 'In']
         df = catcontainer.master_container
         element_dataframe = pd.DataFrame()
 
@@ -661,25 +664,30 @@ def swarmplot_paper1():
             dat = df.loc[(df['{} Loading'.format(ele)] > 0) & (df['n_elements'] == 3)]
             element_dataframe = pd.concat([element_dataframe, dat])
 
+        dat = df.loc[(df['Ru Loading'] == 0.04) & (df['n_elements'] == 2)]
+        element_dataframe = pd.concat([element_dataframe, dat])
+
         catcontainer.master_container = element_dataframe
 
     # ***** Setup Machine Learning *****
-    skynet = SupervisedLearner(version='v42-swarm')
+    skynet = SupervisedLearner(version='v50-swarm_with_RuK')
     skynet.set_filters(
         element_filter=3,
         temperature_filter='350orless',
         ammonia_filter=1,
         space_vel_filter=2000,
-        ru_filter=3,
+        ru_filter='3+',
         pressure_filter=None
     )
 
     # ***** Train the learner *****
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_static_dataset(catalyst_container=catcontainer)
-    skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
+    skynet.set_target_columns(cols=['Measured Conversion'])
+    skynet.set_group_columns(cols=['group'])
+    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
+    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band'])
     skynet.filter_static_dataset()
-    skynet.set_training_data()
     skynet.train_data()
 
     # ***** Generate all metals for predictions *****
@@ -701,16 +709,16 @@ def swarmplot_paper1():
 
     testcatcontainer.build_master_container(drop_empty_columns=False)
     skynet.load_static_dataset(testcatcontainer)
-    skynet.set_features_to_drop(features=['reactor', 'n_Cl_atoms'])
-    skynet.drop_features()
+    skynet.set_target_columns(cols=['Measured Conversion'])
+    skynet.set_group_columns(cols=['group'])
+    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
+    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms'])
     skynet.set_training_data()
     skynet.predict_data()
 
     # ***** Plot base swarmplot *****
     catdf = testcatcontainer.master_container
-    print(skynet.predictions)
     catdf['Predicted'] = skynet.predictions
-    # catdf['Predicted'] = [x[1] for x in skynet.predictions]
     df = catdf.loc[:, ['Element Dictionary', 'Predicted', 'temperature']].copy()
     df.reset_index(inplace=True)
 
@@ -719,11 +727,11 @@ def swarmplot_paper1():
     plt.xlabel('Temperature ($^\circ$C)')
     plt.ylabel('Predicted Conversion')
 
-    plt.savefig(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Figures\3Ru_swarmplot_{}.png'.format(''.join(train_elements)))
+    plt.savefig(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Figures\3Ru_swarmplot_{}_RuK.png'.format(''.join(train_elements)))
     plt.close()
 
     # Save
-    catdf.to_csv(r'../Results/3Ru_prediction_data_{}.csv'.format(''.join(train_elements)))
+    catdf.to_csv(r'../Results/3Ru_prediction_data_{}_RuK.csv'.format(''.join(train_elements)))
     print(df[df['temperature'] == 300.0].sort_values('Predicted', ascending=False).head())
 
 
@@ -1111,9 +1119,9 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v49-addLanthanides')
+    skynet = SupervisedLearner(version='v50-bimetallics')
     skynet.set_filters(
-        element_filter=3,
+        element_filter=2,
         temperature_filter=300,
         ammonia_filter=1,
         space_vel_filter=2000,
@@ -1127,21 +1135,21 @@ if __name__ == '__main__':
 
     skynet.set_target_columns(cols=['Measured Conversion'])
     skynet.set_group_columns(cols=['group'])
-    skynet.set_hold_columns(cols=['Element Dictionary'])
+    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
 
     # v45-Without Zpp added
-    # zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-    #                                       'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-    #                                       'Zunger Pseudopotential (sigma)']
+    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                                          'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                                          'Zunger Pseudopotential (sigma)']
     #
-    # load_list = ['{} Loading'.format(x) for x in
-    #              ['Ru','Cu', 'Y', 'Mg', 'Mn',
-    #               'Ni', 'Cr', 'W', 'Ca', 'Hf',
-    #               'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
-    #               'Mo', 'In', 'Rh', 'K']]
+    load_list = ['{} Loading'.format(x) for x in
+                 ['Ru','Cu', 'Y', 'Mg', 'Mn',
+                  'Ni', 'Cr', 'W', 'Ca', 'Hf',
+                  'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
+                  'Mo', 'In', 'Rh', 'K']]
 
-    zpp_list = []
-    load_list = []
+    # zpp_list = []
+    # load_list = []
     skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
     # skynet.reduce_feature_set()
     skynet.filter_static_dataset()
@@ -1161,7 +1169,7 @@ if __name__ == '__main__':
     #
 
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=-1) # ['350orless', 250, 300, 350, 400, 450, None]
-    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350, 400], fold=0, kde=False)
+    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=False)
 
     # relearn_with_temps(learner=skynet, train_temps='350orless', test_temps='350orless')
     # skynet.predict_all_from_elements(elements=['Ca', 'In', 'Mn'], svnm='CaInMn_350orless')

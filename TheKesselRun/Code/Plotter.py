@@ -28,41 +28,8 @@ class Graphic():
     def __init__(self, learner, df=None):
         sns.set(palette='plasma', context='paper', style='white')
         self.learner = learner
-
-        if df is None:
-            self.graphdf = self.learner.slave_dataset.copy()
-            self.graphdf['Predicted Conversion'] = self.learner.predictions
-
-            if self.graphdf.empty:
-                print('Graphic Failed to initialize.  SupervisedLearner does not contain valid plot dataframe.')
-            else:
-                # Full descriptive name X(#)Y(#)Z(#)
-                self.graphdf['Name'] = [
-                    ''.join('{}({})'.format(key, str(int(val)))
-                            for key, val in x) for x in self.graphdf['Element Dictionary']
-                ]
-
-                for index, edict in self.graphdf['Element Dictionary'].iteritems():
-                    self.graphdf.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
-
-                    i = 1
-                    for key, val in edict:
-                        self.graphdf.loc[index, 'Ele{}'.format(i)] = key
-                        self.graphdf.loc[index, 'Load{}'.format(i)] = val
-                        i += 1
-
-                # CatalystObject ID
-                try:
-                    self.graphdf['ID'] = [int(nm.split('_')[0]) for nm in self.graphdf.index.values]
-                except AttributeError:
-                    self.graphdf['ID'] = self.graphdf.index.values
-
-                # Remove Dictionary to avoid problems down the line
-                self.graphdf.drop(columns='Element Dictionary', inplace=True)
-
-                self.graphdf['clr'] = 'b'
-        else:
-            self.graphdf = df
+        self.graphdf = df
+        self.set_color(feature='temperature')
 
     def set_color(self, feature, cbnds=None, cmap='plasma'):
         if cbnds is not None:
@@ -178,32 +145,31 @@ class Graphic():
         """
 
         if feat_list is None:
-            self.learner.feature_importance_df.sort_values(by='Feature Importance', inplace=True, ascending=False)
-            top_features = self.learner.feature_importance_df.head().index
+            self.graphdf.sort_values(by='Feature Importance', inplace=True, ascending=False)
+            feat_list = list(self.graphdf.head().index)
 
         for feat in feat_list:
             if margins:
-                g = sns.jointplot(x=feat, y='Measured Conversion',  data=self.learner.slave_dataset, kind='kde', color='k',
+                g = sns.jointplot(x=feat, y='Measured Conversion',  data=self.graphdf, kind='kde', color='k',
                                   stat_func=None)
                 g.plot_joint(plt.scatter, c='w', s=15, linewidth=1, marker=".")
                 g.ax_joint.collections[0].set_alpha(0)
             else:
                 fig, ax = plt.subplots(figsize=(5,5))
-                sns.kdeplot(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
+                sns.kdeplot(self.graphdf[feat], self.graphdf['Measured Conversion'],
                                 cmap='Greys', shade=True, shade_lowest=False, ax=ax)
 
-                ax.scatter(self.learner.slave_dataset[feat], self.learner.slave_dataset['Measured Conversion'],
+                ax.scatter(self.graphdf[feat], self.graphdf['Measured Conversion'],
                             c='w', s=15, marker='.')
 
                 if element is not None:
-                    df = self.learner.slave_dataset[self.learner.slave_dataset['{} Loading'.format(element)] != 0].copy()
+                    df = self.graphdf[self.graphdf['{} Loading'.format(element)] != 0].copy()
                     ax.scatter(df[feat], df['Measured Conversion'], c='r', s=15, marker='x')
 
             # Modifying things for publication
             lim_dict = {
                 '': '',
                 # 'Number d-shell Valance Electrons_wt-mad': plt.xlim(-2.5, 17.5),
-                # 'Periodic Table Column_wt-mad': plt.xlim(0, 35),
                 # 'Second Ionization Energy_wt-mad': plt.xlim(500, 700)
             }
 
@@ -219,11 +185,10 @@ class Graphic():
                 plt.savefig('{}//Figures//{}-{}'.format(self.learner.svfl, feat, self.learner.svnm), dpi=400)
             plt.close()
 
-    def plot_important_features(self, svnm=''):
+    def plot_important_features(self, df, svnm=''):
         """ Generate Feature Importance Plots for Random Forests (or other ML algorithms with .feature_importance """
 
         # Copy, sort, and clean up dataframe
-        df = self.learner.feature_importance_df.copy()
         df.sort_values(by='Feature Importance', inplace=True, ascending=False)
         df.rename(index={'reactor':'Reactor', 'temperature':'Temperature','space_velocity':'Space Velocity',
                          'n_elements':'Number of Elements', 'ammonia_concentration':'Ammonia Concentration',

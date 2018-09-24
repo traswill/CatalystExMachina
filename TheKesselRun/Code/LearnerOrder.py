@@ -119,9 +119,9 @@ class SupervisedLearner():
         self.features_df = pd.DataFrame()
         self.labels_df = pd.DataFrame()
 
-        self.features = list()
-        self.labels = list()
-        self.groups = list()
+        self.features = np.empty(1)
+        self.labels = np.empty(1)
+        self.groups = np.empty(1)
         self.predictions = list()
 
         self.features_to_drop = None
@@ -280,7 +280,6 @@ class SupervisedLearner():
 
         if reset_training_data:
             self.set_training_data()
-            self.drop_features()
 
     def set_target_columns(self, cols):
         if isinstance(cols, list):
@@ -311,12 +310,16 @@ class SupervisedLearner():
 
         self.features_df = self.dynamic_dataset.drop(
             labels=self.target_columns + self.group_columns + self.hold_columns, axis=1)
-        self.features = self.features_df.values
+        self.drop_features()
 
         self.labels_df = self.dynamic_dataset[self.target_columns].copy()
         self.labels = self.labels_df.values
+        if self.labels.shape[1] == 1:
+            self.labels = np.ravel(self.labels)
 
         self.groups = self.dynamic_dataset[self.group_columns].values
+        if self.groups.shape[1] == 1:
+            self.groups = np.ravel(self.groups)
 
         self.hold_df = self.dynamic_dataset[self.hold_columns].copy()
 
@@ -386,6 +389,7 @@ class SupervisedLearner():
                                      (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02)],
             31: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03) |
                                      (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
+            '3+': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] >= 0.03)],
         }
 
         self.dynamic_dataset = filter_dict_ruthenium.get(self.ru_filter, self.dynamic_dataset)
@@ -445,6 +449,8 @@ class SupervisedLearner():
 
             self.features_df.drop(columns=feature_list, inplace=True)
             self.features = self.features_df.values
+        else:
+            self.features = self.features_df.values
 
     def set_training_set(self, training_elements=None):
         pass # TODO I want to come up with a clever way to segment into training and test sets...
@@ -458,14 +464,32 @@ class SupervisedLearner():
 
     def predict_crossvalidate(self, kfold=10):
         """ Use k-fold validation with grouping by catalyst ID to determine  """
-        self.predictions = cross_val_predict(self.machina, self.features, self.labels,
-                                             groups=self.groups, cv=GroupKFold(kfold))
+        if isinstance(kfold, int):
+            if kfold > 1:
+                self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+                                                     groups=self.groups, cv=GroupKFold(kfold))
+            else:
+                print('Invalid kfold. Resorting to 10-fold validation.')
+                self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+                                                     groups=self.groups, cv=GroupKFold(10))
+        elif kfold == 'LOO':
+            self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+                                                 groups=self.groups, cv=LeaveOneGroupOut())
+        elif kfold == 'LSO':
+            self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+                                                 cv=LeaveOneOut())
+        else:
+            print('Invalid kfold. Resorting to 10-fold validation.')
+            self.predictions = cross_val_predict(self.machina, self.features, self.labels,
+                                                 groups=self.groups, cv=GroupKFold(10))
 
     def predict_leave_one_out(self):
+        print('Method predict_leave_one_out depricated: Change to predict_crossvalidate.')
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              groups=self.groups, cv=LeaveOneGroupOut())
 
     def predict_leave_self_out(self):
+        print('Method predict_leave_self_out depricated: Change to predict_crossvalidate.')
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              cv=LeaveOneOut())
 
@@ -600,12 +624,25 @@ class SupervisedLearner():
         if self.predictions is None:
             print('WARNING: No predictions have been made.')
 
-        self.result_dataset = self.dynamic_dataset.copy()
-        self.result_dataset['Predictions'] = self.predictions
+        # Create Result DF and add Predictions
+        self.result_dataset = self.dynamic_dataset[self.features_df.columns].copy()
+        self.result_dataset['Predicted Conversion'] = self.predictions
+        self.result_dataset['Measured Conversion'] = self.labels
 
-        # TODO parse element dictionary to reasonable name
+        # Parse the Element Dictionary
+        for index, edict in self.dynamic_dataset['Element Dictionary'].iteritems():
+            self.result_dataset.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
 
-        # TODO save
+            i = 1
+            for key, val in edict:
+                self.result_dataset.loc[index, 'Ele{}'.format(i)] = key
+                self.result_dataset.loc[index, 'Load{}'.format(i)] = val
+                i += 1
+
+        # Save Results and Features
+        self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
+
+
         #
         # # Set up the plot dataframe for easy plotting
         # self.plot_df = self.dynamic_dataset.copy()
@@ -675,8 +712,8 @@ class SupervisedLearner():
 
             new_df.sort_values('Feature Importance', ascending=False, inplace=True)
             new_df.to_csv('{}//features//feature_importance-{}-summed.csv'.format(self.svfl, self.svnm))
-        else:
-            return feature_importance_df
+
+        return feature_importance_df
 
     def hyperparameter_tuning(self, grid=False):
         """ Method Used to tune hyperparameters and increase accuracy of the model """
