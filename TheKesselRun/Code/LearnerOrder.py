@@ -144,7 +144,7 @@ class SupervisedLearner():
         self.machina = None
 
         '''Initialize all options for the algorithm.  These are used in naming files.'''
-        self.element_filter = 0
+        self.num_element_filter = 0
         self.temperature_filter = None
         self.ammonia_filter = None
         self.ru_filter = None
@@ -156,7 +156,7 @@ class SupervisedLearner():
         self.svfl = '..//Results//{version}'.format(version=version)
         self.svnm = '{nm}-{nele}-{temp}'.format(
             nm=version,
-            nele=self.element_filter,
+            nele=self.num_element_filter,
             temp='{}C'.format(self.temperature_filter) if self.temperature_filter is not None else 'All'
         )
 
@@ -177,7 +177,7 @@ class SupervisedLearner():
         self.svfl = '..//Results//{version}'.format(version=self.version)
         self.svnm = '{nm}-{nele}-{temp}'.format(
             nm=self.version,
-            nele=self.element_filter,
+            nele=self.num_element_filter,
             temp='{}C'.format(self.temperature_filter) if self.temperature_filter is not None else 'All'
         )
 
@@ -232,7 +232,7 @@ class SupervisedLearner():
                  ru_filter=None, pressure_filter=None):
 
         if element_filter is not None:
-            self.element_filter = element_filter
+            self.num_element_filter = element_filter
         if temperature_filter is not None:
             self.temperature_filter = temperature_filter
         if ammonia_filter is not None:
@@ -247,7 +247,7 @@ class SupervisedLearner():
         self.set_name_paths()
 
     def reset_filters(self):
-        self.element_filter = None
+        self.num_element_filter = None
         self.temperature_filter = None
         self.ammonia_filter = None
         self.ru_filter = None
@@ -335,7 +335,7 @@ class SupervisedLearner():
                                      (self.dynamic_dataset['n_elements'] == 3)],
         }
 
-        self.dynamic_dataset = filter_dict_neles.get(self.element_filter, self.dynamic_dataset)
+        self.dynamic_dataset = filter_dict_neles.get(self.num_element_filter, self.dynamic_dataset)
 
     def filter_temperatures(self):
         if self.temperature_filter is None:
@@ -618,7 +618,7 @@ class SupervisedLearner():
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
         return data
 
-    def compile_results(self):
+    def compile_results(self, svnm=None):
         """ Prepare all data for plotting """
 
         if self.predictions is None:
@@ -640,48 +640,10 @@ class SupervisedLearner():
                 i += 1
 
         # Save Results and Features
-        self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
-
-
-        #
-        # # Set up the plot dataframe for easy plotting
-        # self.plot_df = self.dynamic_dataset.copy()
-        # self.plot_df['Predicted Conversion'] = self.predictions
-        #
-        # self.plot_df['Name'] = [
-        #     ''.join('{}({})'.format(key, str(int(val)))
-        #             for key, val in x) for x in self.plot_df['Element Dictionary']
-        # ]
-        #
-        # for index, edict in self.plot_df['Element Dictionary'].iteritems():
-        #     self.plot_df.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
-        #
-        #     i = 1
-        #     for key, val in edict:
-        #         self.plot_df.loc[index, 'Ele{}'.format(i)] = key
-        #         self.plot_df.loc[index, 'Load{}'.format(i)] = val
-        #         i += 1
-        #
-        # self.save_predictions()
-    #
-    # def save_predictions(self):
-    #     """ Comment """
-    #     if not self.plot_df.empty:
-    #         df = pd.DataFrame(
-    #             np.array([
-    #                 self.plot_df.index,
-    #                 self.predictions,
-    #                 self.labels_df.values,
-    #                 self.groups,
-    #                 self.plot_df['Name'],
-    #                 self.plot_df['temperature']]).T,
-    #             columns=['ID', 'Predicted Conversion', 'Measured Conversion', 'Groups', 'Name', 'Temperature'])
-    #         df.to_csv('{}\predictions-{}.csv'.format(self.svfl, self.svnm))
-    #     else:
-    #         print('No predictions to save...')
-    #
-    # def save_features(self):
-    #     pass
+        if svnm is None:
+            self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
+        else:
+            self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
 
     def save_dynamic(self):
         """ Comment """

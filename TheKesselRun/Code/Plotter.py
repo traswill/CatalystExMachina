@@ -26,7 +26,7 @@ from bokeh.layouts import row, widgetbox, column, layout
 
 class Graphic():
     def __init__(self, learner, df=None):
-        sns.set(palette='plasma', context='paper', style='white')
+        sns.set(palette='plasma', context='paper', style='white', font_scale=1.5)
         self.learner = learner
         self.graphdf = df
         self.set_color(feature='temperature')
@@ -136,7 +136,7 @@ class Graphic():
             plt.savefig('{}//figures//{}.png'.format(self.learner.svfl, svnm), dpi=400)
         plt.close()
 
-    def plot_kernel_density(self, feat_list=None, margins=True, element=None):
+    def plot_kernel_density(self, feat_list=None, margins=True, element=None, pointcolor='w'):
         """
 
         :param feat_list: A list of features to be plotted
@@ -152,7 +152,7 @@ class Graphic():
             if margins:
                 g = sns.jointplot(x=feat, y='Measured Conversion',  data=self.graphdf, kind='kde', color='k',
                                   stat_func=None)
-                g.plot_joint(plt.scatter, c='w', s=15, linewidth=1, marker=".")
+                g.plot_joint(plt.scatter, c=pointcolor, s=15, linewidth=1, marker=".")
                 g.ax_joint.collections[0].set_alpha(0)
             else:
                 fig, ax = plt.subplots(figsize=(5,5))
@@ -160,7 +160,7 @@ class Graphic():
                                 cmap='Greys', shade=True, shade_lowest=False, ax=ax)
 
                 ax.scatter(self.graphdf[feat], self.graphdf['Measured Conversion'],
-                            c='w', s=15, marker='.')
+                            c=pointcolor, s=15, marker='.')
 
                 if element is not None:
                     df = self.graphdf[self.graphdf['{} Loading'.format(element)] != 0].copy()

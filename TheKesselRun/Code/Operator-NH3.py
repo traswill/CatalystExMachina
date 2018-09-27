@@ -664,19 +664,19 @@ def swarmplot_paper1():
             dat = df.loc[(df['{} Loading'.format(ele)] > 0) & (df['n_elements'] == 3)]
             element_dataframe = pd.concat([element_dataframe, dat])
 
-        dat = df.loc[(df['Ru Loading'] == 0.04) & (df['n_elements'] == 2)]
-        element_dataframe = pd.concat([element_dataframe, dat])
+        # dat = df.loc[(df['Ru Loading'] == 0.04) & (df['n_elements'] == 2)]
+        # element_dataframe = pd.concat([element_dataframe, dat])
 
         catcontainer.master_container = element_dataframe
 
     # ***** Setup Machine Learning *****
-    skynet = SupervisedLearner(version='v50-swarm_with_RuK')
+    skynet = SupervisedLearner(version='v50')
     skynet.set_filters(
         element_filter=3,
         temperature_filter='350orless',
         ammonia_filter=1,
         space_vel_filter=2000,
-        ru_filter='3+',
+        ru_filter=3,
         pressure_filter=None
     )
 
@@ -686,7 +686,13 @@ def swarmplot_paper1():
     skynet.set_target_columns(cols=['Measured Conversion'])
     skynet.set_group_columns(cols=['group'])
     skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
-    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band'])
+    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                'Zunger Pseudopotential (sigma)']
+
+    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band',
+                                  'Periodic Table Column', 'Mendeleev Number'] + zpp_list)
+
     skynet.filter_static_dataset()
     skynet.train_data()
 
@@ -709,10 +715,6 @@ def swarmplot_paper1():
 
     testcatcontainer.build_master_container(drop_empty_columns=False)
     skynet.load_static_dataset(testcatcontainer)
-    skynet.set_target_columns(cols=['Measured Conversion'])
-    skynet.set_group_columns(cols=['group'])
-    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
-    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms'])
     skynet.set_training_data()
     skynet.predict_data()
 
@@ -727,11 +729,11 @@ def swarmplot_paper1():
     plt.xlabel('Temperature ($^\circ$C)')
     plt.ylabel('Predicted Conversion')
 
-    plt.savefig(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Figures\3Ru_swarmplot_{}_RuK.png'.format(''.join(train_elements)))
+    plt.savefig(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Figures\3Ru_swarmplot_{}.png'.format(''.join(train_elements)))
     plt.close()
 
     # Save
-    catdf.to_csv(r'../Results/3Ru_prediction_data_{}_RuK.csv'.format(''.join(train_elements)))
+    catdf.to_csv(r'../Results/3Ru_prediction_data_{}.csv'.format(''.join(train_elements)))
     print(df[df['temperature'] == 300.0].sort_values('Predicted', ascending=False).head())
 
 
@@ -1119,9 +1121,9 @@ if __name__ == '__main__':
     load_nh3_catalysts(catcont=catcontainer)
 
     # ***** Begin Machine Learning *****
-    skynet = SupervisedLearner(version='v50-bimetallics')
+    skynet = SupervisedLearner(version='v52')
     skynet.set_filters(
-        element_filter=2,
+        element_filter=3,
         temperature_filter=300,
         ammonia_filter=1,
         space_vel_filter=2000,
@@ -1142,14 +1144,14 @@ if __name__ == '__main__':
                                           'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
                                           'Zunger Pseudopotential (sigma)']
     #
-    load_list = ['{} Loading'.format(x) for x in
-                 ['Ru','Cu', 'Y', 'Mg', 'Mn',
-                  'Ni', 'Cr', 'W', 'Ca', 'Hf',
-                  'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
-                  'Mo', 'In', 'Rh', 'K']]
+    # load_list = ['{} Loading'.format(x) for x in
+    #              ['Ru','Cu', 'Y', 'Mg', 'Mn',
+    #               'Ni', 'Cr', 'W', 'Ca', 'Hf',
+    #               'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
+    #               'Mo', 'In', 'Rh', 'K']]
 
     # zpp_list = []
-    # load_list = []
+    load_list = []
     skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
     # skynet.reduce_feature_set()
     skynet.filter_static_dataset()
@@ -1169,7 +1171,7 @@ if __name__ == '__main__':
     #
 
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=-1) # ['350orless', 250, 300, 350, 400, 450, None]
-    temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=False)
+    temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=False)
 
     # relearn_with_temps(learner=skynet, train_temps='350orless', test_temps='350orless')
     # skynet.predict_all_from_elements(elements=['Ca', 'In', 'Mn'], svnm='CaInMn_350orless')

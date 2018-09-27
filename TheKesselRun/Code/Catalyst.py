@@ -109,6 +109,7 @@ class CatalystObject():
         def calc_statistics(self, values, weights, feature_name):
             fwmean = np.sum(values * weights)/np.sum(weights)
             avgdev = np.sum(weights * np.abs(values - np.mean(values)))/np.sum(weights)  # (v25)
+            # avgdev = np.sum(weights * np.abs(values - fwmean)) / np.sum(weights)  # (v51)
             self.feature_add('{}_mean'.format(feature_name), fwmean)
             self.feature_add('{}_mad'.format(feature_name), avgdev)
 
