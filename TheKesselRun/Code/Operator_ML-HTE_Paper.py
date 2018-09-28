@@ -332,10 +332,10 @@ def read_learning_rate(pth):
 
     plt.savefig(r'../Figures/ERT_learning_rate5.png', dpi=400)
 
-def load_skynet(version, drop_loads=False):
+def load_skynet(version, drop_loads=False, drop_na_columns=True):
     # Load Data
     catcontainer = CatalystContainer()
-    load_nh3_catalysts(catcont=catcontainer)
+    load_nh3_catalysts(catcont=catcontainer, drop_empty_columns=drop_na_columns)
 
     # Init Learner
     skynet = SupervisedLearner(version=version)
@@ -514,18 +514,35 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
 
 
 def make_all_predictions(version):
-    skynet = load_skynet(version=version)
+    def filter(ml, ru):
+        skynet.set_filters(
+            element_filter=3,
+            temperature_filter='350orless',
+            ammonia_filter=1,
+            space_vel_filter=2000,
+            ru_filter=3,
+            pressure_filter=None
+        )
 
-    # ***** Train Model using CaMnIn *****
-    skynet.set_filters(
-        element_filter=3,
-        temperature_filter='350orless',
-        ammonia_filter=1,
-        space_vel_filter=2000,
-        ru_filter=3,
-        pressure_filter=None
-    )
+    def predict(ru3, ru2, ru1, svnm):
+        catcont = generate_empty_container(ru3=True, ru2=False, ru1=False)
+        skynet.load_static_dataset(catcont)
+        skynet.set_training_data()
+        skynet.predict_data()
+        skynet.compile_results(svnm=svnm)
 
+    skynet = load_skynet(version=version, drop_na_columns=False)
+    skynet.set_target_columns(cols=['Measured Conversion'])
+    skynet.set_group_columns(cols=['group'])
+    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
+    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                'Zunger Pseudopotential (sigma)']
+    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band',
+                                  'Periodic Table Column', 'Mendeleev Number'] + zpp_list)
+
+    """ CaMnIn Dataset """
+    filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.dynamic_dataset = skynet.dynamic_dataset[
         (skynet.dynamic_dataset['Ca Loading'] > 0) |
@@ -534,13 +551,37 @@ def make_all_predictions(version):
     ]
     skynet.set_training_data()
     skynet.train_data()
+    predict(ru3=True, ru2=False, ru1=False, svnm='CaMnIm')
 
-    # ***** Predict everything using CaMnIn training dataset *****
-    catcont = generate_empty_container(ru3=True, ru2=False, ru1=False)
-    skynet.load_static_dataset(catcont)
+    """ 3,1,12 RuMK Dataset (17 catalysts) """
+    filter(skynet, ru=3)
+    skynet.filter_static_dataset()
     skynet.set_training_data()
-    skynet.predict_data()
+    skynet.train_data()
+    predict(ru3=True, ru2=True, ru1=True, svnm='3Ru')
 
+    """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
+    filter(skynet, ru=32)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+    predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_2Ru')
+
+    """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
+    filter(skynet, ru=31)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+    predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_1Ru')
+
+    """ Full Dataset (51 Catalysts) """
+    filter(skynet, ru=0)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+    predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_2Ru_1Ru')
+
+    """ Begin importing data generated above for compilation into single dataframe """
 
 
 if __name__ == '__main__':
