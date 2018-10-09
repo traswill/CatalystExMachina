@@ -1171,7 +1171,7 @@ if __name__ == '__main__':
     #
 
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=-1) # ['350orless', 250, 300, 350, 400, 450, None]
-    temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=False)
+    temperature_slice(learner=skynet, tslice=['350orless', 300], fold=0, kde=False)
 
     # relearn_with_temps(learner=skynet, train_temps='350orless', test_temps='350orless')
     # skynet.predict_all_from_elements(elements=['Ca', 'In', 'Mn'], svnm='CaInMn_350orless')

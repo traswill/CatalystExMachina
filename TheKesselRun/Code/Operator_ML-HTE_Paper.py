@@ -515,17 +515,17 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
 
 def make_all_predictions(version):
     def filter(ml, ru):
-        skynet.set_filters(
+        ml.set_filters(
             element_filter=3,
             temperature_filter='350orless',
             ammonia_filter=1,
             space_vel_filter=2000,
-            ru_filter=3,
+            ru_filter=ru,
             pressure_filter=None
         )
 
     def predict(ru3, ru2, ru1, svnm):
-        catcont = generate_empty_container(ru3=True, ru2=False, ru1=False)
+        catcont = generate_empty_container(ru3=ru3, ru2=ru2, ru1=ru1)
         skynet.load_static_dataset(catcont)
         skynet.set_training_data()
         skynet.predict_data()
@@ -581,12 +581,49 @@ def make_all_predictions(version):
     skynet.train_data()
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_2Ru_1Ru')
 
+def compile_predictions(version):
     """ Begin importing data generated above for compilation into single dataframe """
+    pths = glob.glob(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\result*.csv')
+    output_df = pd.DataFrame(
+        columns=['Catalyst', 'Ru Loading', 'Secondary Metal', 'Secondary Metal Loading', 'Temperature',
+                 'Measured Conversion', 'CaMnIn Prediction', '3% Ru Prediction', '3% and 2% Ru Prediction',
+                 '3% and 1% Ru Prediction', 'All Data Prediction'])
+
+
+
+    for pth in pths:
+        df = pd.read_csv(pth, index_col=0)
+        print(pth)
+        parse_df = df[['Name', 'Load1', 'Ele2', 'Load2', 'temperature', 'Predicted Conversion']]
+        parse_df.columns = ['Catalyst', 'Ru Loading', 'Secondary Metal', 'Secondary Metal Loading', 'Temperature',
+                            'Predicted Conversion']
+        parse_df.index = ['{}_{}'.format(x[1]['Catalyst'], x[1]['Temperature']) for x in parse_df.iterrows()]
+
+        pdict = {
+            '3Ru': '3% Ru Prediction',
+            '3Ru_1Ru': '3% and 1% Ru Prediction',
+            '3Ru_2Ru': '3% and 2% Ru Prediction',
+            '3Ru_2Ru_1Ru': 'All Data Prediction',
+            'CaMnIm': 'CaMnIn Prediction'
+        }
+
+        col_nm = pdict.get(pth.split('-')[-1], 'Error')
+
+        for idx, val in parse_df.iterrows():
+            print(idx)
+            try:
+                output_df.loc[idx, col_nm] = val.values
+            except ValueError:
+                output_df = pd.concat([output_df, parse_df], sort=False)
+
+    output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
+
 
 
 if __name__ == '__main__':
-    version = 'v52'
-    make_all_predictions(version=version)
+    version = 'v53'
+    # make_all_predictions(version=version)
+    compile_predictions(version=version)
 
     # skynet = load_skynet()
     # temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=False)

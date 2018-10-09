@@ -25,11 +25,25 @@ from bokeh.layouts import row, widgetbox, column, layout
 
 
 class Graphic():
-    def __init__(self, learner, df=None):
+    def __init__(self, df=None, svfl=None, svnm=None):
         sns.set(palette='plasma', context='paper', style='white', font_scale=1.5)
-        self.learner = learner
         self.graphdf = df
-        self.set_color(feature='temperature')
+
+        # TODO need to fix this to flow better, throws error if no df
+        try:
+            self.set_color(feature='temperature')
+        except:
+            print('Temperature not found')
+
+        if svfl is None:
+            self.svfl = '' # TODO default directory
+        else:
+            self.svfl = svfl
+
+        if svnm is None:
+            self.svnm = 'Figure.png'
+        else:
+            self.svnm = svnm
 
     def set_color(self, feature, cbnds=None, cmap='plasma'):
         if cbnds is not None:
@@ -65,10 +79,10 @@ class Graphic():
         plt.tight_layout()
 
         if len(uniq_tmps) == 1:
-            plt.savefig('{}//figures//{}-basic-{}C.png'.format(self.learner.svfl, self.learner.svnm, uniq_tmps[0]),
+            plt.savefig('{}//figures//{}-basic-{}C.png'.format(self.svfl, self.svnm, uniq_tmps[0]),
                         dpi=400)
         else:
-            plt.savefig('{}//figures//{}-basic.png'.format(self.learner.svfl, self.learner.svnm),
+            plt.savefig('{}//figures//{}-basic.png'.format(self.svfl, self.svnm),
                         dpi=400)
         plt.close()
 
@@ -117,11 +131,6 @@ class Graphic():
             plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
                         horizontalalignment='left', fontsize=6)
 
-            plt.figtext(0.5, 0.01, 'E{} A{} S{}'.format(self.learner.element_filter,
-                                                        self.learner.ammonia_filter,
-                                                        self.learner.sv_filter),
-                        horizontalalignment='center', fontsize=6)
-
         plt.xlabel('Predicted Conversion')
         plt.ylabel('Measured Conversion')
         plt.legend(title='Temperature')
@@ -130,10 +139,10 @@ class Graphic():
         plt.legend(title='Temperature')
         plt.tight_layout()
         if svnm is None:
-            plt.savefig('{}//figures//{}-{}.png'.format(self.learner.svfl, self.learner.svnm, 'err'),
+            plt.savefig('{}//figures//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
                         dpi=400)
         else:
-            plt.savefig('{}//figures//{}.png'.format(self.learner.svfl, svnm), dpi=400)
+            plt.savefig('{}//figures//{}.png'.format(self.svfl, svnm), dpi=400)
         plt.close()
 
     def plot_kernel_density(self, feat_list=None, margins=True, element=None, pointcolor='w'):
@@ -180,9 +189,9 @@ class Graphic():
 
             plt.tight_layout()
             if element is not None:
-                plt.savefig('{}//Figures//{}-{}-{}'.format(self.learner.svfl, feat, self.learner.svnm, element), dpi=400)
+                plt.savefig('{}//Figures//{}-{}-{}'.format(self.svfl, feat, self.svnm, element), dpi=400)
             else:
-                plt.savefig('{}//Figures//{}-{}'.format(self.learner.svfl, feat, self.learner.svnm), dpi=400)
+                plt.savefig('{}//Figures//{}-{}'.format(self.svfl, feat, self.svnm), dpi=400)
             plt.close()
 
     def plot_important_features(self, df, svnm=''):
@@ -228,7 +237,7 @@ class Graphic():
         # ax.legend(handles2, labels2)
         plt.gca().invert_yaxis()
         plt.tight_layout()
-        plt.savefig('{}//Figures//features-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
+        plt.savefig('{}//Figures//features-{}{}'.format(self.svfl, self.svnm, svnm), dpi=400)
         plt.close()
 
         f, ax = plt.subplots()
@@ -240,7 +249,7 @@ class Graphic():
         # ax.legend(handles2, labels2)
         plt.gca().invert_yaxis()
         plt.tight_layout()
-        plt.savefig('{}//Figures//top10-{}{}'.format(self.learner.svfl, self.learner.svnm, svnm), dpi=400)
+        plt.savefig('{}//Figures//top10-{}{}'.format(self.svfl, self.svnm, svnm), dpi=400)
         plt.close()
 
 # TODO Implement Bokeh
@@ -255,7 +264,7 @@ class Graphic():
 
         tools.append(hover)
 
-        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.learner.svnm)
+        p = figure(tools=tools, toolbar_location="above", logo="grey", plot_width=600, plot_height=600, title=self.svnm)
         p.x_range = Range1d(0,1)
         p.y_range = Range1d(0,1)
         p.background_fill_color = "#dddddd"
@@ -268,9 +277,9 @@ class Graphic():
         p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
                  color='clr', line_color="black", fill_alpha=0.8)
         if svnm is None:
-            output_file("{}\\htmls\\{}.html".format(self.learner.svfl, self.learner.svnm), title="stats.py")
+            output_file("{}\\htmls\\{}.html".format(self.svfl, self.svnm), title="stats.py")
         else:
-            output_file("{}\\htmls\\{}.html".format(self.learner.svfl, svnm), title="stats.py")
+            output_file("{}\\htmls\\{}.html".format(self.svfl, svnm), title="stats.py")
         save(p)
 
     def bokeh_by_elements(self):
