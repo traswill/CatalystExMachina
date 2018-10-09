@@ -589,8 +589,6 @@ def compile_predictions(version):
                  'Measured Conversion', 'CaMnIn Prediction', '3% Ru Prediction', '3% and 2% Ru Prediction',
                  '3% and 1% Ru Prediction', 'All Data Prediction'])
 
-
-
     for pth in pths:
         df = pd.read_csv(pth, index_col=0)
         print(pth)
@@ -600,11 +598,11 @@ def compile_predictions(version):
         parse_df.index = ['{}_{}'.format(x[1]['Catalyst'], x[1]['Temperature']) for x in parse_df.iterrows()]
 
         pdict = {
-            '3Ru': '3% Ru Prediction',
-            '3Ru_1Ru': '3% and 1% Ru Prediction',
-            '3Ru_2Ru': '3% and 2% Ru Prediction',
-            '3Ru_2Ru_1Ru': 'All Data Prediction',
-            'CaMnIm': 'CaMnIn Prediction'
+            '3Ru.csv': '3% Ru Prediction',
+            '3Ru_1Ru.csv': '3% and 1% Ru Prediction',
+            '3Ru_2Ru.csv': '3% and 2% Ru Prediction',
+            '3Ru_2Ru_1Ru.csv': 'All Data Prediction',
+            'CaMnIn.csv': 'CaMnIn Prediction'
         }
 
         col_nm = pdict.get(pth.split('-')[-1], 'Error')
