@@ -25,8 +25,9 @@ from bokeh.layouts import row, widgetbox, column, layout
 
 
 class Graphic():
-    def __init__(self, df=None, svfl=None, svnm=None):
-        sns.set(palette='plasma', context='paper', style='white', font_scale=1.5)
+    def __init__(self, df=None, svfl=None, svnm=None, fs=1.5):
+        sns.set(palette='plasma', context='paper', style='white', font_scale=fs)
+
         if df is not None:
             self.graphdf = df
             self.set_color(feature='temperature')
