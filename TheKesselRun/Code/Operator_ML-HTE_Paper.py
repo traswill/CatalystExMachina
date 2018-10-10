@@ -371,7 +371,8 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True):
     else:
         load_list = []
 
-    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number'] + zpp_list + load_list)
+    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'n_Cl_atoms', 'Norskov d-band']
+                                 + zpp_list + load_list)
     skynet.filter_static_dataset()
     return skynet
 
@@ -514,6 +515,8 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
 
 
 def make_all_predictions(version):
+    ''' Generate Crossvalidations and prediction files '''
+
     def filter(ml, ru):
         ml.set_filters(
             element_filter=3,
@@ -531,17 +534,12 @@ def make_all_predictions(version):
         skynet.predict_data()
         skynet.compile_results(svnm=svnm)
 
+    def crossvalidate(svnm):
+        skynet.predict_crossvalidate(kfold='LOO')
+        skynet.compile_results(svnm=svnm)
+
     def reset_skynet():
         skynet = load_skynet(version=version, drop_na_columns=False)
-        skynet.set_target_columns(cols=['Measured Conversion'])
-        skynet.set_group_columns(cols=['group'])
-        skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
-        zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-                    'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-                    'Zunger Pseudopotential (sigma)']
-        skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band',
-                                      'Periodic Table Column', 'Mendeleev Number'] + zpp_list)
-
         return skynet
 
     """ CaMnIn Dataset (3 catalysts) """
@@ -555,9 +553,28 @@ def make_all_predictions(version):
     ]
     skynet.set_training_data()
     skynet.train_data()
-    predict(ru3=True, ru2=False, ru1=False, svnm='CaMnIn')
+    crossvalidate(svnm='CaMnIn_CV')
+
+    skynet = reset_skynet()
+    filter(skynet, ru=3)
+    skynet.filter_static_dataset()
+    skynet.dynamic_dataset = skynet.dynamic_dataset[
+        (skynet.dynamic_dataset['Ca Loading'] > 0) |
+        (skynet.dynamic_dataset['Mn Loading'] > 0) |
+        (skynet.dynamic_dataset['In Loading'] > 0)
+        ]
+    skynet.set_training_data()
+    skynet.train_data()
+    predict(ru3=True, ru2=True, ru1=True, svnm='CaMnIn')
 
     """ 3,1,12 RuMK Dataset (17 catalysts) """
+    skynet = reset_skynet()
+    filter(skynet, ru=3)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+    crossvalidate(svnm='3Ru_CV')
+
     skynet = reset_skynet()
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
@@ -571,6 +588,13 @@ def make_all_predictions(version):
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
+    crossvalidate(svnm='3Ru_2Ru_CV')
+
+    skynet = reset_skynet()
+    filter(skynet, ru=32)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_2Ru')
 
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
@@ -579,9 +603,23 @@ def make_all_predictions(version):
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
+    crossvalidate(svnm='3Ru_1Ru_CV')
+
+    skynet = reset_skynet()
+    filter(skynet, ru=31)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_1Ru')
 
     """ Full Dataset (51 Catalysts) """
+    skynet = reset_skynet()
+    filter(skynet, ru=0)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+    crossvalidate(svnm='3Ru_2Ru_1Ru_CV')
+
     skynet = reset_skynet()
     filter(skynet, ru=0)
     skynet.filter_static_dataset()

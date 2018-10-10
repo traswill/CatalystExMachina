@@ -67,6 +67,8 @@ class Graphic():
         self.graphdf['clr'] = self.graphdf[feature].apply(norm).apply(c)
 
     def plot_basic(self, legend_label=None):
+        fig, ax = plt.subplots()
+
         uniq_tmps = np.unique(self.graphdf[self.color_column])
 
         for tmp in uniq_tmps:
@@ -93,7 +95,8 @@ class Graphic():
         else:
             plt.savefig('{}//figures//{}-basic.png'.format(self.svfl, self.svnm),
                         dpi=400)
-        plt.close()
+
+        return plt
 
     def plot_metadata(self):
         pass
