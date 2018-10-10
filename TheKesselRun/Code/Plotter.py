@@ -66,7 +66,7 @@ class Graphic():
         self.graphdf['clr'] = self.graphdf[feature].apply(norm).apply(c)
 
     def plot_basic(self, legend_label=None):
-        uniq_tmps = np.unique(self.graphdf['temperature'])
+        uniq_tmps = np.unique(self.graphdf[self.color_column])
 
         for tmp in uniq_tmps:
             plt.scatter(x=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.x_axis_value],
