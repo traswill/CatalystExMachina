@@ -531,17 +531,21 @@ def make_all_predictions(version):
         skynet.predict_data()
         skynet.compile_results(svnm=svnm)
 
-    skynet = load_skynet(version=version, drop_na_columns=False)
-    skynet.set_target_columns(cols=['Measured Conversion'])
-    skynet.set_group_columns(cols=['group'])
-    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
-    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-                'Zunger Pseudopotential (sigma)']
-    skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band',
-                                  'Periodic Table Column', 'Mendeleev Number'] + zpp_list)
+    def reset_skynet():
+        skynet = load_skynet(version=version, drop_na_columns=False)
+        skynet.set_target_columns(cols=['Measured Conversion'])
+        skynet.set_group_columns(cols=['group'])
+        skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
+        zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                    'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                    'Zunger Pseudopotential (sigma)']
+        skynet.set_drop_columns(cols=['reactor', 'n_Cl_atoms', 'Norskov d-band',
+                                      'Periodic Table Column', 'Mendeleev Number'] + zpp_list)
 
-    """ CaMnIn Dataset """
+        return skynet
+
+    """ CaMnIn Dataset (3 catalysts) """
+    skynet = reset_skynet()
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.dynamic_dataset = skynet.dynamic_dataset[
@@ -551,9 +555,10 @@ def make_all_predictions(version):
     ]
     skynet.set_training_data()
     skynet.train_data()
-    predict(ru3=True, ru2=False, ru1=False, svnm='CaMnIm')
+    predict(ru3=True, ru2=False, ru1=False, svnm='CaMnIn')
 
     """ 3,1,12 RuMK Dataset (17 catalysts) """
+    skynet = reset_skynet()
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -561,6 +566,7 @@ def make_all_predictions(version):
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru')
 
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
+    skynet = reset_skynet()
     filter(skynet, ru=32)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -568,6 +574,7 @@ def make_all_predictions(version):
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_2Ru')
 
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
+    skynet = reset_skynet()
     filter(skynet, ru=31)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -575,6 +582,7 @@ def make_all_predictions(version):
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_1Ru')
 
     """ Full Dataset (51 Catalysts) """
+    skynet = reset_skynet()
     filter(skynet, ru=0)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -616,12 +624,10 @@ def compile_predictions(version):
 
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
-
-
 if __name__ == '__main__':
-    version = 'v53'
-    # make_all_predictions(version=version)
-    compile_predictions(version=version)
+    version = 'v52'
+    make_all_predictions(version=version)
+    # compile_predictions(version=version)
 
     # skynet = load_skynet()
     # temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=False)

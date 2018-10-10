@@ -43,7 +43,13 @@ class Graphic():
         else:
             self.svnm = svnm
 
+        self.x_axis_value = 'Predicted Conversion'
+        self.y_axis_value = 'Measured Conversion'
+        self.color_column = 'temperature'
+
     def set_color(self, feature, cbnds=None, cmap='plasma'):
+        self.color_column = feature
+
         if cbnds is not None:
             mn, mx = cbnds
         else:
@@ -59,21 +65,25 @@ class Graphic():
         c = cm.ScalarMappable(norm=norm, cmap=cmap).get_cmap()
         self.graphdf['clr'] = self.graphdf[feature].apply(norm).apply(c)
 
-    def plot_basic(self):
+    def plot_basic(self, legend_label=None):
         uniq_tmps = np.unique(self.graphdf['temperature'])
 
         for tmp in uniq_tmps:
-            plt.scatter(x=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'Predicted Conversion'],
-                        y=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'Measured Conversion'],
-                        c=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'clr'],
+            plt.scatter(x=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.x_axis_value],
+                        y=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.y_axis_value],
+                        c=self.graphdf.loc[self.graphdf[self.color_column] == tmp, 'clr'],
                         label='{}{}C'.format(int(tmp), u'\N{DEGREE SIGN}'),
                         edgecolors='k')
 
-        plt.xlabel('Predicted Conversion')
-        plt.ylabel('Measured Conversion')
+        plt.xlabel(self.x_axis_value)
+        plt.ylabel(self.y_axis_value)
         plt.xlim(0, 1)
         plt.ylim(0, 1)
-        plt.legend(title='Temperature')
+        if legend_label is None:
+            plt.legend(title=self.color_column)
+        else:
+            plt.legend(title=legend_label)
+
         plt.tight_layout()
 
         if len(uniq_tmps) == 1:
@@ -87,25 +97,25 @@ class Graphic():
     def plot_metadata(self):
         pass
 
-    def plot_err(self, metadata=True, svnm=None, color_bounds=None):
+    def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None):
         fig, ax = plt.subplots()
 
-        rats = np.abs(np.subtract(self.graphdf['Predicted Conversion'], self.graphdf['Measured Conversion'],
-                                  out=np.zeros_like(self.graphdf['Predicted Conversion']),
-                                  where=self.graphdf['Measured Conversion'] != 0))
+        rats = np.abs(np.subtract(self.graphdf[self.x_axis_value], self.graphdf[self.y_axis_value],
+                                  out=np.zeros_like(self.graphdf[self.y_axis_value]),
+                                  where=self.graphdf[self.x_axis_value] != 0))
 
         rat_count = rats.size
         wi5 = (rats < 0.05).sum()
         wi10 = (rats < 0.10).sum()
         wi20 = (rats < 0.20).sum()
 
-        self.set_color(feature='temperature', cbnds=color_bounds)
-        uniq_tmps = np.unique(self.graphdf['temperature'])
+        self.set_color(feature=self.color_column, cbnds=color_bounds)
+        uniq_tmps = np.unique(self.graphdf[self.color_column])
 
         for tmp in uniq_tmps:
-            plt.scatter(x=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'Predicted Conversion'],
-                        y=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'Measured Conversion'],
-                        c=self.graphdf.loc[self.graphdf['temperature'] == tmp, 'clr'].values,
+            plt.scatter(x=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.x_axis_value],
+                        y=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.y_axis_value],
+                        c=self.graphdf.loc[self.graphdf[self.color_column] == tmp, 'clr'].values,
                         label='{}{}C'.format(int(tmp), u'\N{DEGREE SIGN}'),
                         edgecolors='k', linewidth=1)
 
@@ -123,18 +133,22 @@ class Graphic():
                             five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
                         horizontalalignment='right', fontsize=6)
 
-            mean_abs_err = mean_absolute_error(self.graphdf['Measured Conversion'], self.graphdf['Predicted Conversion'])
-            rmse = np.sqrt(mean_squared_error(self.graphdf['Measured Conversion'], self.graphdf['Predicted Conversion']))
+            mean_abs_err = mean_absolute_error(self.graphdf[self.y_axis_value], self.graphdf[self.x_axis_value])
+            rmse = np.sqrt(mean_squared_error(self.graphdf[self.y_axis_value], self.graphdf[self.x_axis_value]))
 
             plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
                         horizontalalignment='left', fontsize=6)
 
-        plt.xlabel('Predicted Conversion')
-        plt.ylabel('Measured Conversion')
-        plt.legend(title='Temperature')
+        plt.xlabel(self.x_axis_value)
+        plt.ylabel(self.y_axis_value)
+
+        if legend_label is None:
+            plt.legend(title=self.color_column)
+        else:
+            plt.legend(title=legend_label)
+
         plt.xlim(0, 1)
         plt.ylim(0, 1)
-        plt.legend(title='Temperature')
         plt.tight_layout()
         if svnm is None:
             plt.savefig('{}//figures//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
@@ -157,21 +171,21 @@ class Graphic():
 
         for feat in feat_list:
             if margins:
-                g = sns.jointplot(x=feat, y='Measured Conversion',  data=self.graphdf, kind='kde', color='k',
+                g = sns.jointplot(x=feat, y=self.y_axis_value,  data=self.graphdf, kind='kde', color='k',
                                   stat_func=None)
                 g.plot_joint(plt.scatter, c=pointcolor, s=15, linewidth=1, marker=".")
                 g.ax_joint.collections[0].set_alpha(0)
             else:
                 fig, ax = plt.subplots(figsize=(5,5))
-                sns.kdeplot(self.graphdf[feat], self.graphdf['Measured Conversion'],
+                sns.kdeplot(self.graphdf[feat], self.graphdf[self.y_axis_value],
                                 cmap='Greys', shade=True, shade_lowest=False, ax=ax)
 
-                ax.scatter(self.graphdf[feat], self.graphdf['Measured Conversion'],
+                ax.scatter(self.graphdf[feat], self.graphdf[self.y_axis_value],
                             c=pointcolor, s=15, marker='.')
 
                 if element is not None:
                     df = self.graphdf[self.graphdf['{} Loading'.format(element)] != 0].copy()
-                    ax.scatter(df[feat], df['Measured Conversion'], c='r', s=15, marker='x')
+                    ax.scatter(df[feat], df[self.y_axis_value], c='r', s=15, marker='x')
 
             # Modifying things for publication
             lim_dict = {
@@ -391,7 +405,7 @@ class Graphic():
         save(p)
 
     def bokeh_important_features(self, svtag='IonEn',
-                                 xaxis='Measured Conversion', xlabel='Measured Conversion', xrng=None,
+                                 xaxis="Measured Conversion", xlabel="Measured Conversion", xrng=None,
                                  yaxis='Predicted Conversion', ylabel='Predicted Conversion', yrng=None,
                                  caxis='temperature'
                                  ):
