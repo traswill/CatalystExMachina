@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Housekeeping after flagging rework">
+    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Update">
+      <change afterPath="$PROJECT_DIR$/TheKesselRun/PeriodicTablePlotter.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/CatalystExMachina.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CatalystExMachina.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/TheKesselRun/Results/Storage/" />
@@ -16,11 +18,13 @@
     <session id="490387299">
       <usages-collector id="statistics.lifecycle.project">
         <counts>
-          <entry key="project.closed" value="2" />
+          <entry key="project.closed" value="4" />
           <entry key="project.open.time.1" value="1" />
           <entry key="project.open.time.3" value="1" />
           <entry key="project.open.time.4" value="1" />
-          <entry key="project.opened" value="3" />
+          <entry key="project.open.time.5" value="1" />
+          <entry key="project.open.time.6" value="1" />
+          <entry key="project.opened" value="5" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.extensions.open">
@@ -36,12 +40,12 @@
       <usages-collector id="statistics.file.extensions.edit">
         <counts>
           <entry key="py" value="2833" />
-          <entry key="txt" value="143" />
+          <entry key="txt" value="153" />
         </counts>
       </usages-collector>
       <usages-collector id="statistics.file.types.edit">
         <counts>
-          <entry key="PLAIN_TEXT" value="143" />
+          <entry key="PLAIN_TEXT" value="153" />
           <entry key="Python" value="2833" />
         </counts>
       </usages-collector>
@@ -52,16 +56,10 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="600">
-              <caret line="1144" column="46" selection-start-line="1144" selection-start-column="46" selection-end-line="1144" selection-end-column="46" />
+            <state relative-caret-position="464">
+              <caret line="1154" column="46" selection-start-line="1154" selection-start-column="46" selection-end-line="1154" selection-end-column="46" />
               <folding>
                 <element signature="e#0#79#0" expanded="true" />
-                <element signature="e#38301#38475#0" />
-                <element signature="e#38545#38614#0" />
-                <element signature="e#38714#38972#0" />
-                <element signature="e#38996#39168#0" />
-                <element signature="e#39279#39512#0" />
-                <element signature="e#39573#41008#0" />
               </folding>
             </state>
           </provider>
@@ -70,11 +68,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="409">
-              <caret line="447" lean-forward="true" selection-start-line="447" selection-end-line="447" />
-              <folding>
-                <marker date="1537643037175" expanded="true" signature="13079:13214" ph="..." />
-              </folding>
+            <state relative-caret-position="7344">
+              <caret line="453" selection-start-line="453" selection-end-line="453" />
             </state>
           </provider>
         </entry>
@@ -109,6 +104,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -121,43 +117,126 @@
               <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
               <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
             </path>
-            <path>
-              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
-              <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
-              <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
-              <item name="Code" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
-              <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
-              <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
-              <item name="Data" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
-              <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
-              <item name="TheKesselRun" type="462c0819:PsiDirectoryNode" />
-              <item name="Data" type="462c0819:PsiDirectoryNode" />
-              <item name="RAW" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
-              <item name="CatalystExMachina" type="462c0819:PsiDirectoryNode" />
-              <item name="venv" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="CatalystExMachina" type="b2602c69:ProjectViewProjectNode" />
-              <item name="External Libraries" type="cb654da1:ExternalLibrariesNode" />
-            </path>
           </expand>
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
+  </component>
+  <component name="RestoreUpdateTree" date="Moments ago" ActionInfo="_Update">
+    <UpdatedFiles>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Updated from server" />
+        <option name="myStatusName" value="Changed on server" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="CHANGED_ON_SERVER" />
+        <FILE-GROUP>
+          <option name="myUpdateName" value="Updated" />
+          <option name="myStatusName" value="Changed" />
+          <option name="mySupportsDeletion" value="false" />
+          <option name="myCanBeAbsent" value="false" />
+          <option name="myId" value="UPDATED" />
+          <PATH vcs="Git" revision="">$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py</PATH>
+          <PATH vcs="Git" revision="">$PROJECT_DIR$/TheKesselRun/Code/Operator_ML-HTE_Paper.py</PATH>
+          <PATH vcs="Git" revision="">$PROJECT_DIR$/TheKesselRun/Code/Plotter.py</PATH>
+        </FILE-GROUP>
+        <FILE-GROUP>
+          <option name="myUpdateName" value="Created" />
+          <option name="myStatusName" value="Created" />
+          <option name="mySupportsDeletion" value="false" />
+          <option name="myCanBeAbsent" value="false" />
+          <option name="myId" value="CREATED" />
+        </FILE-GROUP>
+        <FILE-GROUP>
+          <option name="myUpdateName" value="Deleted" />
+          <option name="myStatusName" value="Deleted" />
+          <option name="mySupportsDeletion" value="false" />
+          <option name="myCanBeAbsent" value="true" />
+          <option name="myId" value="REMOVED_FROM_REPOSITORY" />
+        </FILE-GROUP>
+        <FILE-GROUP>
+          <option name="myUpdateName" value="Restored" />
+          <option name="myStatusName" value="Will be restored" />
+          <option name="mySupportsDeletion" value="false" />
+          <option name="myCanBeAbsent" value="false" />
+          <option name="myId" value="RESTORED" />
+        </FILE-GROUP>
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Modified" />
+        <option name="myStatusName" value="Modified" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="MODIFIED" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Skipped" />
+        <option name="myStatusName" value="Skipped" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="SKIPPED" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Merged with conflicts" />
+        <option name="myStatusName" value="Will be merged with conflicts" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="MERGED_WITH_CONFLICTS" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Merged with tree conflicts" />
+        <option name="myStatusName" value="Merged with tree conflicts" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="MERGED_WITH_TREE_CONFLICT" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Merged with property conflicts" />
+        <option name="myStatusName" value="Will be merged with property conflicts" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="MERGED_WITH_PROPERTY_CONFLICT" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Merged" />
+        <option name="myStatusName" value="Will be merged" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="MERGED" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Not in repository" />
+        <option name="myStatusName" value="Not in repository" />
+        <option name="mySupportsDeletion" value="true" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="UNKNOWN" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Locally added" />
+        <option name="myStatusName" value="Locally added" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="LOCALLY_ADDED" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Locally removed" />
+        <option name="myStatusName" value="Locally removed" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="LOCALLY_REMOVED" />
+      </FILE-GROUP>
+      <FILE-GROUP>
+        <option name="myUpdateName" value="Switched" />
+        <option name="myStatusName" value="Switched" />
+        <option name="mySupportsDeletion" value="false" />
+        <option name="myCanBeAbsent" value="false" />
+        <option name="myId" value="SWITCHED" />
+      </FILE-GROUP>
+    </UpdatedFiles>
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
@@ -240,14 +319,21 @@
       <option name="project" value="LOCAL" />
       <updated>1537643057256</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Update">
+      <created>1537756063631</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1537756063631</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info active="true" content_ui="combo" id="Project" order="1" visible="true" weight="0.18603411" />
+      <window_info active="true" content_ui="combo" id="Project" order="1" visible="true" weight="0.19029851" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32936078" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.29577464" />
@@ -273,32 +359,24 @@
     <MESSAGE value="Added unique ID for each catalyst" />
     <MESSAGE value="Rework methods to use column flags" />
     <MESSAGE value="Housekeeping after flagging rework" />
-    <option name="LAST_COMMIT_MESSAGE" value="Housekeeping after flagging rework" />
+    <MESSAGE value="Update" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="409">
-          <caret line="447" lean-forward="true" selection-start-line="447" selection-end-line="447" />
+        <state relative-caret-position="464">
+          <caret line="1154" column="46" selection-start-line="1154" selection-start-column="46" selection-end-line="1154" selection-end-column="46" />
           <folding>
-            <marker date="1537643037175" expanded="true" signature="13079:13214" ph="..." />
+            <element signature="e#0#79#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py">
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="600">
-          <caret line="1144" column="46" selection-start-line="1144" selection-start-column="46" selection-end-line="1144" selection-end-column="46" />
-          <folding>
-            <element signature="e#0#79#0" expanded="true" />
-            <element signature="e#38301#38475#0" />
-            <element signature="e#38545#38614#0" />
-            <element signature="e#38714#38972#0" />
-            <element signature="e#38996#39168#0" />
-            <element signature="e#39279#39512#0" />
-            <element signature="e#39573#41008#0" />
-          </folding>
+        <state relative-caret-position="7344">
+          <caret line="453" selection-start-line="453" selection-end-line="453" />
         </state>
       </provider>
     </entry>
