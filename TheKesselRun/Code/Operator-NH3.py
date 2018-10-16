@@ -962,11 +962,11 @@ def read_learning_rate(pth):
     df2 = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
     sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=df2)
     plt.xlabel('Number of Catalysts in Training Dataset')
-    plt.xlim(1, 40)
+    plt.xlim(1, 50)
     plt.yticks(np.arange(0.1, 0.35, 0.05))
     plt.ylim(0.1, 0.3)
 
-    plt.savefig(r'../Figures/ERT_learning_rate5.png', dpi=400)
+    plt.savefig(r'../Figures/ERT_learning_rate6.png', dpi=400)
 
 
 def generate_feature_changes_from_learning_rate():
@@ -1045,7 +1045,7 @@ if __name__ == '__main__':
         exit()
 
     # ***** Predict all elements from Ca, Mn, In bimetallics (Ru-M-K) *****
-    if False:
+    if True:
         # determine_algorithm_learning_rate()
         read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v44-learning-rate\figures\learning_rate2.csv")
         # generate_feature_changes_from_learning_rate()
@@ -1171,7 +1171,7 @@ if __name__ == '__main__':
     #
 
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=-1) # ['350orless', 250, 300, 350, 400, 450, None]
-    temperature_slice(learner=skynet, tslice=['350orless', 300], fold=0, kde=False)
+    temperature_slice(learner=skynet, tslice=['350orless', 300], fold=10, kde=False)
 
     # relearn_with_temps(learner=skynet, train_temps='350orless', test_temps='350orless')
     # skynet.predict_all_from_elements(elements=['Ca', 'In', 'Mn'], svnm='CaInMn_350orless')

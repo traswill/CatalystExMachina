@@ -461,6 +461,7 @@ class SupervisedLearner():
 
     def predict_data(self):
         self.predictions = self.machina.predict(self.features)
+        return self.predictions
 
     def predict_crossvalidate(self, kfold=10):
         """ Use k-fold validation with grouping by catalyst ID to determine  """
@@ -554,58 +555,42 @@ class SupervisedLearner():
         g.bokeh_predictions(svnm='{}_predict-self_{}'.format(self.version, svnm))
 
     def predict_all_from_elements(self, elements, loads=None, svnm='data', save_plots=True, save_features=True):
-        # TODO rework this method
-        element_dataframe = pd.DataFrame()
+        self.filter_static_dataset()
 
-        for jj, ele in enumerate(elements):
-            if loads is None:
-                dat = self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] > 0]
-            else:
-                dat = self.dynamic_dataset.loc[self.dynamic_dataset['{} Loading'.format(ele)] == loads[jj]]
+        test_elements = [
+            x.replace(' Loading', '') for x in self.dynamic_dataset.columns
+            if ('Loading' in x) &
+            (x.replace(' Loading', '') not in ['Ru','K']) &
+            (x.replace(' Loading', '') not in np.unique(elements).tolist())
+            ]
+        self.filter_out_elements(eles=test_elements)
 
-            element_dataframe = pd.concat([element_dataframe, dat])
-
-        drop_ids = np.unique(element_dataframe.index)
-
-        self.labels_df = element_dataframe.loc[:, 'Measured Conversion'].copy()
-
-        self.features_df = element_dataframe.drop(
-                labels=['Measured Conversion', 'Element Dictionary', 'group'],
-                axis=1
-            )
+        # if loads is not None:
+        #     for jj, ele in enumerate(elements):
+        #         pass # TODO figure out loadings
 
         self.train_data()
 
-        test_data = self.dynamic_dataset.drop(index=drop_ids).copy()
+        self.reset_dynamic_dataset()
+        self.filter_static_dataset()
+        self.filter_out_elements(np.unique(elements).tolist())
+        self.predict_data()
+        self.compile_results()
 
-        predvals = self.machina.predict(test_data.drop(labels=['Measured Conversion', 'Element Dictionary', 'group'],
-            axis=1))
+        # TODO: add save features back to method
+        # if save_features:
+        #     feat_df = self.extract_important_features()
+        #     feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
+        #
+        # if save_plots:
+        #     g = Graphic(df=comparison_df)
+        #     g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
+        #     g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
+        #     # g.plot_important_features(svnm=svnm)
+        #     g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
 
-        measvals = test_data.loc[:, 'Measured Conversion'].values
+        return self.result_dataset
 
-        comparison_df = pd.DataFrame([predvals, measvals],
-                                     index=['Predicted Conversion', 'Measured Conversion'],
-                                     columns=test_data.index).T
-
-        comparison_df['ID'] = comparison_df.index  # [x.split('_')[0] for x in comparison_df.index]
-        comparison_df['Name'] = [
-            ''.join('{}({})'.format(key, str(int(val)))
-                    for key, val in x) for x in test_data['Element Dictionary']
-        ]
-        comparison_df['temperature'] = test_data['temperature']
-
-        if save_features:
-            feat_df = self.extract_important_features()
-            feat_df.to_csv('{}\\{}-features.csv'.format(self.svfl, svnm))
-
-        if save_plots:
-            g = Graphic(learner=self, df=comparison_df)
-            g.plot_err(svnm='{}-predict_{}'.format(self.version, svnm))
-            g.plot_err(svnm='{}-predict_{}_nometa'.format(self.version, svnm), metadata=False)
-            g.plot_important_features(svnm=svnm)
-            g.bokeh_predictions(svnm='{}-predict_{}'.format(self.version, svnm))
-
-        return comparison_df
 
     def predict_from_master_dataset(self):
         """ Description """
@@ -618,7 +603,7 @@ class SupervisedLearner():
         data.to_csv(r'{}/{}-BinaryPredictions.csv'.format(self.svfl, self.version))
         return data
 
-    def compile_results(self, svnm=None):
+    def compile_results(self, sv=False, svnm=None):
         """ Prepare all data for plotting """
 
         if self.predictions is None:
@@ -639,11 +624,12 @@ class SupervisedLearner():
                 self.result_dataset.loc[index, 'Load{}'.format(i)] = val
                 i += 1
 
-        # Save Results and Features
-        if svnm is None:
-            self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
-        else:
-            self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
+        if sv:
+            # Save Results and Features
+            if svnm is None:
+                self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
+            else:
+                self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
 
     def save_dynamic(self):
         """ Comment """

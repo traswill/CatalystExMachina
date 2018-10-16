@@ -274,9 +274,9 @@ def test_all_ML_models(version, three_ele=True, ru_filter=3):
     plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
 
 def determine_algorithm_learning_rate():
-    catcontainer = CatalystContainer()
-    load_nh3_catalysts(catcont=catcontainer)
-    elements = [x.replace(' Loading', '') for x in catcontainer.master_container.columns if 'Loading' in x]
+    skynet = load_skynet(version='v52-learning-rate')
+
+    elements = [x.replace(' Loading', '') for x in skynet.static_dataset.columns if 'Loading' in x]
     elements.remove('K')
     elements.remove('Ru')
 
@@ -284,27 +284,32 @@ def determine_algorithm_learning_rate():
     elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc', 'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh']
     loads = [0.03, 0.02, 0.01]
 
-    skynet = SupervisedLearner(version='v44-learning-rate')
-    skynet.set_filters(
-        element_filter=3,
-        temperature_filter='350orless',
-        ammonia_filter=1,
-        space_vel_filter=2000,
-        ru_filter=0,
-        pressure_filter=None
-    )
-
-    skynet.set_learner(learner='etr', params='etr')
-    skynet.load_static_dataset(catalyst_container=catcontainer)
-    skynet.set_features_to_drop(features=['reactor'])
-
     results = pd.DataFrame()
+    results_3ele = pd.DataFrame()
 
-    allcats = [(x, y) for x in elements for y in loads]
+    # allcats = [(x, y) for x in elements for y in loads]
 
-    for i in range(1, len(allcats)): # iterate through all possible numbers of catalyst
+    for i in range(3, len(elements)): # iterate through all possible numbers of catalyst
+        if i == 3:
+            for eset in list(itertools.combinations(elements, 3)):
+                allcats = [(x, y) for x in eset for y in loads]
+                catalyst_set, load_set = list(zip(*allcats))
+                df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set,
+                                                      save_plots=False, save_features=False,
+                                                      svnm=''.join(catalyst_set))
+                mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
+
+                results_3ele.loc['{} {} {}'.format(eset[0], eset[1], eset[2]), 'MAE'] = mae
+
+            results_3ele.to_csv(r'../Results/3_element_learning.csv')
+            results_3ele.to_csv(r'{}/figures/3_element_learning.csv'.format(skynet.svfl))
+            exit()
+
         for j in range(1, 25): # randomly sample x catalyst groups
-            catalyst_set, load_set = list(zip(*random.sample(allcats, i)))
+            eset = random.sample(elements, i)
+            allcats = [(x, y) for x in eset for y in loads]
+            # catalyst_set, load_set = list(zip(*random.sample(allcats, i)))
+            catalyst_set, load_set = list(zip(*allcats))
             df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set,
                                                   save_plots=False, save_features=False,
                                                   svnm=''.join(catalyst_set))
@@ -326,13 +331,13 @@ def read_learning_rate(pth):
     df2 = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
     sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=df2)
     plt.xlabel('Number of Catalysts in Training Dataset')
-    plt.xlim(1, 40)
+    plt.xlim(1, 60)
     plt.yticks(np.arange(0.1, 0.35, 0.05))
     plt.ylim(0.1, 0.3)
 
-    plt.savefig(r'../Figures/ERT_learning_rate5.png', dpi=400)
+    plt.savefig(r'../Figures/ERT_learning_rate6.png', dpi=400)
 
-def load_skynet(version, drop_loads=False, drop_na_columns=True):
+def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     # Load Data
     catcontainer = CatalystContainer()
     load_nh3_catalysts(catcont=catcontainer, drop_empty_columns=drop_na_columns)
@@ -344,7 +349,7 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True):
         temperature_filter='350orless',
         ammonia_filter=1,
         space_vel_filter=2000,
-        ru_filter=3,
+        ru_filter=ru_filter,
         pressure_filter=None
     )
 
@@ -371,7 +376,7 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True):
     else:
         load_list = []
 
-    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'n_Cl_atoms', 'Norskov d-band']
+    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band']
                                  + zpp_list + load_list)
     skynet.filter_static_dataset()
     return skynet
@@ -394,7 +399,7 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         learner.evaluate_regression_learner()
         learner.compile_results()
 
-        g = Graphic(learner=learner, df=learner.result_dataset)
+        g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm=learner.svnm)
         g.plot_important_features(df=featdf)
         g.plot_basic()
         g.plot_err()
@@ -424,6 +429,28 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
 
         g.bokeh_predictions()
         # learner.bokeh_by_elements()
+
+def CaMnIn_prediction(learner):
+    learner.set_filters(temperature_filter='350orless')
+    learner.filter_static_dataset()
+    eles = [x.replace(' Loading', '') for x in learner.dynamic_dataset.columns if 'Loading' in x]
+    eles = [x for x in eles if x not in ['Ca','Mn','In','Ru','K']]
+    learner.filter_out_elements(eles=eles)
+    print(learner.dynamic_dataset)
+    learner.train_data()
+
+
+    learner.filter_static_dataset()
+    learner.filter_out_elements(eles=['Ca','Mn','In'])
+    learner.predict_data()
+
+    learner.evaluate_regression_learner()
+    learner.compile_results()
+
+    g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_CaMnIn'.format(learner.svnm))
+    g.plot_basic()
+    g.plot_err()
+    g.plot_err(metadata=False, svnm='{}_CaMnIn_nometa'.format(learner.svnm))
 
 def generate_empty_container(ru3=True, ru2=True, ru1=True):
     def create_catalyst(catcont, ele, atnum, ru3, ru2, ru1):
@@ -663,12 +690,15 @@ def compile_predictions(version):
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
 if __name__ == '__main__':
-    version = 'v52'
-    make_all_predictions(version=version)
+    version = 'v53-AICHE-LOGO-AllSamples'
+
+    determine_algorithm_learning_rate()
+    # make_all_predictions(version=version)
     # compile_predictions(version=version)
 
-    # skynet = load_skynet()
-    # temperature_slice(learner=skynet, tslice=['350orless', 250, 300, 350], fold=0, kde=False)
+    # skynet = load_skynet(version=version, ru_filter=0)
+    # CaMnIn_prediction(learner=skynet)
+    # temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=True)
 
     # three_catalyst_model()
     # test_all_ML_models()

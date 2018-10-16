@@ -147,9 +147,12 @@ class Graphic():
         plt.ylabel(self.y_axis_value)
 
         if legend_label is None:
-            plt.legend(title=self.color_column)
-        else:
-            plt.legend(title=legend_label)
+            legend_label = self.color_column
+
+        if legend_label == 'temperature':
+            legend_label = 'Temperature'
+
+        plt.legend(title=legend_label)
 
         plt.xlim(0, 1)
         plt.ylim(0, 1)
