@@ -948,8 +948,8 @@ def determine_algorithm_learning_rate():
 
             results.loc[i, j] = mae
 
-    results.to_csv(r'../Results/learning_rate2.csv')
-    results.to_csv(r'{}/figures/learning_rate2.csv'.format(skynet.svfl))
+    results.to_csv(r'../Results/learning_rate3.csv')
+    results.to_csv(r'{}/figures/learning_rate3.csv'.format(skynet.svfl))
 
 
 def read_learning_rate(pth):
@@ -966,7 +966,7 @@ def read_learning_rate(pth):
     plt.yticks(np.arange(0.1, 0.35, 0.05))
     plt.ylim(0.1, 0.3)
 
-    plt.savefig(r'../Figures/ERT_learning_rate6.png', dpi=400)
+    plt.savefig(r'../Figures/ERT_learning_rate7.png', dpi=400)
 
 
 def generate_feature_changes_from_learning_rate():
@@ -1046,8 +1046,8 @@ if __name__ == '__main__':
 
     # ***** Predict all elements from Ca, Mn, In bimetallics (Ru-M-K) *****
     if True:
-        # determine_algorithm_learning_rate()
-        read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v44-learning-rate\figures\learning_rate2.csv")
+        determine_algorithm_learning_rate()
+        read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\figures\learning_rate2.csv")
         # generate_feature_changes_from_learning_rate()
         exit()
 

@@ -555,25 +555,44 @@ class SupervisedLearner():
         g.bokeh_predictions(svnm='{}_predict-self_{}'.format(self.version, svnm))
 
     def predict_all_from_elements(self, elements, loads=None, svnm='data', save_plots=True, save_features=True):
+        """ Segment data into training dataset (elements) and test dataset (not elements) and predict test dataset """
+
+        # Refresh dynamic dataset
         self.filter_static_dataset()
 
-        test_elements = [
-            x.replace(' Loading', '') for x in self.dynamic_dataset.columns
-            if ('Loading' in x) &
-            (x.replace(' Loading', '') not in ['Ru','K']) &
-            (x.replace(' Loading', '') not in np.unique(elements).tolist())
-            ]
-        self.filter_out_elements(eles=test_elements)
+        # test_elements = [
+        #     x.replace(' Loading', '') for x in self.dynamic_dataset.columns
+        #     if ('Loading' in x) &
+        #     (x.replace(' Loading', '') not in ['Ru','K']) &
+        #     (x.replace(' Loading', '') not in np.unique(elements).tolist())
+        #     ]
+        # self.filter_out_elements(eles=test_elements)
 
-        # if loads is not None:
-        #     for jj, ele in enumerate(elements):
-        #         pass # TODO figure out loadings
+        # Create a dataframe of all element/load pairs to filter
+        filter_df = pd.DataFrame([elements, loads], index=['Element', 'Loading']).T
+        training_index_list = list()
 
+        # Set training and test data index lists
+        for idx, rw in filter_df.iterrows():
+            training_index_list += self.dynamic_dataset[self.dynamic_dataset['{} Loading'.format(rw['Element'])] == rw['Loading']].index.values.tolist()
+
+        dynamic_index_list = self.dynamic_dataset.index.values.tolist()
+        test_data_index_list = list(set(dynamic_index_list) - set(training_index_list))
+
+        # Drop test data from dataset
+        self.dynamic_dataset.drop(index=test_data_index_list)
+
+        # Train model
         self.train_data()
 
+        # Refresh dynamic dataset
         self.reset_dynamic_dataset()
         self.filter_static_dataset()
-        self.filter_out_elements(np.unique(elements).tolist())
+
+        # Drop training data from dynamic dataset
+        self.dynamic_dataset.drop(index=training_index_list)
+
+        # Predict test data and compile results
         self.predict_data()
         self.compile_results()
 
@@ -604,17 +623,17 @@ class SupervisedLearner():
         return data
 
     def compile_results(self, sv=False, svnm=None):
-        """ Prepare all data for plotting """
+        """ Create a results dataframe that mimics dynamic but includes non-data values such as catalyst names """
 
         if self.predictions is None:
             print('WARNING: No predictions have been made.')
 
-        # Create Result DF and add Predictions
+        # Create Result DF, add predictions and experimental data
         self.result_dataset = self.dynamic_dataset[self.features_df.columns].copy()
         self.result_dataset['Predicted Conversion'] = self.predictions
         self.result_dataset['Measured Conversion'] = self.labels
 
-        # Parse the Element Dictionary
+        # Parse the Element Dictionary to get catalyst names
         for index, edict in self.dynamic_dataset['Element Dictionary'].iteritems():
             self.result_dataset.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
 
@@ -624,6 +643,7 @@ class SupervisedLearner():
                 self.result_dataset.loc[index, 'Load{}'.format(i)] = val
                 i += 1
 
+        # Save result dataframe if requested
         if sv:
             # Save Results and Features
             if svnm is None:
@@ -632,7 +652,7 @@ class SupervisedLearner():
                 self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
 
     def save_dynamic(self):
-        """ Comment """
+        """ Save RAW dynamic dataset - Use "compile_results" method unless debugging """
         self.dynamic_dataset.to_csv('{}\slavedata-{}.csv'.format(self.svfl, self.svnm))
 
     def extract_important_features(self, sv=False, prnt=False):

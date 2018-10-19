@@ -271,6 +271,9 @@ class Graphic():
         plt.savefig('{}//Figures//top10-{}{}'.format(self.svfl, self.svnm, svnm), dpi=400)
         plt.close()
 
+    def plot_partial_dependance(self):
+        pass #TODO http://scikit-learn.org/stable/auto_examples/ensemble/plot_partial_dependence.html#sphx-glr-auto-examples-ensemble-plot-partial-dependence-py
+
 # TODO Implement Bokeh
     def bokeh_predictions(self, svnm=None):
         """ Comment """

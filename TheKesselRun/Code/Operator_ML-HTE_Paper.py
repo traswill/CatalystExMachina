@@ -285,31 +285,32 @@ def determine_algorithm_learning_rate():
     loads = [0.03, 0.02, 0.01]
 
     results = pd.DataFrame()
+    results_cv = pd.DataFrame()
     results_3ele = pd.DataFrame()
 
-    # allcats = [(x, y) for x in elements for y in loads]
+    allcats = [(x, y) for x in elements for y in loads]
 
-    for i in range(3, len(elements)): # iterate through all possible numbers of catalyst
-        if i == 3:
-            for eset in list(itertools.combinations(elements, 3)):
-                allcats = [(x, y) for x in eset for y in loads]
-                catalyst_set, load_set = list(zip(*allcats))
-                df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set,
-                                                      save_plots=False, save_features=False,
-                                                      svnm=''.join(catalyst_set))
-                mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
-
-                results_3ele.loc['{} {} {}'.format(eset[0], eset[1], eset[2]), 'MAE'] = mae
-
-            results_3ele.to_csv(r'../Results/3_element_learning.csv')
-            results_3ele.to_csv(r'{}/figures/3_element_learning.csv'.format(skynet.svfl))
-            exit()
+    for i in range(1, len(allcats)): # iterate through all possible numbers of catalyst
+        # if i == 3:
+        #     for eset in list(itertools.combinations(elements, 3)):
+        #         allcats = [(x, y) for x in eset for y in loads]
+        #         catalyst_set, load_set = list(zip(*allcats))
+        #         df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set,
+        #                                               save_plots=False, save_features=False,
+        #                                               svnm=''.join(catalyst_set))
+        #         mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
+        #
+        #         results_3ele.loc['{} {} {}'.format(eset[0], eset[1], eset[2]), 'MAE'] = mae
+        #
+        #     results_3ele.to_csv(r'../Results/3_element_learning.csv')
+        #     results_3ele.to_csv(r'{}/figures/3_element_learning.csv'.format(skynet.svfl))
+        #     exit()
 
         for j in range(1, 25): # randomly sample x catalyst groups
-            eset = random.sample(elements, i)
-            allcats = [(x, y) for x in eset for y in loads]
-            # catalyst_set, load_set = list(zip(*random.sample(allcats, i)))
-            catalyst_set, load_set = list(zip(*allcats))
+            # eset = random.sample(elements, i)
+            # allcats = [(x, y) for x in eset for y in loads]
+            catalyst_set, load_set = list(zip(*random.sample(allcats, i)))
+            # catalyst_set, load_set = list(zip(*allcats))
             df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set,
                                                   save_plots=False, save_features=False,
                                                   svnm=''.join(catalyst_set))
@@ -317,8 +318,8 @@ def determine_algorithm_learning_rate():
 
             results.loc[i, j] = mae
 
-    results.to_csv(r'../Results/learning_rate2.csv')
-    results.to_csv(r'{}/figures/learning_rate2.csv'.format(skynet.svfl))
+    # results.to_csv(r'../Results/learning_rate4.csv')
+    results.to_csv(r'{}/learning_rate4.csv'.format(skynet.svfl))
 
 
 def read_learning_rate(pth):
@@ -690,9 +691,11 @@ def compile_predictions(version):
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
 if __name__ == '__main__':
-    version = 'v53-AICHE-LOGO-AllSamples'
+    version = 'v53-learning-rate'
 
     determine_algorithm_learning_rate()
+    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate4.csv")
+
     # make_all_predictions(version=version)
     # compile_predictions(version=version)
 
