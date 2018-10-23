@@ -620,31 +620,31 @@ def swarmplot_paper1():
 
         catcont.add_catalyst(index=cat.ID, catalyst=cat)
 
-        # cat = CatalystObject()
-        # cat.ID = 'B_{}'.format(atnum)
-        # cat.add_element('Ru', 2)
-        # cat.add_element(ele, 2)
-        # cat.add_element('K', 12)
-        # cat.input_group(atnum)
-        # cat.feature_add_n_elements()
-        # cat.feature_add_Lp_norms()
-        # cat.feature_add_elemental_properties()
-        # add_obs(cat)
-        #
-        # catcont.add_catalyst(index=cat.ID, catalyst=cat)
-        #
-        # cat = CatalystObject()
-        # cat.ID = 'C_{}'.format(atnum)
-        # cat.add_element('Ru', 1)
-        # cat.add_element(ele, 3)
-        # cat.add_element('K', 12)
-        # cat.input_group(atnum)
-        # cat.feature_add_n_elements()
-        # cat.feature_add_Lp_norms()
-        # cat.feature_add_elemental_properties()
-        # add_obs(cat)
-        #
-        # catcont.add_catalyst(index=cat.ID, catalyst=cat)
+        cat = CatalystObject()
+        cat.ID = 'B_{}'.format(atnum)
+        cat.add_element('Ru', 2)
+        cat.add_element(ele, 2)
+        cat.add_element('K', 12)
+        cat.input_group(atnum)
+        cat.feature_add_n_elements()
+        cat.feature_add_Lp_norms()
+        cat.feature_add_elemental_properties()
+        add_obs(cat)
+
+        catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+        cat = CatalystObject()
+        cat.ID = 'C_{}'.format(atnum)
+        cat.add_element('Ru', 1)
+        cat.add_element(ele, 3)
+        cat.add_element('K', 12)
+        cat.input_group(atnum)
+        cat.feature_add_n_elements()
+        cat.feature_add_Lp_norms()
+        cat.feature_add_elemental_properties()
+        add_obs(cat)
+
+        catcont.add_catalyst(index=cat.ID, catalyst=cat)
 
     # ***** Set up Catalyst Container to only include specified elements*****
     catcontainer = CatalystContainer()
@@ -670,13 +670,13 @@ def swarmplot_paper1():
         catcontainer.master_container = element_dataframe
 
     # ***** Setup Machine Learning *****
-    skynet = SupervisedLearner(version='v50')
+    skynet = SupervisedLearner(version='v55')
     skynet.set_filters(
         element_filter=3,
         temperature_filter='350orless',
         ammonia_filter=1,
         space_vel_filter=2000,
-        ru_filter=3,
+        ru_filter=0,
         pressure_filter=None
     )
 
@@ -729,11 +729,11 @@ def swarmplot_paper1():
     plt.xlabel('Temperature ($^\circ$C)')
     plt.ylabel('Predicted Conversion')
 
-    plt.savefig(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Figures\3Ru_swarmplot_{}.png'.format(''.join(train_elements)))
+    plt.savefig(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Figures\0Ru_swarmplot_{}.png'.format(''.join(train_elements)))
     plt.close()
 
     # Save
-    catdf.to_csv(r'../Results/3Ru_prediction_data_{}.csv'.format(''.join(train_elements)))
+    catdf.to_csv(r'../Results/0Ru_prediction_data_{}.csv'.format(''.join(train_elements)))
     print(df[df['temperature'] == 300.0].sort_values('Predicted', ascending=False).head())
 
 
@@ -1045,13 +1045,13 @@ if __name__ == '__main__':
         exit()
 
     # ***** Predict all elements from Ca, Mn, In bimetallics (Ru-M-K) *****
-    if True:
+    if False:
         determine_algorithm_learning_rate()
         read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\figures\learning_rate2.csv")
         # generate_feature_changes_from_learning_rate()
         exit()
 
-    if False:
+    if True:
         # unsupervised_paper_1_training_set_selection()
         swarmplot_paper1()
         # categorize_data_from_swarmpredictions()

@@ -104,9 +104,13 @@ class Graphic():
     def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None):
         fig, ax = plt.subplots()
 
+        # Not sure why this has failed working...
+        # rats = np.abs(np.subtract(self.graphdf[self.x_axis_value], self.graphdf[self.y_axis_value],
+        #                           out=np.zeros_like(self.graphdf[self.y_axis_value]),
+        #                           where=self.graphdf[self.x_axis_value].values != 0))
+
         rats = np.abs(np.subtract(self.graphdf[self.x_axis_value], self.graphdf[self.y_axis_value],
-                                  out=np.zeros_like(self.graphdf[self.y_axis_value]),
-                                  where=self.graphdf[self.x_axis_value] != 0))
+                                  where=self.graphdf[self.x_axis_value].values != 0))
 
         rat_count = rats.size
         wi5 = (rats < 0.05).sum()
@@ -160,6 +164,8 @@ class Graphic():
         if svnm is None:
             plt.savefig('{}//figures//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
                         dpi=400)
+        elif svnm == 'return':
+            return plt
         else:
             plt.savefig('{}//figures//{}.png'.format(self.svfl, svnm), dpi=400)
         plt.close()

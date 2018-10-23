@@ -375,7 +375,7 @@ class SupervisedLearner():
     def filter_space_velocities(self):
         filter_dict_sv = {
             2000: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'space_velocity'] > 1400) &
-                                       (self.dynamic_dataset.loc[:, 'space_velocity'] < 2600)]
+                                       (self.dynamic_dataset.loc[:, 'space_velocity'] < 3000)]
         }
 
         self.dynamic_dataset = filter_dict_sv.get(self.sv_filter, self.dynamic_dataset)
@@ -463,7 +463,7 @@ class SupervisedLearner():
         self.predictions = self.machina.predict(self.features)
         return self.predictions
 
-    def predict_crossvalidate(self, kfold=10):
+    def predict_crossvalidate(self, kfold=None):
         """ Use k-fold validation with grouping by catalyst ID to determine  """
         if isinstance(kfold, int):
             if kfold > 1:
@@ -554,19 +554,11 @@ class SupervisedLearner():
         g.plot_important_features(svnm=svnm)
         g.bokeh_predictions(svnm='{}_predict-self_{}'.format(self.version, svnm))
 
-    def predict_all_from_elements(self, elements, loads=None, svnm='data', save_plots=True, save_features=True):
+    def predict_all_from_elements(self, elements, loads=None, cv=False, svnm='data', save_plots=True, save_features=True):
         """ Segment data into training dataset (elements) and test dataset (not elements) and predict test dataset """
 
         # Refresh dynamic dataset
         self.filter_static_dataset()
-
-        # test_elements = [
-        #     x.replace(' Loading', '') for x in self.dynamic_dataset.columns
-        #     if ('Loading' in x) &
-        #     (x.replace(' Loading', '') not in ['Ru','K']) &
-        #     (x.replace(' Loading', '') not in np.unique(elements).tolist())
-        #     ]
-        # self.filter_out_elements(eles=test_elements)
 
         # Create a dataframe of all element/load pairs to filter
         filter_df = pd.DataFrame([elements, loads], index=['Element', 'Loading']).T
@@ -580,20 +572,49 @@ class SupervisedLearner():
         test_data_index_list = list(set(dynamic_index_list) - set(training_index_list))
 
         # Drop test data from dataset
-        self.dynamic_dataset.drop(index=test_data_index_list)
+        self.dynamic_dataset.drop(index=test_data_index_list, inplace=True)
+        self.set_training_data()
 
         # Train model
         self.train_data()
 
-        # Refresh dynamic dataset
-        self.reset_dynamic_dataset()
-        self.filter_static_dataset()
+        if cv:
+            try:
+                self.predict_crossvalidate(kfold='LSO')
+                cv_df = pd.DataFrame([self.dynamic_dataset.index, self.predictions], index=['Index', 'Predictions']).T
+            except ValueError:
+                cv_df = pd.DataFrame()
+                print('Fewer than 2 groups')
 
-        # Drop training data from dynamic dataset
-        self.dynamic_dataset.drop(index=training_index_list)
+            # Refresh dynamic dataset
+            self.filter_static_dataset()
 
-        # Predict test data and compile results
-        self.predict_data()
+            # Drop training data from dynamic dataset
+            self.dynamic_dataset.drop(index=training_index_list, inplace=True)
+            self.set_training_data()
+
+            # Predict test data and compile results
+            self.predict_data()
+
+            test_df = pd.DataFrame([self.dynamic_dataset.index, self.predictions], index=['Index','Predictions']).T
+            pred_df = pd.concat([cv_df, test_df])
+            pred_df.set_index(keys=['Index'], drop=True, inplace=True)
+
+            # Refresh dynamic dataset
+            self.filter_static_dataset()
+            self.predictions = pred_df.loc[self.dynamic_dataset.index].dropna().values
+
+        else:
+            # Refresh dynamic dataset
+            self.filter_static_dataset()
+
+            # Drop training data from dynamic dataset
+            self.dynamic_dataset.drop(index=training_index_list, inplace=True)
+            self.set_training_data()
+
+            # Predict test data and compile results
+            self.predict_data()
+
         self.compile_results()
 
         # TODO: add save features back to method
@@ -644,12 +665,18 @@ class SupervisedLearner():
                 i += 1
 
         # Save result dataframe if requested
-        if sv:
-            # Save Results and Features
-            if svnm is None:
+        if svnm is None:
+            if self.svnm is not None:
                 self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
-            else:
-                self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
+        else:
+            self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
+        #
+        # if sv:
+        #     # Save Results and Features
+        #     if svnm is None:
+        #         self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
+        #     else:
+        #         self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
 
     def save_dynamic(self):
         """ Save RAW dynamic dataset - Use "compile_results" method unless debugging """
@@ -807,3 +834,21 @@ class SupervisedLearner():
         plt.legend(loc="best")
         plt.show()
 
+    def save_model_parameters_to_csv(self):
+
+        df = pd.DataFrame(
+            [
+                self.num_element_filter,
+                self.temperature_filter,
+                self.ammonia_filter,
+                self.ru_filter,
+                self.pressure_filter,
+                self.sv_filter,
+                self.version,
+                self.target_columns,
+                self.drop_columns,
+                self.group_columns,
+                self.hold_columns,
+
+            ]
+        )

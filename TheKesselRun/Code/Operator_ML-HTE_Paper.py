@@ -290,7 +290,7 @@ def determine_algorithm_learning_rate():
 
     allcats = [(x, y) for x in elements for y in loads]
 
-    for i in range(1, len(allcats)): # iterate through all possible numbers of catalyst
+    for i in range(2, len(allcats)): # iterate through all possible numbers of catalyst
         # if i == 3:
         #     for eset in list(itertools.combinations(elements, 3)):
         #         allcats = [(x, y) for x in eset for y in loads]
@@ -311,7 +311,7 @@ def determine_algorithm_learning_rate():
             # allcats = [(x, y) for x in eset for y in loads]
             catalyst_set, load_set = list(zip(*random.sample(allcats, i)))
             # catalyst_set, load_set = list(zip(*allcats))
-            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set,
+            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=True,
                                                   save_plots=False, save_features=False,
                                                   svnm=''.join(catalyst_set))
             mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
@@ -319,7 +319,7 @@ def determine_algorithm_learning_rate():
             results.loc[i, j] = mae
 
     # results.to_csv(r'../Results/learning_rate4.csv')
-    results.to_csv(r'{}/learning_rate4.csv'.format(skynet.svfl))
+    results.to_csv(r'{}/learning_rate-LSOCV.csv'.format(skynet.svfl))
 
 
 def read_learning_rate(pth):
@@ -332,11 +332,11 @@ def read_learning_rate(pth):
     df2 = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
     sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=df2)
     plt.xlabel('Number of Catalysts in Training Dataset')
-    plt.xlim(1, 60)
-    plt.yticks(np.arange(0.1, 0.35, 0.05))
-    plt.ylim(0.1, 0.3)
+    plt.xlim(1, 50)
+    plt.yticks(np.arange(0.10, 0.35, 0.05))
+    plt.ylim(0.10, 0.25)
 
-    plt.savefig(r'../Figures/ERT_learning_rate6.png', dpi=400)
+    plt.savefig(r'../Figures/ERT_learning_rate-LSOCV2.png', dpi=400)
 
 def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     # Load Data
@@ -377,7 +377,7 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     else:
         load_list = []
 
-    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band']
+    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
                                  + zpp_list + load_list)
     skynet.filter_static_dataset()
     return skynet
@@ -610,6 +610,29 @@ def make_all_predictions(version):
     skynet.train_data()
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru')
 
+    """ 3,1,12 RuMK + Full Wt Load CaMnIn Dataset (26 catalysts) """
+    skynet = reset_skynet()
+    filter(skynet, ru=3)
+    df = skynet.dynamic_dataset
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
+    skynet.filter_static_dataset()
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+    crossvalidate(svnm='3RuandCaMnInFull_CV')
+
+    skynet = reset_skynet()
+    filter(skynet, ru=3)
+    df = skynet.dynamic_dataset
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
+    skynet.filter_static_dataset()
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+    predict(ru3=False, ru2=True, ru1=True, svnm='3RuandCaMnInFull')
+
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
     skynet = reset_skynet()
     filter(skynet, ru=32)
@@ -691,10 +714,10 @@ def compile_predictions(version):
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
 if __name__ == '__main__':
-    version = 'v53-learning-rate'
+    version = 'v55'
 
-    determine_algorithm_learning_rate()
-    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate4.csv")
+    # determine_algorithm_learning_rate()
+    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
 
     # make_all_predictions(version=version)
     # compile_predictions(version=version)
