@@ -147,7 +147,8 @@ class Graphic():
             plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
                         horizontalalignment='left', fontsize=6)
 
-        plt.xlabel(self.x_axis_value)
+        # plt.xlabel(self.x_axis_value)
+        plt.xlabel('Predicted Conversion')
         plt.ylabel(self.y_axis_value)
 
         if legend_label is None:
@@ -168,6 +169,7 @@ class Graphic():
             return plt
         else:
             plt.savefig('{}//figures//{}.png'.format(self.svfl, svnm), dpi=400)
+
         plt.close()
 
     def plot_kernel_density(self, feat_list=None, margins=True, element=None, pointcolor='w'):

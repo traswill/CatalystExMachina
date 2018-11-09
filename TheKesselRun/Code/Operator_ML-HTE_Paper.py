@@ -377,8 +377,15 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     else:
         load_list = []
 
-    skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
-                                 + zpp_list + load_list)
+    skynet.set_drop_columns(
+        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+                                 + zpp_list + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
+                                               'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
+                                               'Number f-shell Unfilled Electrons'])
+
+    # skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+    #                              + zpp_list + load_list)
+
     skynet.filter_static_dataset()
     return skynet
 
@@ -541,6 +548,126 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
 
     return catcont
 
+def predict_lanthanides(ru3=True, ru2=True, ru1=True):
+    def create_catalyst(catcont, ele, atnum, ru3, ru2, ru1):
+        def add_obs(cat):
+            cat.add_observation(
+                temperature=250,
+                space_velocity=2000,
+                gas_concentration=1,
+                reactor_number=0
+            )
+
+            cat.add_observation(
+                temperature=300,
+                space_velocity=2000,
+                gas_concentration=1,
+                reactor_number=0
+            )
+
+            cat.add_observation(
+                temperature=350,
+                space_velocity=2000,
+                gas_concentration=1,
+                reactor_number=0
+            )
+
+        # Create a catalyst of 3,1,12 Ru-ele-K for testing
+        if ru3:
+            cat = CatalystObject()
+            cat.ID = 'A_{}'.format(atnum)
+            cat.add_element('Ru', 3)
+            cat.add_element(ele, 1)
+            cat.add_element('K', 12)
+            cat.input_group(atnum)
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties()
+            add_obs(cat)
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+        # Create a catalyst of 2,2,12 Ru-ele-K for testing
+        if ru2:
+            cat = CatalystObject()
+            cat.ID = 'B_{}'.format(atnum)
+            cat.add_element('Ru', 2)
+            cat.add_element(ele, 2)
+            cat.add_element('K', 12)
+            cat.input_group(atnum)
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties()
+            add_obs(cat)
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+        # Create a catalyst of 1,3,12 Ru-ele-K for testing
+        if ru1:
+            cat = CatalystObject()
+            cat.ID = 'C_{}'.format(atnum)
+            cat.add_element('Ru', 1)
+            cat.add_element(ele, 3)
+            cat.add_element('K', 12)
+            cat.input_group(atnum)
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties()
+            add_obs(cat)
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    def filter(ml, ru):
+        ml.set_filters(
+            element_filter=3,
+            temperature_filter='350orless',
+            ammonia_filter=1,
+            space_vel_filter=2000,
+            ru_filter=ru,
+            pressure_filter=None
+        )
+
+    def predict(ru3, ru2, ru1, svnm):
+        catcont = generate_empty_container(ru3=ru3, ru2=ru2, ru1=ru1)
+        skynet.load_static_dataset(catcont)
+        skynet.set_training_data()
+        skynet.predict_data()
+        skynet.compile_results(svnm=svnm)
+
+    def crossvalidate(svnm):
+        skynet.predict_crossvalidate(kfold='LOO')
+        skynet.compile_results(svnm=svnm)
+
+    def reset_skynet():
+        skynet = load_skynet(version=version, drop_na_columns=False)
+        return skynet
+
+    skynet = reset_skynet()
+    filter(skynet, ru=0)
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+
+    # ***** Generate all metals for predictions *****
+    eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+    ele_list = [57, 58, 60, 62, 63, 67]
+
+    ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
+    eles = ele_df.index.values
+    edf = pd.DataFrame([eles, ele_list], index=['Ele', 'Atnum']).T
+    eles = edf.values.tolist()
+
+    catcont = CatalystContainer()
+
+    for nm, atnum in eles:
+        create_catalyst(catcont=catcont, ele=nm, atnum=atnum, ru3=ru3, ru2=ru2, ru1=ru1)
+
+    catcont.build_master_container(drop_empty_columns=False)
+
+    skynet.load_static_dataset(catcont)
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.compile_results(svnm='Lanthanides')
 
 def make_all_predictions(version):
     ''' Generate Crossvalidations and prediction files '''
@@ -714,16 +841,26 @@ def compile_predictions(version):
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
 if __name__ == '__main__':
-    version = 'v55'
+    version = 'v57-lanthanides'
 
     # determine_algorithm_learning_rate()
-    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
+    # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
 
     # make_all_predictions(version=version)
     # compile_predictions(version=version)
 
-    # skynet = load_skynet(version=version, ru_filter=0)
-    # CaMnIn_prediction(learner=skynet)
+    skynet = load_skynet(version=version, ru_filter=0)
+    predict_lanthanides()
+    # Lists for dropping certain features
+    # zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+    #             'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+    #             'Zunger Pseudopotential (sigma)']
+    #
+    # skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+    #                              + zpp_list + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
+    #                                            'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
+    #                                            'Number f-shell Unfilled Electrons'])
+    #
     # temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=True)
 
     # three_catalyst_model()
