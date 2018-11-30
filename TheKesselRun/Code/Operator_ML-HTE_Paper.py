@@ -650,7 +650,7 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
 
     # ***** Generate all metals for predictions *****
     eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
-    ele_list = [57, 58, 60, 62, 63, 67]
+    ele_list = [57, 58, 60, 62, 63, 67, 73]
 
     ele_df = eledf[eledf['Atomic Number'].isin(ele_list)]
     eles = ele_df.index.values
@@ -760,6 +760,24 @@ def make_all_predictions(version):
     skynet.train_data()
     predict(ru3=False, ru2=True, ru1=True, svnm='3RuandCaMnInFull')
 
+    """ Full Wt Load CaMnIn Dataset (9 catalysts) """
+    skynet = reset_skynet()
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
+    skynet.dynamic_dataset = df
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+    crossvalidate(svnm='CaMnInFull_CV')
+
+    skynet = reset_skynet()
+    df = skynet.dynamic_dataset
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
+    skynet.dynamic_dataset = df
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+    predict(ru3=False, ru2=True, ru1=True, svnm='CaMnInFull')
+
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
     skynet = reset_skynet()
     filter(skynet, ru=32)
@@ -841,12 +859,12 @@ def compile_predictions(version):
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
 if __name__ == '__main__':
-    version = 'v57-lanthanides'
+    version = 'v58'
 
     # determine_algorithm_learning_rate()
     # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
 
-    # make_all_predictions(version=version)
+    make_all_predictions(version=version)
     # compile_predictions(version=version)
 
     skynet = load_skynet(version=version, ru_filter=0)
