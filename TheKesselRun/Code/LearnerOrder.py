@@ -646,12 +646,17 @@ class SupervisedLearner():
     def compile_results(self, sv=False, svnm=None):
         """ Create a results dataframe that mimics dynamic but includes non-data values such as catalyst names """
 
-        if self.predictions is None:
+        if not self.predictions:
             print('WARNING: No predictions have been made.')
 
         # Create Result DF, add predictions and experimental data
         self.result_dataset = self.dynamic_dataset[self.features_df.columns].copy()
-        self.result_dataset['Predicted Conversion'] = self.predictions
+
+        if not self.predictions:
+            print('WARNING: No predictions have been made.')
+        else:
+            self.result_dataset['Predicted Conversion'] = self.predictions
+
         self.result_dataset['Measured Conversion'] = self.labels
 
         # Parse the Element Dictionary to get catalyst names

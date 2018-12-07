@@ -12,12 +12,12 @@ class CatalystObject():
     """CatalystObject will contain each individual training set"""
     def __init__(self):
         self.ID = None
-        self.activity = None
         self.group = None
 
         self.observation_dict = dict()
         self.feature_dict = dict()
         self.elements = dict()
+        self.support = None
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
                         reactor_number=None, activity=None, selectivity=None):
@@ -36,6 +36,9 @@ class CatalystObject():
     def add_element(self, element, weight_loading):
         if (element != '-') & (element != '--'):
             self.elements[element] = weight_loading
+
+    def add_support(self, support):
+        self.support = support
 
     def input_n_cl_atoms(self, cl_atoms):
         self.feature_dict['n_Cl_atoms'] = cl_atoms
@@ -244,53 +247,6 @@ class CatalystObject():
                 n_eles += 1
 
         self.feature_add('n_elements',n_eles)
-
-    def feature_add_M1M2_ratio(self):
-        if len(list(self.elements.values())) >= 2:
-            ratio = list(self.elements.values())[0] / list(self.elements.values())[1] * 100
-        else:
-            ratio = 0
-        self.feature_add('M1M2_ratio', ratio)
-
-    def feature_add_oxidation_states(self):
-        eledf = pd.read_csv(r'./Data/Elements.csv', index_col=0, usecols=['Abbreviation','OxidationStates'])
-        eledf.dropna(inplace=True)
-        eledf = eledf.loc[list(self.elements.keys())]
-
-        for indx, val in eledf.iterrows():
-            for ox_state in val.values[0].split(' '):
-                eledf.loc[indx, 'OxState {}'.format(ox_state)] = 1
-
-        eledf.fillna(0, inplace=True)
-        eledf.drop(columns='OxidationStates', inplace=True)
-
-        for feature_name, feature_values in eledf.T.iterrows():
-            for index, _ in enumerate(self.elements):
-                self.feature_add('{nm}_{index}'.format(nm=feature_name, index=index),
-                                 feature_values.values[index])
-
-    def feature_add_xrd_peaks(self, peak_xx, peak_yy):
-        # Adds peak intensities
-        peak_xx = ['XRD 2TH {:0.2f}'.format(x) for x in peak_xx]
-        bundle_data = list(zip(peak_xx, peak_yy))
-
-        for x, y in bundle_data:
-            self.feature_add(key=x, value=y)
-
-    def feature_add_xrd_peak_FWHM(self, peak_nm, peak_fwhm):
-        self.feature_add(key=peak_nm, value=peak_fwhm)
-
-    def feature_add_Norskov_dband(self):
-        if len(self.elements) == 3:
-            dband_df = pd.read_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Processed\Norskov Data Processed.csv', index_col=0)
-            eles = list(self.elements.keys())
-
-            for idx, rw in dband_df.iterrows():
-                e1, e2 = rw[0].replace('1% ', '').split(' on ')
-
-                if (e1 == eles[1]) & (e2 == eles[0]):
-                    self.feature_add(key='Norskov d-band', value=rw[1])
-                    return
 
 
 class CatalystObservation():

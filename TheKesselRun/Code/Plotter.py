@@ -172,7 +172,7 @@ class Graphic():
 
         plt.close()
 
-    def plot_kernel_density(self, feat_list=None, margins=True, element=None, pointcolor='w'):
+    def plot_kernel_density(self, feat_list=None, margins=True, element=None, pointcolor='w', ylim=(0.3, 1.3)):
         """
 
         :param feat_list: A list of features to be plotted
@@ -210,15 +210,15 @@ class Graphic():
             }
 
             lim_dict.get(feat, plt.autoscale())
-            plt.ylim(-0.3, 1.3)
+            plt.ylim(ylim)
 
             plt.xlabel(feat.split('_')[0])
 
             plt.tight_layout()
             if element is not None:
-                plt.savefig('{}//Figures//{}-{}-{}'.format(self.svfl, feat, self.svnm, element), dpi=400)
+                plt.savefig('{}//figures//{}-{}-{}'.format(self.svfl, feat, self.svnm, element), dpi=400)
             else:
-                plt.savefig('{}//Figures//{}-{}'.format(self.svfl, feat, self.svnm), dpi=400)
+                plt.savefig('{}//figures//{}-{}'.format(self.svfl, feat, self.svnm), dpi=400)
             plt.close()
 
     def plot_important_features(self, df, svnm=''):
@@ -281,6 +281,17 @@ class Graphic():
 
     def plot_partial_dependance(self):
         pass #TODO http://scikit-learn.org/stable/auto_examples/ensemble/plot_partial_dependence.html#sphx-glr-auto-examples-ensemble-plot-partial-dependence-py
+
+    def plot_conversion_heatmap(self, feature1, feature2, conversion='Measured'):
+        plt.hexbin(x=self.graphdf[feature1], y=self.graphdf[feature2], C=self.graphdf['{} Conversion'.format(conversion)],
+                   gridsize=30)
+        plt.xlabel(feature1)
+        plt.ylabel(feature2)
+        cb = plt.colorbar()
+        cb.set_label('{} Conversion'.format(conversion))
+        # sns.scatterplot(data=self.graphdf, x=feature1, y=feature2,
+        #                 hue='{} Conversion'.format(conversion), style='{} Conversion'.format(conversion))
+        plt.show()
 
 # TODO Implement Bokeh
     def bokeh_predictions(self, svnm=None):

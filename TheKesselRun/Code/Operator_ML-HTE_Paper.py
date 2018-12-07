@@ -1,3 +1,9 @@
+# Created by Travis Williams
+# Property of the University of South Carolina
+# Jochen Lauterbach Group
+# Contact: travisw@email.sc.edu
+# Project Start: February 15, 2018
+
 from TheKesselRun.Code.LearnerOrder import SupervisedLearner, CatalystContainer
 from TheKesselRun.Code.LearnerAnarchy import Anarchy
 from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
@@ -59,7 +65,6 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_Norskov_dband()
             cat.feature_add_elemental_properties()
 
             cat.add_observation(
@@ -858,8 +863,143 @@ def compile_predictions(version):
 
     output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
 
+def feature_extraction_with_XRD():
+    catcont = CatalystContainer()
+
+    """ Import NH3 data from Katie's HiTp dataset(cleaned). """
+    df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
+    df.dropna(axis=0, inplace=True, how='all')
+
+    # Drop RuK data that is inconsistent from file 5
+    df.drop(index=df[df['ID'] == 20].index, inplace=True)
+    df.drop(index=df[df['ID'] == 21].index, inplace=True)
+    df.drop(index=df[df['ID'] == 22].index, inplace=True)
+    # Using catalyst #24 for RuK (20ml)
+
+    # Import Cl atoms during synthesis
+    cl_atom_df = pd.read_excel(r'..\Data\Catalyst_Synthesis_Parameters.xlsx', index_col=0)
+    xrd_df = pd.read_csv(r'..\Data\From Katie\XRD_GrainSize_11Nov18_edited.csv', index_col=0)
+
+    mn = np.floor(xrd_df.index.min())
+    mx = np.ceil(xrd_df.index.max())
+    idx = np.arange(mn, mx, step=1)
+    grain_reindex_df = pd.DataFrame(index=idx, columns=xrd_df.columns)
+    for idx, rw in grain_reindex_df.iterrows():
+        grain_reindex_df.loc[idx, :] = xrd_df.loc[(xrd_df.index > idx) & (xrd_df.index < idx + 1)].mean().values
+
+    grain_reindex_df = grain_reindex_df.transpose()
+
+    # Loop through all data
+    for index, dat in df.iterrows():
+        # If the ID already exists in container, then only add an observation.  Else, generate a new catalyst.
+        if dat['ID'] in catcont.catalyst_dictionary:
+            catcont.catalyst_dictionary[dat['ID']].add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=None,
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Conversion'],
+                selectivity=None
+            )
+        else:
+            cat = CatalystObject()
+            cat.ID = dat['ID']
+            cat.add_element(dat['Ele1'], dat['Wt1'])
+            cat.add_element(dat['Ele2'], dat['Wt2'])
+            cat.add_element(dat['Ele3'], dat['Wt3'])
+            cat.input_group(dat['Groups'])
+            try:
+                cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+            except KeyError:
+                print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
+
+
+            nm = '{:.0f}{:.0f}{:.0f} {}{}{}'.format(dat['Wt1'], dat['Wt2'], dat['Wt3'], dat['Ele1'], dat['Ele2'], dat['Ele3'])
+            if '-' not in nm:
+                try:
+                    xrd = grain_reindex_df.loc[grain_reindex_df.index == nm].fillna(value=0)
+                    for twoth, gsz in xrd.iteritems():
+                        cat.feature_add(key='{:.0f} 2Th'.format(twoth), value=gsz.values[0])
+                except IndexError:
+                    print('{} has no XRD'.format(nm))
+                    continue
+            else:
+                continue
+
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties()
+
+            cat.add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=None,
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Conversion'],
+                selectivity=None
+            )
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    catcont.build_master_container(drop_empty_columns=True)
+
+    # Init Learner
+    skynet = SupervisedLearner(version=version)
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=0,
+        pressure_filter=None
+    )
+
+    # Set algorithm and add data
+    skynet.set_learner(learner='etr', params='etr')
+    skynet.load_static_dataset(catalyst_container=catcont)
+
+    # Set parameters
+    skynet.set_target_columns(cols=['Measured Conversion'])
+    skynet.set_group_columns(cols=['group'])
+    skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
+
+    # Lists for dropping certain features
+    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                'Zunger Pseudopotential (sigma)']
+
+    skynet.set_drop_columns(
+        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+             + zpp_list + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
+                           'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
+                           'Number f-shell Unfilled Electrons'])
+
+    # skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+    #                              + zpp_list + load_list)
+
+    skynet.filter_static_dataset()
+
+    skynet.train_data()
+    # skynet.predict_crossvalidate(kfold=10)
+    skynet.extract_important_features(prnt=True, sv=True)
+    skynet.compile_results()
+    g = Graphic(df=skynet.result_dataset, svfl=r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v58-XRD')
+    g.plot_kernel_density(feat_list=['58 2Th', '28 2Th'], pointcolor='r')
+    g.plot_conversion_heatmap(feature1='28 2Th', feature2='Number d-shell Valence Electrons_mad')
+    #
+    # g.y_axis_value = 'Number d-shell Valence Electrons_mad'
+    # g.svnm = '{}_dshell.png'.format(g.svnm.split('.')[0])
+    # g.plot_kernel_density(feat_list=['58 2Th', '28 2Th'], pointcolor='r', ylim=None)
+
+
 if __name__ == '__main__':
-    version = 'v58'
+    version = 'v58-XRD'
+    feature_extraction_with_XRD()
+    exit()
 
     # determine_algorithm_learning_rate()
     # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
