@@ -20,7 +20,7 @@ class CatalystObject():
         self.support = None
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
-                        reactor_number=None, activity=None, selectivity=None):
+                        reactor_number=None, activity=None, selectivity=None, activity_error=None):
         obs = CatalystObservation()
         obs.temperature = temperature
         obs.space_velocity = space_velocity
@@ -30,6 +30,7 @@ class CatalystObject():
         obs.reactor = reactor_number
         obs.activity = activity
         obs.selectivity = selectivity
+        obs.activity_error = activity_error
 
         self.observation_dict[len(self.observation_dict)] = obs
 
@@ -260,6 +261,8 @@ class CatalystObservation():
 
         self.activity = None
         self.selectivity = None
+        self.activity_error = None
+        self.selectivity_error = None
 
     def to_dict(self):
         dict = {
@@ -269,8 +272,10 @@ class CatalystObservation():
             'gas': self.gas,
             'ammonia_concentration': self.concentration,
             'reactor': self.reactor,
-            'Measured Conversion': self.activity,
-            'selectivity': self.selectivity
+            'Measured Conversion': self.activity, # TODO lower case and fix propigation through code
+            'measured conversion experimental error': self.activity_error,
+            'selectivity': self.selectivity,
+            'selectivity experimental error': self.selectivity_error
         }
 
         return dict

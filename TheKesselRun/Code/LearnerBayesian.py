@@ -16,5 +16,10 @@ import time
 
 class BayesianLearner():
     def __init__(self):
-        pass
+
+        # Data_space is the current known dataset in the form X_ds
+        self.data_space = None
+
+        # Parameter_space is the experimental design that is to be explored, in the form X_ps
+        self.parameter_space = None
 
