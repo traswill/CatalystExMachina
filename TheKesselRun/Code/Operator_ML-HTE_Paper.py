@@ -998,8 +998,8 @@ def feature_extraction_with_XRD():
 
 if __name__ == '__main__':
     version = 'v58-XRD'
-    feature_extraction_with_XRD()
-    exit()
+    # feature_extraction_with_XRD()
+    # exit()
 
     # determine_algorithm_learning_rate()
     # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
