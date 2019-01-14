@@ -278,8 +278,8 @@ def test_all_ML_models(version, three_ele=True, ru_filter=3):
     plt.ylim(0,0.36)
     plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
 
-def determine_algorithm_learning_rate():
-    skynet = load_skynet(version='v52-learning-rate')
+def determine_algorithm_learning_rate(version):
+    skynet = load_skynet(version=version)
 
     elements = [x.replace(' Loading', '') for x in skynet.static_dataset.columns if 'Loading' in x]
     elements.remove('K')
@@ -296,6 +296,7 @@ def determine_algorithm_learning_rate():
     allcats = [(x, y) for x in elements for y in loads]
 
     for i in range(2, len(allcats)): # iterate through all possible numbers of catalyst
+        print('{} of {}'.format(i, len(allcats)))
         # if i == 3:
         #     for eset in list(itertools.combinations(elements, 3)):
         #         allcats = [(x, y) for x in eset for y in loads]
@@ -315,33 +316,55 @@ def determine_algorithm_learning_rate():
             # eset = random.sample(elements, i)
             # allcats = [(x, y) for x in eset for y in loads]
             catalyst_set, load_set = list(zip(*random.sample(allcats, i)))
+            # print('Catalyst Set: {} \n Load Set: {}'.format(catalyst_set, load_set))
             # catalyst_set, load_set = list(zip(*allcats))
-            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=True,
+
+            # Predict from training set
+            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=False,
                                                   save_plots=False, save_features=False,
                                                   svnm=''.join(catalyst_set))
             mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
 
             results.loc[i, j] = mae
 
+            # Cross validateb LOO
+            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=True,
+                                                  save_plots=False, save_features=False,
+                                                  svnm=''.join(catalyst_set))
+            mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
+
+            results_cv.loc[i, j] = mae
+
     # results.to_csv(r'../Results/learning_rate4.csv')
-    results.to_csv(r'{}/learning_rate-LSOCV.csv'.format(skynet.svfl))
+    results.to_csv(r'{}/learning_predict-rate.csv'.format(skynet.svfl))
+    results_cv.to_csv(r'{}/learning_cv-rate.csv'.format(skynet.svfl))
 
 
 def read_learning_rate(pth):
-    df = pd.read_csv(pth, index_col=0)
+    learn_df = pd.read_csv('{}\\{}'.format(pth, 'learning_predict-rate.csv'), index_col=0)
     datlist = list()
-    for idx, rw in df.iterrows():
+    for idx, rw in learn_df.iterrows():
         for val in rw:
             datlist.append([idx, val])
 
-    df2 = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
-    sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=df2)
+    learn_df_summary = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
+
+    cv_df = pd.read_csv('{}\\{}'.format(pth, 'learning_cv-rate.csv'), index_col=0)
+    datlist = list()
+    for idx, rw in cv_df.iterrows():
+        for val in rw:
+            datlist.append([idx, val])
+
+    cv_df_summary = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
+
+    sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=learn_df_summary)
+    sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=cv_df_summary)
+    plt.legend(['Learning Rate', 'Cross-Validate'])
     plt.xlabel('Number of Catalysts in Training Dataset')
     plt.xlim(1, 50)
     plt.yticks(np.arange(0.10, 0.35, 0.05))
     plt.ylim(0.10, 0.25)
-
-    plt.savefig(r'../Figures/ERT_learning_rate-LSOCV2.png', dpi=400)
+    plt.savefig(r'{}//learningrate.png'.format(pth), dpi=400)
 
 def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     # Load Data
@@ -997,12 +1020,14 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v58-XRD'
+    version = 'v60-learning-rate'
     # feature_extraction_with_XRD()
     # exit()
 
-    # determine_algorithm_learning_rate()
-    # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52-learning-rate\learning_rate-LSOCV.csv")
+    # determine_algorithm_learning_rate(version)
+    # exit()
+    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v60-learning-rate")
+    exit()
 
     make_all_predictions(version=version)
     # compile_predictions(version=version)

@@ -99,7 +99,7 @@ class Graphic():
         return plt
 
     def plot_metadata(self):
-        pass
+        pass #TODO do this
 
     def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None):
         fig, ax = plt.subplots()

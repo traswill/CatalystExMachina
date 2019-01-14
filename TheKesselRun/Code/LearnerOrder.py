@@ -578,31 +578,36 @@ class SupervisedLearner():
         # Train model
         self.train_data()
 
-        if cv:
-            try:
+        if cv is not False:
+            if cv is True:
                 self.predict_crossvalidate(kfold='LSO')
-                cv_df = pd.DataFrame([self.dynamic_dataset.index, self.predictions], index=['Index', 'Predictions']).T
-            except ValueError:
-                cv_df = pd.DataFrame()
-                print('Fewer than 2 groups')
+            else:
+                self.predict_crossvalidate(kfold=cv)
 
-            # Refresh dynamic dataset
-            self.filter_static_dataset()
-
-            # Drop training data from dynamic dataset
-            self.dynamic_dataset.drop(index=training_index_list, inplace=True)
-            self.set_training_data()
-
-            # Predict test data and compile results
-            self.predict_data()
-
-            test_df = pd.DataFrame([self.dynamic_dataset.index, self.predictions], index=['Index','Predictions']).T
-            pred_df = pd.concat([cv_df, test_df])
-            pred_df.set_index(keys=['Index'], drop=True, inplace=True)
-
-            # Refresh dynamic dataset
-            self.filter_static_dataset()
-            self.predictions = pred_df.loc[self.dynamic_dataset.index].dropna().values
+            # try:
+            #     self.predict_crossvalidate(kfold='LSO')
+            #     cv_df = pd.DataFrame([self.dynamic_dataset.index, self.predictions], index=['Index', 'Predictions']).T
+            # except ValueError:
+            #     cv_df = pd.DataFrame()
+            #     print('Fewer than 2 groups')
+            #
+            # # Refresh dynamic dataset
+            # self.filter_static_dataset()
+            #
+            # # Drop training data from dynamic dataset
+            # self.dynamic_dataset.drop(index=training_index_list, inplace=True)
+            # self.set_training_data()
+            #
+            # # Predict test data and compile results
+            # self.predict_data()
+            #
+            # test_df = pd.DataFrame([self.dynamic_dataset.index, self.predictions], index=['Index','Predictions']).T
+            # pred_df = pd.concat([cv_df, test_df])
+            # pred_df.set_index(keys=['Index'], drop=True, inplace=True)
+            #
+            # # Refresh dynamic dataset
+            # self.filter_static_dataset()
+            # self.predictions = pred_df.loc[self.dynamic_dataset.index].dropna().values
 
         else:
             # Refresh dynamic dataset
@@ -615,7 +620,7 @@ class SupervisedLearner():
             # Predict test data and compile results
             self.predict_data()
 
-        self.compile_results()
+        self.compile_results(sv=False)
 
         # TODO: add save features back to method
         # if save_features:
@@ -646,17 +651,16 @@ class SupervisedLearner():
     def compile_results(self, sv=False, svnm=None):
         """ Create a results dataframe that mimics dynamic but includes non-data values such as catalyst names """
 
-        if not self.predictions:
-            print('WARNING: No predictions have been made.')
-
         # Create Result DF, add predictions and experimental data
         self.result_dataset = self.dynamic_dataset[self.features_df.columns].copy()
 
-        if not self.predictions:
-            print('WARNING: No predictions have been made.')
-        else:
-            self.result_dataset['Predicted Conversion'] = self.predictions
+        # TODO why did this break?  Getting value error for if not self.predictions...
+        # if not self.predictions:
+        #     print('WARNING: No predictions have been made.')
+        # else:
+        #     self.result_dataset['Predicted Conversion'] = self.predictions
 
+        self.result_dataset['Predicted Conversion'] = self.predictions
         self.result_dataset['Measured Conversion'] = self.labels
 
         # Parse the Element Dictionary to get catalyst names
@@ -670,11 +674,12 @@ class SupervisedLearner():
                 i += 1
 
         # Save result dataframe if requested
-        if svnm is None:
-            if self.svnm is not None:
-                self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
-        else:
-            self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
+        if sv:
+            if svnm is None:
+                if self.svnm is not None:
+                    self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, self.svnm))
+            else:
+                self.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(self.svfl, svnm))
         #
         # if sv:
         #     # Save Results and Features
