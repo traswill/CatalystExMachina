@@ -290,8 +290,9 @@ def determine_algorithm_learning_rate(version):
     loads = [0.03, 0.02, 0.01]
 
     results = pd.DataFrame()
-    results_cv = pd.DataFrame()
-    results_3ele = pd.DataFrame()
+    results_LSOcv = pd.DataFrame()
+    results_3foldcv = pd.DataFrame()
+    results_10foldcv = pd.DataFrame()
 
     allcats = [(x, y) for x in elements for y in loads]
 
@@ -327,20 +328,45 @@ def determine_algorithm_learning_rate(version):
 
             results.loc[i, j] = mae
 
-            # Cross validateb LOO
-            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=True,
+            # Cross validateb LSO
+            df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv='LSO',
                                                   save_plots=False, save_features=False,
                                                   svnm=''.join(catalyst_set))
             mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
 
-            results_cv.loc[i, j] = mae
+            results_LSOcv.loc[i, j] = mae
+
+            # Cross validateb 3-fold
+            try:
+                df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=3,
+                                                      save_plots=False, save_features=False,
+                                                      svnm=''.join(catalyst_set))
+                mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
+            except ValueError:
+                mae = np.nan
+
+            results_3foldcv.loc[i, j] = mae
+
+            # Cross validateb 10-fold
+            try:
+                df = skynet.predict_all_from_elements(elements=catalyst_set, loads=load_set, cv=10,
+                                                      save_plots=False, save_features=False,
+                                                      svnm=''.join(catalyst_set))
+                mae = mean_absolute_error(df['Measured Conversion'].values, df['Predicted Conversion'].values)
+            except ValueError:
+                mae = np.nan
+
+            results_10foldcv.loc[i, j] = mae
 
     # results.to_csv(r'../Results/learning_rate4.csv')
     results.to_csv(r'{}/learning_predict-rate.csv'.format(skynet.svfl))
-    results_cv.to_csv(r'{}/learning_cv-rate.csv'.format(skynet.svfl))
+    results_LSOcv.to_csv(r'{}/learning_LSOcv-rate.csv'.format(skynet.svfl))
+    results_3foldcv.to_csv(r'{}/learning_3foldcv-rate.csv'.format(skynet.svfl))
+    results_10foldcv.to_csv(r'{}/learning_10foldcv-rate.csv'.format(skynet.svfl))
 
 
 def read_learning_rate(pth):
+    # Prediction Rate
     learn_df = pd.read_csv('{}\\{}'.format(pth, 'learning_predict-rate.csv'), index_col=0)
     datlist = list()
     for idx, rw in learn_df.iterrows():
@@ -349,7 +375,8 @@ def read_learning_rate(pth):
 
     learn_df_summary = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
 
-    cv_df = pd.read_csv('{}\\{}'.format(pth, 'learning_cv-rate.csv'), index_col=0)
+    # LSO CV
+    cv_df = pd.read_csv('{}\\{}'.format(pth, 'learning_LSOcv-rate.csv'), index_col=0)
     datlist = list()
     for idx, rw in cv_df.iterrows():
         for val in rw:
@@ -357,9 +384,30 @@ def read_learning_rate(pth):
 
     cv_df_summary = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
 
+    # 3-fold
+    cv3_df = pd.read_csv('{}\\{}'.format(pth, 'learning_3foldcv-rate.csv'), index_col=0)
+    datlist = list()
+    for idx, rw in cv3_df.iterrows():
+        for val in rw:
+            datlist.append([idx, val])
+
+    cv3_df_summary = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
+
+    # 10-fold
+    cv10_df = pd.read_csv('{}\\{}'.format(pth, 'learning_10foldcv-rate.csv'), index_col=0)
+    datlist = list()
+    for idx, rw in cv10_df.iterrows():
+        for val in rw:
+            datlist.append([idx, val])
+
+    cv10_df_summary = pd.DataFrame(datlist, columns=['nCatalysts', 'Mean Absolute Error'])
+
+    # plot things
     sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=learn_df_summary)
     sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=cv_df_summary)
-    plt.legend(['Learning Rate', 'Cross-Validate'])
+    sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=cv3_df_summary)
+    sns.lineplot(x='nCatalysts', y='Mean Absolute Error', data=cv10_df_summary)
+    plt.legend(['Learning Rate', 'LSO Cross-Validatation', '3-fold Cross-Validatation', '10-fold Cross-Validatation'])
     plt.xlabel('Number of Catalysts in Training Dataset')
     plt.xlim(1, 50)
     plt.yticks(np.arange(0.10, 0.35, 0.05))
@@ -1020,13 +1068,13 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v60-learning-rate'
+    version = 'v61-learning-rate'
     # feature_extraction_with_XRD()
     # exit()
 
     # determine_algorithm_learning_rate(version)
     # exit()
-    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v60-learning-rate")
+    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v61-learning-rate")
     exit()
 
     make_all_predictions(version=version)

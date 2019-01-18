@@ -101,7 +101,7 @@ class Graphic():
     def plot_metadata(self):
         pass #TODO do this
 
-    def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None):
+    def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None, err_bound=None):
         fig, ax = plt.subplots()
 
         # Not sure why this has failed working...
@@ -131,9 +131,12 @@ class Graphic():
         y = np.array([0, 0.5, 1])
 
         ax.plot(x, y, lw=2, c='k')
-        ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
-        ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
-        ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
+        if err_bound is None:
+            ax.fill_between(x, y + 0.1, y - 0.1, alpha=0.1, color='b')
+            ax.fill_between(x, y + 0.2, y + 0.1, alpha=0.1, color='y')
+            ax.fill_between(x, y - 0.2, y - 0.1, alpha=0.1, color='y')
+        else:
+            ax.fill_between(x, y + err_bound, y - err_bound, alpha=0.1, color='b')
 
         if metadata:
             plt.figtext(0.99, 0.01,
