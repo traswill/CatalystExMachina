@@ -7,7 +7,6 @@
 import pandas as pd
 import numpy as np
 
-
 class CatalystObject():
     """CatalystObject will contain each individual training set"""
     def __init__(self):

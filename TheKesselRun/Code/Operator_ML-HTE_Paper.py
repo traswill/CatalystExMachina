@@ -523,7 +523,6 @@ def CaMnIn_prediction(learner):
     print(learner.dynamic_dataset)
     learner.train_data()
 
-
     learner.filter_static_dataset()
     learner.filter_out_elements(eles=['Ca','Mn','In'])
     learner.predict_data()
@@ -535,6 +534,30 @@ def CaMnIn_prediction(learner):
     g.plot_basic()
     g.plot_err()
     g.plot_err(metadata=False, svnm='{}_CaMnIn_nometa'.format(learner.svnm))
+
+
+def element_predictor(elements):
+    skynet = load_skynet(version=version, ru_filter=3, drop_na_columns=False)
+    skynet.set_filters(temperature_filter='350orless')
+    skynet.filter_static_dataset()
+    eles = [x.replace(' Loading', '') for x in skynet.dynamic_dataset.columns if 'Loading' in x]
+    eles = [x for x in eles if x not in elements + ['Ru', 'K']]
+    skynet.filter_out_elements(eles=eles)
+    skynet.train_data()
+
+    catcont = generate_empty_container(ru2=False, ru1=False)
+    skynet.load_static_dataset(catcont)
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    nm = ''.join(x for x in elements)
+    skynet.compile_results(sv=True, svnm=nm)
+
+    #
+    # g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, nm))
+    # g.plot_basic()
+    # g.plot_err()
+    # g.plot_err(metadata=False, svnm='{}_CaMnIn_nometa'.format(learner.svnm))
 
 def generate_empty_container(ru3=True, ru2=True, ru1=True):
     def create_catalyst(catcont, ele, atnum, ru3, ru2, ru1):
@@ -745,6 +768,238 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
     skynet.predict_data()
     skynet.compile_results(svnm='Lanthanides')
 
+def eval_3Ru_vs_3RuplusCaMnIn(version):
+    skynet = load_skynet(version=version, drop_na_columns=False)
+
+    # *******************
+    # Train 3Ru
+    # *******************
+    skynet.set_filters(
+            element_filter=3,
+            temperature_filter='350orless',
+            ammonia_filter=1,
+            space_vel_filter=2000,
+            ru_filter=3,
+            pressure_filter=None
+        )
+
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru')
+
+    g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='3Ru')
+    g.plot_basic()
+    g.plot_err()
+
+    #*******************
+    # 3% Ru and 2/1% Ca
+    #*******************
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=3,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    df = skynet.static_dataset
+    df = df[(df['Ca Loading'] > 0) & (df['n_elements'] == 3) &
+            (df['ammonia_concentration'] == 1.0) & (df['temperature'] <= 350)]
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru&Ca')
+
+    g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='3Ru&Ca')
+    g.plot_basic()
+    g.plot_err()
+
+    # *******************
+    # 3% Ru and 2/1% In
+    # *******************
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=3,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    df = skynet.static_dataset
+    df = df[(df['In Loading'] > 0) & (df['n_elements'] == 3) &
+            (df['ammonia_concentration'] == 1.0) & (df['temperature'] <= 350)]
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru&In')
+
+    g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='3Ru&In')
+    g.plot_basic()
+    g.plot_err()
+
+    # *******************
+    # 3% Ru and 2/1% Mn
+    # *******************
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=3,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    df = skynet.static_dataset
+    df = df[(df['Mn Loading'] > 0) & (df['n_elements'] == 3) &
+            (df['ammonia_concentration'] == 1.0) & (df['temperature'] <= 350)]
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru&Mn')
+
+    g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='3Ru&Mn')
+    g.plot_basic()
+    g.plot_err()
+
+    # *******************
+    # 3% Ru and 2/1% CaMn
+    # *******************
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=3,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    df = skynet.static_dataset
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0)) & (df['n_elements'] == 3) &
+            (df['ammonia_concentration'] == 1.0) & (df['temperature'] <= 350)]
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru&CaMn')
+
+    g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='3Ru&CaMn')
+    g.plot_basic()
+    g.plot_err()
+
+    # *******************
+    # 3% Ru and 2/1% CaMnIn
+    # *******************
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=3,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    df = skynet.static_dataset
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3) &
+            (df['ammonia_concentration'] == 1.0) & (df['temperature'] <= 350)]
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru&CaMnIn')
+
+    g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='3Ru&CaMnIn')
+    g.plot_basic()
+    g.plot_err()
+
 def make_all_predictions(version):
     ''' Generate Crossvalidations and prediction files '''
 
@@ -769,12 +1024,12 @@ def make_all_predictions(version):
         skynet.predict_crossvalidate(kfold='LOO')
         skynet.compile_results(svnm=svnm)
 
-    def reset_skynet():
+    def reset_skynet(version):
         skynet = load_skynet(version=version, drop_na_columns=False)
         return skynet
 
     """ CaMnIn Dataset (3 catalysts) """
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.dynamic_dataset = skynet.dynamic_dataset[
@@ -786,7 +1041,7 @@ def make_all_predictions(version):
     skynet.train_data()
     crossvalidate(svnm='CaMnIn_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.dynamic_dataset = skynet.dynamic_dataset[
@@ -799,22 +1054,22 @@ def make_all_predictions(version):
     predict(ru3=True, ru2=True, ru1=True, svnm='CaMnIn')
 
     """ 3,1,12 RuMK Dataset (17 catalysts) """
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
     crossvalidate(svnm='3Ru_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=3)
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru')
 
-    """ 3,1,12 RuMK + Full Wt Load CaMnIn Dataset (26 catalysts) """
-    skynet = reset_skynet()
+    """ 3,1,12 RuMK + Full Wt Load CaMnIn Dataset (23 catalysts) """
+    skynet = reset_skynet(version)
     filter(skynet, ru=3)
     df = skynet.dynamic_dataset
     df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
@@ -825,7 +1080,7 @@ def make_all_predictions(version):
     skynet.train_data()
     crossvalidate(svnm='3RuandCaMnInFull_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=3)
     df = skynet.dynamic_dataset
     df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
@@ -837,7 +1092,7 @@ def make_all_predictions(version):
     predict(ru3=False, ru2=True, ru1=True, svnm='3RuandCaMnInFull')
 
     """ Full Wt Load CaMnIn Dataset (9 catalysts) """
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
     skynet.dynamic_dataset = df
     skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
@@ -845,7 +1100,7 @@ def make_all_predictions(version):
     skynet.train_data()
     crossvalidate(svnm='CaMnInFull_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     df = skynet.dynamic_dataset
     df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3)]
     skynet.dynamic_dataset = df
@@ -855,14 +1110,14 @@ def make_all_predictions(version):
     predict(ru3=False, ru2=True, ru1=True, svnm='CaMnInFull')
 
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=32)
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
     crossvalidate(svnm='3Ru_2Ru_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=32)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -870,14 +1125,14 @@ def make_all_predictions(version):
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_2Ru')
 
     """ 3,1,12 and 2,2,12 RuMK Dataset (34 Catalysts) """
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=31)
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
     crossvalidate(svnm='3Ru_1Ru_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=31)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -885,14 +1140,14 @@ def make_all_predictions(version):
     predict(ru3=True, ru2=True, ru1=True, svnm='3Ru_1Ru')
 
     """ Full Dataset (51 Catalysts) """
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=0)
     skynet.filter_static_dataset()
     skynet.set_training_data()
     skynet.train_data()
     crossvalidate(svnm='3Ru_2Ru_1Ru_CV')
 
-    skynet = reset_skynet()
+    skynet = reset_skynet(version)
     filter(skynet, ru=0)
     skynet.filter_static_dataset()
     skynet.set_training_data()
@@ -1068,31 +1323,103 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v61-learning-rate'
+    version = 'v64'
     # feature_extraction_with_XRD()
     # exit()
 
     # determine_algorithm_learning_rate(version)
     # exit()
-    read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v61-learning-rate")
-    exit()
+    # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v61-learning-rate")
+    # exit()
 
-    make_all_predictions(version=version)
+    eval_3Ru_vs_3RuplusCaMnIn(version)
+    # make_all_predictions(version=version)
+    exit()
     # compile_predictions(version=version)
 
-    skynet = load_skynet(version=version, ru_filter=0)
-    predict_lanthanides()
+    skynet = load_skynet(version=version, ru_filter=3, drop_na_columns=False)
+    # predict_lanthanides()
     # Lists for dropping certain features
-    # zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-    #             'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-    #             'Zunger Pseudopotential (sigma)']
+    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
+                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
+                'Zunger Pseudopotential (sigma)']
+
+    # load_list = ['{} Loading'.format(x) for x in
+    #              ['Ru', 'Cu', 'Y', 'Mg', 'Mn',
+    #               'Ni', 'Cr', 'W', 'Ca', 'Hf',
+    #               'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
+    #               'Mo', 'In', 'Rh', 'K']]
+
+    skynet.set_drop_columns(cols=
+                            ['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+                            + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
+                               'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
+                               'Number f-shell Unfilled Electrons']
+                            + zpp_list
+                            # + load_list
+                            )
+
+    # Random Thing!
+    # train_elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc',
+    #                   'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh', 'Ca', 'Mn', 'In']
     #
-    # skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
-    #                              + zpp_list + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
-    #                                            'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
-    #                                            'Number f-shell Unfilled Electrons'])
+    # for _ in range(50):
+    #     eleslist = random.sample(train_elements, 3)
+    #     print(eleslist)
+    #     element_predictor(eleslist)
     #
-    # temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=True)
+    # exit()
+
+    skynet.set_filters(temperature_filter='350orless')
+    skynet.filter_static_dataset()
+    skynet.train_data()
+    skynet.calculate_tau()
+
+    catcont = generate_empty_container()
+    skynet.load_static_dataset(catcont)
+    catcont = CatalystContainer()
+    cat = CatalystObject()
+    cat.ID = 'A_{}'.format('TEST')
+    cat.add_element('Cu', 3)
+    cat.add_element('Y', 1)
+    cat.add_element('Na', 12)
+    cat.input_group(-1)
+    cat.feature_add_n_elements()
+    cat.feature_add_Lp_norms()
+    cat.feature_add_elemental_properties()
+
+    cat.add_observation(
+        temperature=250,
+        space_velocity=2000,
+        gas_concentration=1,
+        reactor_number=0
+    )
+
+    cat.add_observation(
+        temperature=300,
+        space_velocity=2000,
+        gas_concentration=1,
+        reactor_number=0
+    )
+
+    cat.add_observation(
+        temperature=350,
+        space_velocity=2000,
+        gas_concentration=1,
+        reactor_number=0
+    )
+
+    catcont.add_catalyst(index=cat.ID, catalyst=cat)
+    catcont.build_master_container(drop_empty_columns=False)
+
+    skynet.dynamic_dataset = skynet.dynamic_dataset.append(catcont.master_container, sort=False)
+
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.calculate_uncertainty()
+    skynet.compile_results(sv=True)
+
+    # temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=False)
 
     # three_catalyst_model()
     # test_all_ML_models()

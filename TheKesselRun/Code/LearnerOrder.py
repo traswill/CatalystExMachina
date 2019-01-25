@@ -123,6 +123,8 @@ class SupervisedLearner():
         self.labels = np.empty(1)
         self.groups = np.empty(1)
         self.predictions = list()
+        self.tau = 0.
+        self.uncertainty = list()
 
         self.features_to_drop = None
 
@@ -275,11 +277,13 @@ class SupervisedLearner():
         self.filter_ruthenium_loading()
         self.filter_space_velocities()
 
+
+
         if shuffle_dataset:
             self.shuffle_dynamic_dataset()
 
         if reset_training_data:
-            self.set_training_data()
+            self.set_training_data() # This does nothing right now...
 
     def set_target_columns(self, cols):
         if isinstance(cols, list):
@@ -389,6 +393,8 @@ class SupervisedLearner():
                                      (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02)],
             31: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03) |
                                      (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
+            21: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02) |
+                                     (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
             '3+': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] >= 0.03)],
         }
 
@@ -483,6 +489,41 @@ class SupervisedLearner():
             print('Invalid kfold. Resorting to 10-fold validation.')
             self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                                  groups=self.groups, cv=GroupKFold(10))
+
+    def calculate_tau(self):
+        tree_predition_df = pd.DataFrame(index=self.features_df.index)
+
+        # Use each tree in the forest to generate the individual tree prediction
+        for nth_tree, tree in enumerate(self.machina.estimators_):
+            tree_predition_df.loc[:, 'Tree {}'.format(nth_tree)] = tree.predict(self.features)
+
+
+        # Remove observations (i.e. trees) that are outside 90% CI (less than 5% or greater than 95%)
+        forest_stats = tree_predition_df.apply(lambda x: np.percentile(a=x, q=[5, 95]), axis=1)
+        for idx, rw in tree_predition_df.iterrows():
+            forest_min = forest_stats[idx][0]
+            forest_max = forest_stats[idx][1]
+            rw[(rw > forest_max) | (rw < forest_min)] = np.nan
+            tree_predition_df.loc[idx] = rw
+
+        # Calculate scaling parameter per...
+        # J. W. Coulston, C. E. Blinn, V. A. Thomas, R. H. Wynne,
+        # Approximating Prediction Uncertainty for Random Forest Regression Models.
+        # Photogramm. Eng. Remote Sens. 82, 189–197 (2016).
+        tau_array = np.sqrt(
+            (self.labels - tree_predition_df.mean(axis=1).values)**2 / tree_predition_df.var(axis=1).values
+        )
+        self.tau = np.nanmean(tau_array)
+        print(self.tau)
+
+    def calculate_uncertainty(self):
+        tree_predition_df = pd.DataFrame(index=self.features_df.index)
+
+        # Use each tree in the forest to generate the individual tree prediction
+        for nth_tree, tree in enumerate(self.machina.estimators_):
+            tree_predition_df.loc[:, 'Tree {}'.format(nth_tree)] = tree.predict(self.features)
+
+        self.uncertainty = (self.tau**2 * tree_predition_df.var(axis=1).values)**2
 
     def predict_leave_one_out(self):
         print('Method predict_leave_one_out depricated: Change to predict_crossvalidate.')
@@ -660,7 +701,11 @@ class SupervisedLearner():
         # else:
         #     self.result_dataset['Predicted Conversion'] = self.predictions
 
-        self.result_dataset['Predicted Conversion'] = self.predictions
+        try:
+            self.result_dataset['Predicted Conversion'] = self.predictions
+        except ValueError:
+            print('No Predictions Generated')
+
         self.result_dataset['Measured Conversion'] = self.labels
 
         # Parse the Element Dictionary to get catalyst names
@@ -672,6 +717,11 @@ class SupervisedLearner():
                 self.result_dataset.loc[index, 'Ele{}'.format(i)] = key
                 self.result_dataset.loc[index, 'Load{}'.format(i)] = val
                 i += 1
+
+        try:
+            self.result_dataset['Uncertainty'] = self.uncertainty
+        except ValueError:
+            print('No Uncertainty Generated')
 
         # Save result dataframe if requested
         if sv:
