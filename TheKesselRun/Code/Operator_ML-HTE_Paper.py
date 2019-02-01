@@ -216,14 +216,60 @@ def test_ML_models_with_feature_reduction(version):
         temperature_filter=300,
         ammonia_filter=1,
         space_vel_filter=2000,
-        ru_filter=0,
+        ru_filter=3,
         pressure_filter=None
     )
 
+    # Use the full dataset to calculate the columns to keep, then drop all other features
     skynet.filter_static_dataset()
-    print(list(skynet.static_dataset.columns))
+    feat_selector = SelectKBest(score_func=f_regression, k=20)
+    feats = feat_selector.fit_transform(skynet.features, skynet.labels)
+    feats = feat_selector.inverse_transform(feats)
+    skynet.features_df[:] = feats
+    kbest_column_list = list(skynet.features_df.loc[:, skynet.features_df.sum(axis=0) != 0].columns)
+    skynet.set_drop_columns(cols=list(set(skynet.features_df.columns) - set(kbest_column_list)))
+    skynet.filter_static_dataset()
 
+    # Iterate through all ML algorithms and train a model
+    eval_dict = dict()
 
+    for algs in ['rfr','adaboost','tree','neuralnet','svr','knnr','krr','etr','gbr','ridge','lasso']:
+        if algs == 'neuralnet':
+            skynet.set_learner(learner=algs, params='nnet')
+        else:
+            skynet.set_learner(learner=algs, params='empty')
+
+        skynet.predict_crossvalidate(kfold=5)
+        eval_dict[algs] = mean_absolute_error(skynet.labels_df.values, skynet.predictions)
+
+    print(eval_dict)
+
+    nm_dict = {
+        'rfr': 'Random Forest',
+        'adaboost': 'AdaBoost',
+        'tree': 'Decision Tree',
+        'neuralnet': 'Neural Net',
+        'svr': 'Support Vector Machine',
+        'knnr': 'k-Nearest Neighbor Regression',
+        'krr': 'Kernel Ridge Regression',
+        'etr': 'Extremely Randomized Trees',
+        'gbr': 'Gradient Tree Boosting',
+        'ridge': 'Ridge Regressor',
+        'lasso': 'Lasso Regressor'
+    }
+
+    names = eval_dict.keys()
+    vals = eval_dict.values()
+
+    df = pd.DataFrame([names, vals], index=['rgs', 'Mean Absolute Error']).T
+    df['Machine Learning Algorithm'] = [nm_dict.get(x, 'ERROR') for x in df['rgs'].values]
+    df.sort_values(by='Mean Absolute Error', inplace=True, ascending=False)
+
+    g = sns.barplot(x='Machine Learning Algorithm', y='Mean Absolute Error', data=df, palette="GnBu_d")
+    g.set_xticklabels(g.get_xticklabels(), rotation=30, ha='right')
+    plt.tight_layout()
+    plt.ylim(0,0.36)
+    plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
 
 
 def test_all_ML_models(version, three_ele=True, ru_filter=3, reduce_features=True):
@@ -1331,7 +1377,7 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v66'
+    version = 'v67-testallmodels'
 
     test_ML_models_with_feature_reduction(version)
     exit()

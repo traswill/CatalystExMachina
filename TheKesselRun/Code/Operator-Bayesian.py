@@ -23,6 +23,9 @@ import scipy.cluster
 import glob
 import random
 import os
+from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 
 def load_nh3_catalysts(catcont, drop_empty_columns=True):
     """ Import NH3 data from Katie's HiTp dataset(cleaned). """
@@ -194,7 +197,89 @@ def predict_design_space(version):
     skynet.predict_data()
     skynet.calculate_uncertainty()
     skynet.compile_results(sv=True)
+    return skynet
+
+def get_drop_colunms(ru_filter=0):
+    skynet = load_skynet(version=version)
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter=300,
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=ru_filter,
+        pressure_filter=None
+    )
+
+    # Use the full dataset to calculate the columns to keep, then drop all other features
+    skynet.filter_static_dataset()
+    feat_selector = SelectKBest(score_func=f_regression, k=20)
+    feats = feat_selector.fit_transform(skynet.features, skynet.labels)
+    feats = feat_selector.inverse_transform(feats)
+    skynet.features_df[:] = feats
+    kbest_column_list = list(skynet.features_df.loc[:, skynet.features_df.sum(axis=0) != 0].columns)
+    return kbest_column_list
+
+def unsupervised_pipeline(pth=None, learner=None, n_clusters=4):
+    df = pd.DataFrame()
+
+    if learner is None:
+        if pth is None:
+            print('No data provided...')
+            exit()
+        else:
+            df = pd.read_csv(pth, index_col=0)
+    else:
+        df = learner.result_dataset
+
+    kbest_columns = get_drop_colunms(ru_filter=0)
+
+    # Dimensionality Reduction
+    pca = PCA(n_components=2)
+    df_pca = pd.DataFrame(pca.fit_transform(df.loc[:, kbest_columns].dropna(axis=1)), index=df.index)
+
+    # Cluster
+    km = KMeans(n_clusters=n_clusters)
+    df_pca['kmean'] = km.fit_predict(df_pca)
+    res_df = pd.concat([df_pca, df], axis=1)
+
+    # Plot Cluster Map
+    plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K'])
+    g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
+    eles = res_df['Ele2'].unique()
+    for i, ele in enumerate(eles):
+        for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'kmean']].iterrows():
+            plotdf.loc[x.Ele3, x.Load3] = x['kmean']
+        plotdf = plotdf.apply(pd.to_numeric)
+        sns.heatmap(data=plotdf, cmap=sns.color_palette("hls", n_clusters), ax=g.axes[i], vmin=0,
+                    vmax=res_df['kmean'].max(), linewidths=.5, annot=True, cbar=False)
+        g.axes[i].set_title(ele)
+
+    plt.savefig('{}\\{}-clustermap.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.close()
+
+    # Plot Scatter of KMeans with groups
+    sns.scatterplot(res_df[0], res_df[1], hue=res_df['kmean'], palette=sns.color_palette("hls", n_clusters))
+    plt.legend(bbox_to_anchor=(1, 1))
+    plt.savefig('{}\\{}-KMeans.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.close()
+
+    # Plot Uncertainty
+    plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K'])
+    g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
+    eles = res_df['Ele2'].unique()
+
+    for i, ele in enumerate(eles):
+        for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'Uncertainty']].iterrows():
+            plotdf.loc[x.Ele3, x.Load3] = x.Uncertainty
+
+        plotdf = plotdf.apply(pd.to_numeric)
+        sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=res_df.Uncertainty.max(), linewidths=0.5)
+        g.axes[i].set_title(ele)
+
+    plt.savefig('{}\\{}-Uncertainty.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+
 
 if __name__ == '__main__':
-    version = 'v65-bayesian-uncertainty'
-    predict_design_space(version)
+    version = 'v67-bayesian-uncertainty'
+    skynet = predict_design_space(version)
+    unsupervised_pipeline(learner=skynet, n_clusters=13)
