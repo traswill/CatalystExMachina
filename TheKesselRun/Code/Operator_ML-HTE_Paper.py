@@ -8,6 +8,7 @@ from TheKesselRun.Code.LearnerOrder import SupervisedLearner, CatalystContainer
 from TheKesselRun.Code.LearnerAnarchy import Anarchy
 from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
 from TheKesselRun.Code.Plotter import Graphic
+from sklearn.feature_selection import SelectKBest, f_regression
 
 from sklearn.metrics import r2_score, explained_variance_score, \
         mean_absolute_error, roc_curve, recall_score, precision_score, mean_squared_error, accuracy_score
@@ -208,7 +209,24 @@ def three_catalyst_model(version):
     catdf.to_csv(r'{}/3Ru_prediction_data_{}.csv'.format(svpth, ''.join(train_elements)))
     print(df[df['temperature'] == 300.0].sort_values('Predicted', ascending=False).head())
 
-def test_all_ML_models(version, three_ele=True, ru_filter=3):
+def test_ML_models_with_feature_reduction(version):
+    skynet = load_skynet(version=version)
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter=300,
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=0,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    print(list(skynet.static_dataset.columns))
+
+
+
+
+def test_all_ML_models(version, three_ele=True, ru_filter=3, reduce_features=True):
     skynet = SupervisedLearner(version=version)
     catcontainer = CatalystContainer()
     skynet.set_filters(
@@ -439,11 +457,6 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     skynet.set_group_columns(cols=['group'])
     skynet.set_hold_columns(cols=['Element Dictionary', 'ID'])
 
-    # Lists for dropping certain features
-    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-                'Zunger Pseudopotential (sigma)']
-
     if drop_loads:
         load_list = ['{} Loading'.format(x) for x in
                      ['Ru', 'Cu', 'Y', 'Mg', 'Mn',
@@ -455,12 +468,7 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
 
     skynet.set_drop_columns(
         cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
-                                 + zpp_list + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
-                                               'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
-                                               'Number f-shell Unfilled Electrons'])
-
-    # skynet.set_drop_columns(cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
-    #                              + zpp_list + load_list)
+    )
 
     skynet.filter_static_dataset()
     return skynet
@@ -1323,7 +1331,11 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v64'
+    version = 'v66'
+
+    test_ML_models_with_feature_reduction(version)
+    exit()
+
     # feature_extraction_with_XRD()
     # exit()
 

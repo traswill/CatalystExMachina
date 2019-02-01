@@ -21,6 +21,9 @@ from sklearn.linear_model import Ridge, Lasso, SGDRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
+from sklearn.decomposition import PCA
+from sklearn.cluster import k_means
+from sklearn.feature_selection import SelectKBest
 
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
     LeaveOneOut, learning_curve
@@ -213,6 +216,8 @@ class SupervisedLearner():
                         'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
                         'criterion':'mae'},
             'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+            'etr-uncertainty': {'n_estimators': 500, 'min_samples_split': 5, 'min_samples_leaf': 4, 'min_impurity_decrease': 0,
                     'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
             'etr-CaMnIn': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
                     'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
@@ -438,13 +443,6 @@ class SupervisedLearner():
     #     """ Set groups parameter AFTER shuffling the slave dataset """
     #     self.groups = self.dynamic_dataset[self.group_columns].values
 
-    # TODO this method should be offloaded to an operator
-    def reduce_feature_set(self):
-        reduced_features = [
-            'temperature', 'Number d-shell Valence Electrons_mean', 'Number d-shell Valence Electrons_mad'
-        ]
-        self.drop_columns = [x for x in list(self.dynamic_dataset.columns) if x not in reduced_features]
-
     def drop_features(self):
         if self.drop_columns is not None:
             cols = self.features_df.columns
@@ -498,6 +496,7 @@ class SupervisedLearner():
             tree_predition_df.loc[:, 'Tree {}'.format(nth_tree)] = tree.predict(self.features)
 
 
+
         # Remove observations (i.e. trees) that are outside 90% CI (less than 5% or greater than 95%)
         forest_stats = tree_predition_df.apply(lambda x: np.percentile(a=x, q=[5, 95]), axis=1)
         for idx, rw in tree_predition_df.iterrows():
@@ -523,7 +522,8 @@ class SupervisedLearner():
         for nth_tree, tree in enumerate(self.machina.estimators_):
             tree_predition_df.loc[:, 'Tree {}'.format(nth_tree)] = tree.predict(self.features)
 
-        self.uncertainty = (self.tau**2 * tree_predition_df.var(axis=1).values)**2
+        # print(tree_predition_df.var(axis=1))
+        self.uncertainty = np.sqrt(self.tau**2 * tree_predition_df.var(axis=1).values)
 
     def predict_leave_one_out(self):
         print('Method predict_leave_one_out depricated: Change to predict_crossvalidate.')

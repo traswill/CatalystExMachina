@@ -102,7 +102,7 @@ class CatalystObject():
 
     def feature_add_elemental_properties(self):
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
-        eledf = pd.read_csv(r'../Data/Elements_Cleaned.csv', index_col=1)
+        eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
         eledf = eledf.loc[list(self.elements.keys())]
 
         # Methods of processing different features
