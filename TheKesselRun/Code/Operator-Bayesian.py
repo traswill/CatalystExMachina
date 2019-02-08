@@ -151,7 +151,7 @@ def predict_design_space(version):
 
     # Setup element-promoter-loading combinations
     ch_eles = ['Y','Hf','Mg','Ca','Sr']
-    ch_prom = ['K','Na','Cs','Ba']
+    ch_prom = ['K','Na','Cs','Ba', 'Rb']
     prom_load = [5, 10, 15, 20, 25]
 
     # loop through all combinations
@@ -228,8 +228,12 @@ def unsupervised_pipeline(pth=None, learner=None, n_clusters=4):
             exit()
         else:
             df = pd.read_csv(pth, index_col=0)
+            svfl = os.curdir
+            svnm = 'unsupervised_pipeline'
     else:
         df = learner.result_dataset
+        svfl = learner.svfl
+        svnm = learner.svnm
 
     kbest_columns = get_drop_colunms(ru_filter=0)
 
@@ -241,12 +245,14 @@ def unsupervised_pipeline(pth=None, learner=None, n_clusters=4):
     km = KMeans(n_clusters=n_clusters)
     df_pca['kmean'] = km.fit_predict(df_pca)
     res_df = pd.concat([df_pca, df], axis=1)
+    res_df = res_df.loc[res_df['temperature'] == 300]
 
     # Plot Cluster Map
-    plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K'])
     g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
     eles = res_df['Ele2'].unique()
     for i, ele in enumerate(eles):
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+
         for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'kmean']].iterrows():
             plotdf.loc[x.Ele3, x.Load3] = x['kmean']
         plotdf = plotdf.apply(pd.to_numeric)
@@ -254,21 +260,23 @@ def unsupervised_pipeline(pth=None, learner=None, n_clusters=4):
                     vmax=res_df['kmean'].max(), linewidths=.5, annot=True, cbar=False)
         g.axes[i].set_title(ele)
 
-    plt.savefig('{}\\{}-clustermap.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.savefig('{}\\{}-clustermap.png'.format(svfl, svnm), dpi=400)
     plt.close()
 
     # Plot Scatter of KMeans with groups
     sns.scatterplot(res_df[0], res_df[1], hue=res_df['kmean'], palette=sns.color_palette("hls", n_clusters))
     plt.legend(bbox_to_anchor=(1, 1))
-    plt.savefig('{}\\{}-KMeans.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.tight_layout()
+    plt.savefig('{}\\{}-KMeans.png'.format(svfl, svnm), dpi=400)
     plt.close()
 
     # Plot Uncertainty
-    plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K'])
     g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
     eles = res_df['Ele2'].unique()
 
     for i, ele in enumerate(eles):
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+
         for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'Uncertainty']].iterrows():
             plotdf.loc[x.Ele3, x.Load3] = x.Uncertainty
 
@@ -276,10 +284,69 @@ def unsupervised_pipeline(pth=None, learner=None, n_clusters=4):
         sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=res_df.Uncertainty.max(), linewidths=0.5)
         g.axes[i].set_title(ele)
 
-    plt.savefig('{}\\{}-Uncertainty.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.savefig('{}\\{}-Uncertainty.png'.format(svfl, svnm), dpi=400)
+    plt.close()
 
+    res_df.to_csv('{}\\{}.csv'.format(svfl, svnm))
+    sel_df = select_catalysts(res_df, svfl=svfl, svnm='SelectedGroupReps')
+
+    # Plot Scatter of KMeans with groups
+    sns.scatterplot(res_df[0], res_df[1], hue=res_df['kmean'], palette=sns.color_palette("hls", n_clusters))
+    plt.scatter(sel_df[0], sel_df[1], facecolors='None', edgecolors='k')
+    plt.legend(bbox_to_anchor=(1, 1))
+    plt.tight_layout()
+    plt.savefig('{}\\{}-KMeans_wth_selection.png'.format(svfl, svnm), dpi=400)
+    plt.close()
+
+    # Plot Cluster Map
+    plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+    g = sns.FacetGrid(sel_df, col='Ele2', col_wrap=3)
+    eles = sel_df['Ele2'].unique()
+
+    for i, ele in enumerate(eles):
+        # Plot Grey Background
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb']).fillna(0)
+        sns.heatmap(data=plotdf, cmap=sns.color_palette("Greys", 0), ax=g.axes[i], vmin=0,
+                    vmax=sel_df['kmean'].max(), linewidths=.5, annot=False, cbar=False)
+
+        # Refresh plotdf for kmeans plotting
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+
+        for idx, x in sel_df.loc[sel_df['Ele2'] == ele, ['Ele3', 'Load3', 'kmean']].iterrows():
+            plotdf.loc[x.Ele3, x.Load3] = x['kmean']
+        plotdf = plotdf.apply(pd.to_numeric)
+        plofdf = plotdf.fillna(' ')
+        sns.heatmap(data=plotdf, cmap=sns.color_palette("hls", n_clusters), ax=g.axes[i], vmin=0,
+                    vmax=sel_df['kmean'].max(), linewidths=.5, annot=True, cbar=False)
+        g.axes[i].set_title(ele)
+
+    plt.savefig('{}\\{}-KMeans_selection.png'.format(svfl, svnm), dpi=400)
+    plt.close()
+
+def select_catalysts(df, groups='kmean', svfl=None, svnm=None):
+    grps = df.groupby(groups)
+    cat_selection = grps['Name'].apply(np.random.choice)
+    sel_df = df.loc[[x in cat_selection.values for x in df['Name'].values]].copy()
+    sel_df[[0, 1, 'kmean', 'Ele2', 'Ele3', 'Load3', 'Predicted Conversion', 'Uncertainty']].to_csv('{}\\{}.csv'.format(svfl, svnm))
+
+    print(sel_df['Ele2'].value_counts())
+    print(sel_df['Ele3'].value_counts())
+    print(sel_df['Load3'].value_counts())
+
+    return sel_df
 
 if __name__ == '__main__':
-    version = 'v67-bayesian-uncertainty'
+    version = 'v68-bayesian-uncertainty-2'
     skynet = predict_design_space(version)
     unsupervised_pipeline(learner=skynet, n_clusters=13)
+
+    # df = pd.read_csv(r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v68-bayesian-uncertainty\v68-bayesian-uncertainty-3-350orlessC.csv", index_col=0)
+    # df = df.loc[df['temperature'] == 300]
+    # select_catalysts(df,
+    #                  svfl=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v68-bayesian-uncertainty",
+    #                  svnm='Results'
+    #                  )
+
+
+
+
