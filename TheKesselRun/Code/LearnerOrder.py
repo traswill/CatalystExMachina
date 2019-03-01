@@ -551,10 +551,16 @@ class SupervisedLearner():
         self.uncertainty = np.sqrt(self.tau**2 * tree_predition_df.var(axis=1).values)
 
     def calculate_bias(self):
-        pass
+        #TODO: Finish bias
+        n_samples = len(self.labels)
+        sq_bias = 1/n_samples * (np.mean(self.labels) - self.labels)**2
+        print(sq_bias)
 
     def calculate_variance(self):
-        pass
+        # TODO: Finish variance
+        n_samples = len(self.labels)
+        vari = 1 / n_samples * (np.mean(self.labels) - self.labels) ** 2
+        print(vari)
 
     def predict_leave_one_out(self):
         print('Method predict_leave_one_out depricated: Change to predict_crossvalidate.')

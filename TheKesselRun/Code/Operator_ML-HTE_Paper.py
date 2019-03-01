@@ -1054,6 +1054,45 @@ def eval_3Ru_vs_3RuplusCaMnIn(version):
     g.plot_basic()
     g.plot_err()
 
+def predict_all_elements_with_3Ru_21CaMnIn(version):
+    skynet = load_skynet(version=version, drop_na_columns=False)
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=3,
+        pressure_filter=None
+    )
+
+    skynet.filter_static_dataset()
+    df = skynet.static_dataset
+    df = df[((df['Ca Loading'] > 0) | (df['Mn Loading'] > 0) | (df['In Loading'] > 0)) & (df['n_elements'] == 3) &
+            (df['ammonia_concentration'] == 1.0) & (df['temperature'] <= 350)]
+    skynet.dynamic_dataset = pd.concat([skynet.dynamic_dataset, df])
+    skynet.dynamic_dataset = skynet.dynamic_dataset[~skynet.dynamic_dataset.index.duplicated(keep='first')]
+    skynet.set_training_data()
+    skynet.train_data()
+
+    catcont = generate_empty_container(ru3=False)
+    skynet.static_dataset = catcont.master_container
+
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=21,
+        pressure_filter=None
+    )
+    skynet.filter_static_dataset()
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.evaluate_regression_learner()
+    skynet.compile_results(svnm='3Ru&CaMnIn2', sv=True)
+
+
 def make_all_predictions(version):
     ''' Generate Crossvalidations and prediction files '''
 
@@ -1377,7 +1416,10 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v67-testallmodels'
+    version = 'v68-fullprediction'
+    predict_all_elements_with_3Ru_21CaMnIn(version)
+    exit()
+
 
     test_ML_models_with_feature_reduction(version)
     exit()

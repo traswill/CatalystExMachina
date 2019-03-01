@@ -51,7 +51,7 @@ class CatalystObject():
 
     def add_unweighted_features(self):
         # Load Elements.csv as DataFrame
-        eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
+        eledf = pd.read_csv(r'./Data/Elements_01Feb19.csv', index_col=1)
 
         # Slice Elements.csv based on elements present
         eledf = eledf.loc[list(self.elements.keys())]
@@ -62,7 +62,7 @@ class CatalystObject():
 
     def feature_add_weighted_average(self):
         # Load Elements.csv as DataFrame
-        eledf = pd.read_csv(r'./Data/Elements_Cleaned.csv', index_col=1)
+        eledf = pd.read_csv(r'./Data/Elements_01Feb19.csv', index_col=1)
 
         # Slice Elements.csv based on elements present
         eledf = eledf.loc[list(self.elements.keys())]
@@ -78,7 +78,7 @@ class CatalystObject():
 
     def feature_add_unsupervised_properties(self):
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
-        eledf = pd.read_csv(r'../Data/Elements_Unsupervised.csv', index_col=1)
+        eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
         eledf = eledf.loc[list(self.elements.keys())]
 
         for feature_name, feature_values in eledf.T.iterrows():
