@@ -536,7 +536,7 @@ class SupervisedLearner():
             (self.labels - tree_predition_df.mean(axis=1).values)**2 / tree_predition_df.var(axis=1).values
         )
         self.tau = np.nanmean(tau_array)
-        print('$\Tau$: {}'.format(self.tau))
+        print('Tau: {}'.format(self.tau))
 
     def calculate_uncertainty(self):
         """ Calculate the uncertainty of new predictions.  These predictions are scaled by Tau to estimate MAE. """

@@ -11,7 +11,7 @@ def load_info_sheet(pth, thresh=15, sheetname='Info', skip_footer=13, skiprow=1)
     """ Reads data from path, drops NAN columns up to a threshold (variable per sheet), trashes empty reactor columns,
     and returns a dataframe """
 
-    df = pd.read_excel(pth, skiprows=skiprow, skip_footer=skip_footer, sheet_name=sheetname)
+    df = pd.read_excel(pth, skiprows=skiprow, skipfooter=skip_footer, sheet_name=sheetname)
     df.dropna(inplace=True, axis=1, thresh=thresh)
     df = df.loc[~np.isnan(df['Reactor'])]
     df.dropna(inplace=True, axis=0, thresh=5)
@@ -27,7 +27,7 @@ def load_activity_sheet(pth, sheet, cols=None):
     return df
 
 
-def extract_activity_information(df):
+def extract_activity_information(df, proc='default'):
     """
     Input: Activity datasheet in the form of a dataframe
     Output: Dataframe with 4 columns, numerical index
@@ -41,14 +41,27 @@ def extract_activity_information(df):
         if tmp[0] == 'Sample':
             continue
 
-        reactor = tmp[0].split('_')[-1].split('.')[0].replace('R', '')
-        type = 'down' if re.search('\d{3}d.*-\d',tmp[0]) is not None else 'up'
-        temp = tmp[0].split('_')[0][-8:].split('-')[1][:3]
-        pred = tmp[1]
+        if proc == 'default':
+            reactor = tmp[0].split('_')[-1].split('.')[0].replace('R', '')
+            type = 'down' if re.search('\d{3}d.*-\d',tmp[0]) is not None else 'up'
+            temp = tmp[0].split('_')[0][-8:].split('-')[1][:3]
+            pred = tmp[1]
+        elif proc == 'data12':
+            reactor = tmp[0].split('_')[-1].split('.')[0].replace('R', '')
+            type = 'down' if re.search('\d{3}d', tmp[0]) is not None else 'up'
+            temp = tmp[0].split('_')[2].replace('C', '')
+            pred = tmp[1]
+        else:
+            print('Proc not recognized. Resort to default.')
+            reactor = tmp[0].split('_')[-1].split('.')[0].replace('R', '')
+            type = 'down' if re.search('\d{3}d.*-\d', tmp[0]) is not None else 'up'
+            temp = tmp[0].split('_')[0][-8:].split('-')[1][:3]
+            pred = tmp[1]
 
         act_list += [[reactor, type, temp, pred]]
 
     return pd.DataFrame(act_list, columns=['Reactor', 'Ramp Direction', 'Temperature', 'Pred Value'])
+
 
 
 def split_katies_ID(df):
@@ -65,6 +78,7 @@ def split_katies_ID(df):
 
     """
     output_list = list()
+
     for catdat in df['Catalyst']:
         catlst = catdat.split(' ')
         if len(catlst) == 3:
@@ -324,6 +338,21 @@ def read_data_9_updated():
     output_df.reset_index(drop=True, inplace=True)
     output_df.to_csv('..//Data//Processed//SS9_u.csv')
 
+def read_data_12():
+    datpth = r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\RAW\NH3_v9_data_12.xlsx"
+    referencedata_df = load_info_sheet(datpth, sheetname='Info', thresh=10, skip_footer=14, skiprow=1)
+    activitydata_df = load_activity_sheet(datpth, sheet='Data', cols='A,D')
+
+    actdf = extract_activity_information(activitydata_df, proc='data12')
+
+    # Katie said to drop the down ramp because they were exposed to a higher concentration of NH3
+    actdf.drop(actdf[actdf.loc[:, 'Ramp Direction'] == 'down'].index, inplace=True)
+
+    catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
+
+    df = merge_activity_catalysts(actdf, catdf, nh3scale=1)
+    df.to_csv('..//Data//Processed//SS12.csv')
+
 def create_super_monster_file():
     pths = glob.glob('..//Data//Processed//SS*.csv')
 
@@ -361,6 +390,7 @@ def create_super_monster_file():
     final_df = final_df.transpose()[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3', 'Reactor', 'NH3',
                                      'Space Velocity', 'Temperature', 'Conversion', 'Standard Error', 'nAveraged']]
 
+    # TODO: Overhaul grouping algorithm
     ele2 = final_df['Ele2'].copy()
     ele_dict = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation', 'Atomic Number'], index_col='Abbreviation').transpose().to_dict(orient='list')
     groups = [ele_dict.get(x)[0] for x in ele2.values]
@@ -377,9 +407,10 @@ def read_data0_data1():
     df.to_csv('..//Data//Processed//SS1.csv')
 
 if __name__ == '__main__':
-    read_data0_data1()
-    read_v4_data()
-    read_v4_data_8()
-    read_data_9()
-    read_data_9_updated()
+    # read_data0_data1()
+    # read_v4_data()
+    # read_v4_data_8()
+    # read_data_9()
+    # read_data_9_updated()
+    # read_data_12()
     create_super_monster_file()

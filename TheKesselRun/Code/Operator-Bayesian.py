@@ -199,6 +199,88 @@ def predict_design_space(version):
     skynet.compile_results(sv=True)
     return skynet
 
+def predict_design_space_with_subset_catalysts(version):
+    skynet = load_skynet(version=version, ru_filter=0, drop_na_columns=False)
+    skynet.static_dataset = skynet.static_dataset[(skynet.static_dataset['K Loading'] != 0.12)]
+    skynet.set_learner('etr', 'etr-uncertainty')
+    skynet.set_filters(temperature_filter='350orless')
+    skynet.filter_static_dataset()
+    skynet.train_data()
+    skynet.calculate_tau()
+    skynet.predict_crossvalidate(kfold='LSO')
+    skynet.evaluate_regression_learner()
+
+    # init catcont
+    catcont = CatalystContainer()
+
+    # Setup element-promoter-loading combinations
+    ch_eles = ['Y','Hf','Mg','Ca','Sr']
+    ch_prom = ['K','Na','Cs','Ba', 'Rb']
+    prom_load = [5, 10, 15, 20, 25]
+
+    # loop through all combinations
+    for ele in ch_eles:
+        for prom in ch_prom:
+            for load in prom_load:
+                cat = CatalystObject()
+                cat.ID = 'A_{}'.format('{}-{}-{}'.format(ele, prom, load))
+                cat.add_element('Ru', 3)
+                cat.add_element(ele, 1)
+                cat.add_element(prom, load)
+                cat.input_group(-1)
+                cat.feature_add_n_elements()
+                cat.feature_add_Lp_norms()
+                cat.feature_add_elemental_properties()
+
+                cat.add_observation(
+                    temperature=250,
+                    space_velocity=2000,
+                    gas_concentration=1,
+                    reactor_number=0
+                )
+
+                cat.add_observation(
+                    temperature=300,
+                    space_velocity=2000,
+                    gas_concentration=1,
+                    reactor_number=0
+                )
+
+                cat.add_observation(
+                    temperature=350,
+                    space_velocity=2000,
+                    gas_concentration=1,
+                    reactor_number=0
+                )
+
+                catcont.add_catalyst(index=cat.ID, catalyst=cat)
+    catcont.build_master_container(drop_empty_columns=False)
+    skynet.load_static_dataset(catcont)
+
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.calculate_uncertainty()
+    skynet.compile_results(sv=True)
+
+    # Plot Uncertainty
+    res_df = skynet.result_dataset
+    g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
+    eles = res_df['Ele2'].unique()
+
+    for i, ele in enumerate(eles):
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+
+        for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'Uncertainty']].iterrows():
+            plotdf.loc[x.Ele3, x.Load3] = x.Uncertainty
+
+        plotdf = plotdf.apply(pd.to_numeric)
+        sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=0.236903, linewidths=0.5)
+        g.axes[i].set_title(ele)
+
+    plt.savefig('{}\\{}-Uncertainty.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.close()
+    return skynet
+
 def get_drop_colunms(ru_filter=0):
     skynet = load_skynet(version=version)
     skynet.set_filters(
@@ -281,7 +363,7 @@ def unsupervised_pipeline(pth=None, learner=None, n_clusters=4):
             plotdf.loc[x.Ele3, x.Load3] = x.Uncertainty
 
         plotdf = plotdf.apply(pd.to_numeric)
-        sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=res_df.Uncertainty.max(), linewidths=0.5)
+        sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=0.236903, linewidths=0.5)
         g.axes[i].set_title(ele)
 
     plt.savefig('{}\\{}-Uncertainty.png'.format(svfl, svnm), dpi=400)
@@ -336,7 +418,11 @@ def select_catalysts(df, groups='kmean', svfl=None, svnm=None):
     return sel_df
 
 if __name__ == '__main__':
-    version = 'v68-bayesian-uncertainty-2'
+    version = 'v71-13cats-only'
+    skynet = predict_design_space_with_subset_catalysts(version)
+    exit()
+
+    version = 'v70-v68+13catalysts'
     skynet = predict_design_space(version)
     unsupervised_pipeline(learner=skynet, n_clusters=13)
 
