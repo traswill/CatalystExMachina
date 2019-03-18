@@ -390,10 +390,11 @@ def create_super_monster_file():
     final_df = final_df.transpose()[['ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3', 'Reactor', 'NH3',
                                      'Space Velocity', 'Temperature', 'Conversion', 'Standard Error', 'nAveraged']]
 
-    # TODO: Overhaul grouping algorithm
-    ele2 = final_df['Ele2'].copy()
+    # Group catalysts by product of atomic numbers in catalyst - i.e. RuFeK is 44*26*19 = 21736
     ele_dict = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation', 'Atomic Number'], index_col='Abbreviation').transpose().to_dict(orient='list')
-    groups = [ele_dict.get(x)[0] for x in ele2.values]
+    # groups = [ele_dict.get(x)[0] for x in final_df['Ele2'].values] # Old grouping method using second element atomic number only
+    groups = [ele_dict.get(x)[0] * ele_dict.get(y)[0] * ele_dict.get(z)[0]
+              for x, y, z in final_df[['Ele1', 'Ele2', 'Ele3']].values]
 
     final_df['Groups'] = groups
 
