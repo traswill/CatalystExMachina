@@ -8,18 +8,25 @@ import pandas as pd
 import numpy as np
 
 class CatalystObject():
-    """CatalystObject will contain each individual training set"""
+    """
+    CatalystObject contains all information needed to describe a catalyst.
+    It possesses methods to calculate any required features from the information provided by the user.
+    """
+
     def __init__(self):
+        """ All variables initialize to empty (None or empty dictionaries. """
         self.ID = None
         self.group = None
 
-        self.observation_dict = dict()
-        self.feature_dict = dict()
-        self.elements = dict()
+        self.observation_dict = dict() # dictionary of observation objects (see class below)
+        self.feature_dict = dict() # dictionary of feature-value pairs
+        self.elements = dict() # dictionary of element-weight loading pairs
         self.support = None
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
                         reactor_number=None, activity=None, selectivity=None, activity_error=None):
+        """ Create and add observation object to the observation dictionary. Index increments based on number of
+        entries. """
         obs = CatalystObservation()
         obs.temperature = temperature
         obs.space_velocity = space_velocity
@@ -37,13 +44,13 @@ class CatalystObject():
         if (element != '-') & (element != '--'):
             self.elements[element] = weight_loading
 
-    def add_support(self, support):
+    def set_support(self, support):
         self.support = support
 
-    def input_n_cl_atoms(self, cl_atoms):
+    def add_n_cl_atoms(self, cl_atoms):
         self.feature_dict['n_Cl_atoms'] = cl_atoms
 
-    def input_group(self, group):
+    def set_group(self, group):
         self.group = group
 
     def feature_add(self, key, value):

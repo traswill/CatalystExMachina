@@ -94,9 +94,9 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.add_element(dat['Ele1'], dat['Wt1'])
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
-            cat.input_group(dat['Groups'])
+            cat.set_group(dat['Groups'])
             try:
-                cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+                cat.add_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
             except KeyError:
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()

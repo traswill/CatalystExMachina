@@ -104,7 +104,7 @@ class CatalystContainer(object):
 class SupervisedLearner():
     """SupervisedLearner will use catalysts to construct feature-label set and perform machine learning"""
 
-    def __init__(self, version='v00'):
+    def __init__(self, version='v00', note=None):
         """ Initialize Everything """
 
         '''Initialize Main Dataframes'''
@@ -158,6 +158,11 @@ class SupervisedLearner():
             os.makedirs('{}\\{}'.format(self.svfl, 'htmls'))
             os.makedirs('{}\\{}'.format(self.svfl, 'features'))
             os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
+
+        ''' Add Note text file if applicable '''
+        if note:
+            with open('{}\\readme.txt'.format(self.svfl), 'w') as txtfl:
+                print(note, file=txtfl)
 
         '''Initialize Time for run-length statistics'''
         self.start_time = time.time()

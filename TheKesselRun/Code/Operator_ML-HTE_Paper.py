@@ -59,9 +59,9 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.add_element(dat['Ele1'], dat['Wt1'])
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
-            cat.input_group(dat['Groups'])
+            cat.set_group(dat['Groups'])
             try:
-                cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+                cat.add_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
             except KeyError:
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
@@ -112,7 +112,7 @@ def three_catalyst_model(version):
         cat.add_element('Ru', 3)
         cat.add_element(ele, 1)
         cat.add_element('K', 12)
-        cat.input_group(atnum)
+        cat.set_group(atnum)
         cat.feature_add_n_elements()
         cat.feature_add_Lp_norms()
         cat.feature_add_elemental_properties()
@@ -209,8 +209,8 @@ def three_catalyst_model(version):
     catdf.to_csv(r'{}/3Ru_prediction_data_{}.csv'.format(svpth, ''.join(train_elements)))
     print(df[df['temperature'] == 300.0].sort_values('Predicted', ascending=False).head())
 
-def test_ML_models_with_feature_reduction(version):
-    skynet = load_skynet(version=version)
+def test_ML_models_with_feature_reduction(version, note):
+    skynet = load_skynet(version=version, note=note)
     skynet.set_filters(
         element_filter=3,
         temperature_filter=300,
@@ -272,18 +272,17 @@ def test_ML_models_with_feature_reduction(version):
     plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
 
 
-def test_all_ML_models(version, three_ele=True, ru_filter=3, reduce_features=True):
-    skynet = SupervisedLearner(version=version)
+def test_all_ML_models(version, note, three_ele=True, ru_filter=3):
+    skynet = load_skynet(version=version, note=note)
     catcontainer = CatalystContainer()
     skynet.set_filters(
         element_filter=3,
-        temperature_filter=None,
+        temperature_filter='350orless',
         ammonia_filter=1,
+        space_vel_filter=2000,
         ru_filter=ru_filter,
-        space_vel_filter=2000
+        pressure_filter=None
     )
-
-    load_nh3_catalysts(catcontainer)
 
     if three_ele:
         train_elements = ['Ca', 'Mn', 'In']
@@ -291,11 +290,11 @@ def test_all_ML_models(version, three_ele=True, ru_filter=3, reduce_features=Tru
         train_elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc',
                           'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh', 'Ca', 'Mn', 'In']
 
-    df = catcontainer.master_container
+    df = skynet.static_dataset
     element_dataframe = pd.DataFrame()
 
     for ele in train_elements:
-        dat = df.loc[(df['{} Loading'.format(ele)] > 0) & (df['n_elements'] == 3)]
+        dat = df.loc[(df['{} Loading'.format(ele)] > 0) & (df['K Loading'] == 0.12) & (df['n_elements'] == 3)]
         element_dataframe = pd.concat([element_dataframe, dat])
 
     catcontainer.master_container = element_dataframe
@@ -310,8 +309,11 @@ def test_all_ML_models(version, three_ele=True, ru_filter=3, reduce_features=Tru
         else:
             skynet.set_learner(learner=algs, params='empty')
 
-        skynet.predict_crossvalidate(kfold=3)
-        eval_dict[algs] = mean_absolute_error(skynet.labels_df.values, skynet.predictions)
+        try:
+            skynet.predict_crossvalidate(kfold='LOO')
+            eval_dict[algs] = mean_absolute_error(skynet.labels_df.values, skynet.predictions)
+        except ValueError:
+            eval_dict[algs] = -1
 
     print(eval_dict)
 
@@ -336,14 +338,18 @@ def test_all_ML_models(version, three_ele=True, ru_filter=3, reduce_features=Tru
     df['Machine Learning Algorithm'] = [nm_dict.get(x, 'ERROR') for x in df['rgs'].values]
     df.sort_values(by='Mean Absolute Error', inplace=True, ascending=False)
 
+    df.to_csv(r'{}\ML_models.csv'.format(skynet.svfl))
+
     g = sns.barplot(x='Machine Learning Algorithm', y='Mean Absolute Error', data=df, palette="GnBu_d")
     g.set_xticklabels(g.get_xticklabels(), rotation=30, ha='right')
+    plt.xlabel('Machine learning algorithm')
+    plt.ylabel('Mean absolute error')
     plt.tight_layout()
-    plt.ylim(0,0.36)
+    plt.ylim(0,0.4)
     plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
 
-def determine_algorithm_learning_rate(version):
-    skynet = load_skynet(version=version)
+def determine_algorithm_learning_rate(version, note):
+    skynet = load_skynet(version=version, note=note)
 
     elements = [x.replace(' Loading', '') for x in skynet.static_dataset.columns if 'Loading' in x]
     elements.remove('K')
@@ -478,13 +484,13 @@ def read_learning_rate(pth):
     plt.ylim(0.10, 0.25)
     plt.savefig(r'{}//learningrate.png'.format(pth), dpi=400)
 
-def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
+def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter=0):
     # Load Data
     catcontainer = CatalystContainer()
     load_nh3_catalysts(catcont=catcontainer, drop_empty_columns=drop_na_columns)
 
     # Init Learner
-    skynet = SupervisedLearner(version=version)
+    skynet = SupervisedLearner(version=version, note=note)
     skynet.set_filters(
         element_filter=3,
         temperature_filter='350orless',
@@ -591,7 +597,7 @@ def CaMnIn_prediction(learner):
 
 
 def element_predictor(elements):
-    skynet = load_skynet(version=version, ru_filter=3, drop_na_columns=False)
+    skynet = load_skynet(version=version, note=note, ru_filter=3, drop_na_columns=False)
     skynet.set_filters(temperature_filter='350orless')
     skynet.filter_static_dataset()
     eles = [x.replace(' Loading', '') for x in skynet.dynamic_dataset.columns if 'Loading' in x]
@@ -644,7 +650,7 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 3)
             cat.add_element(ele, 1)
             cat.add_element('K', 12)
-            cat.input_group(atnum)
+            cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -659,7 +665,7 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 2)
             cat.add_element(ele, 2)
             cat.add_element('K', 12)
-            cat.input_group(atnum)
+            cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -674,7 +680,7 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 1)
             cat.add_element(ele, 3)
             cat.add_element('K', 12)
-            cat.input_group(atnum)
+            cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -732,7 +738,7 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 3)
             cat.add_element(ele, 1)
             cat.add_element('K', 12)
-            cat.input_group(atnum)
+            cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -747,7 +753,7 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 2)
             cat.add_element(ele, 2)
             cat.add_element('K', 12)
-            cat.input_group(atnum)
+            cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -762,7 +768,7 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 1)
             cat.add_element(ele, 3)
             cat.add_element('K', 12)
-            cat.input_group(atnum)
+            cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
             cat.feature_add_elemental_properties()
@@ -792,7 +798,7 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
         skynet.compile_results(svnm=svnm)
 
     def reset_skynet():
-        skynet = load_skynet(version=version, drop_na_columns=False)
+        skynet = load_skynet(version=version, note=note, drop_na_columns=False)
         return skynet
 
     skynet = reset_skynet()
@@ -822,8 +828,8 @@ def predict_lanthanides(ru3=True, ru2=True, ru1=True):
     skynet.predict_data()
     skynet.compile_results(svnm='Lanthanides')
 
-def eval_3Ru_vs_3RuplusCaMnIn(version):
-    skynet = load_skynet(version=version, drop_na_columns=False)
+def eval_3Ru_vs_3RuplusCaMnIn(version, note):
+    skynet = load_skynet(version=version, note=note, drop_na_columns=False)
 
     # *******************
     # Train 3Ru
@@ -1054,8 +1060,8 @@ def eval_3Ru_vs_3RuplusCaMnIn(version):
     g.plot_basic()
     g.plot_err()
 
-def predict_all_elements_with_3Ru_21CaMnIn(version):
-    skynet = load_skynet(version=version, drop_na_columns=False)
+def predict_all_elements_with_3Ru_21CaMnIn(version, note):
+    skynet = load_skynet(version=version, note=note, drop_na_columns=False)
 
     skynet.set_filters(
         element_filter=3,
@@ -1093,7 +1099,7 @@ def predict_all_elements_with_3Ru_21CaMnIn(version):
     skynet.compile_results(svnm='3Ru&CaMnIn2', sv=True)
 
 
-def make_all_predictions(version):
+def make_all_predictions(version, note):
     ''' Generate Crossvalidations and prediction files '''
 
     def filter(ml, ru):
@@ -1118,7 +1124,7 @@ def make_all_predictions(version):
         skynet.compile_results(svnm=svnm)
 
     def reset_skynet(version):
-        skynet = load_skynet(version=version, drop_na_columns=False)
+        skynet = load_skynet(version=version, note=note, drop_na_columns=False)
         return skynet
 
     """ CaMnIn Dataset (3 catalysts) """
@@ -1328,9 +1334,9 @@ def feature_extraction_with_XRD():
             cat.add_element(dat['Ele1'], dat['Wt1'])
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
-            cat.input_group(dat['Groups'])
+            cat.set_group(dat['Groups'])
             try:
-                cat.input_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+                cat.add_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
             except KeyError:
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
 
@@ -1416,12 +1422,16 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v68-fullprediction'
+    version = 'v81'
+    note = 'Changed data files to use measured NH3 conversion rather than nominal conversion'
+    test_all_ML_models(version=version, three_ele=False, ru_filter=None)
+    exit()
+
     predict_all_elements_with_3Ru_21CaMnIn(version)
     exit()
 
 
-    test_ML_models_with_feature_reduction(version)
+    test_ML_models_with_feature_reduction(version, note)
     exit()
 
     # feature_extraction_with_XRD()
@@ -1432,12 +1442,12 @@ if __name__ == '__main__':
     # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v61-learning-rate")
     # exit()
 
-    eval_3Ru_vs_3RuplusCaMnIn(version)
+    eval_3Ru_vs_3RuplusCaMnIn(version, note)
     # make_all_predictions(version=version)
     exit()
     # compile_predictions(version=version)
 
-    skynet = load_skynet(version=version, ru_filter=3, drop_na_columns=False)
+    skynet = load_skynet(version=version, note=note, ru_filter=3, drop_na_columns=False)
     # predict_lanthanides()
     # Lists for dropping certain features
     zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
@@ -1483,7 +1493,7 @@ if __name__ == '__main__':
     cat.add_element('Cu', 3)
     cat.add_element('Y', 1)
     cat.add_element('Na', 12)
-    cat.input_group(-1)
+    cat.set_group(-1)
     cat.feature_add_n_elements()
     cat.feature_add_Lp_norms()
     cat.feature_add_elemental_properties()

@@ -101,8 +101,9 @@ class Graphic():
     def plot_metadata(self):
         pass #TODO do this
 
-    def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None, err_bound=None):
-        fig, ax = plt.subplots()
+    def plot_err(self, metadata=True, svnm=None, color_bounds=None, legend_label=None, err_bound=None, ax=None):
+        if ax is None:
+            fig, ax = plt.subplots()
 
         # Not sure why this has failed working...
         # rats = np.abs(np.subtract(self.graphdf[self.x_axis_value], self.graphdf[self.y_axis_value],
@@ -121,7 +122,7 @@ class Graphic():
         uniq_tmps = np.unique(self.graphdf[self.color_column])
 
         for tmp in uniq_tmps:
-            plt.scatter(x=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.x_axis_value],
+            ax.scatter(x=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.x_axis_value],
                         y=self.graphdf.loc[self.graphdf[self.color_column] == tmp, self.y_axis_value],
                         c=self.graphdf.loc[self.graphdf[self.color_column] == tmp, 'clr'].values,
                         label='{}{}C'.format(int(tmp), u'\N{DEGREE SIGN}'),
@@ -151,8 +152,8 @@ class Graphic():
                         horizontalalignment='left', fontsize=6)
 
         # plt.xlabel(self.x_axis_value)
-        plt.xlabel('Predicted Conversion')
-        plt.ylabel(self.y_axis_value)
+        ax.set_xlabel('Predicted Conversion')
+        ax.set_ylabel(self.y_axis_value)
 
         if legend_label is None:
             legend_label = self.color_column
@@ -160,20 +161,24 @@ class Graphic():
         if legend_label == 'temperature':
             legend_label = 'Temperature'
 
-        plt.legend(title=legend_label)
+        ax.legend(title=legend_label)
 
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
         plt.tight_layout()
         if svnm is None:
             plt.savefig('{}//figures//{}-{}.png'.format(self.svfl, self.svnm, 'err'),
                         dpi=400)
+            plt.close()
         elif svnm == 'return':
             return plt
+        elif svnm == 'fig':
+            return fig
+        elif svnm == 'ax':
+            return ax
         else:
             plt.savefig('{}//figures//{}.png'.format(self.svfl, svnm), dpi=400)
-
-        plt.close()
+            plt.close()
 
     def plot_kernel_density(self, feat_list=None, margins=True, element=None, pointcolor='w', ylim=(0.3, 1.3)):
         """

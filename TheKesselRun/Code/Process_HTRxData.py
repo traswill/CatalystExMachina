@@ -123,6 +123,13 @@ def merge_ids_flows(flowsdf, iddf):
 
 
 def merge_activity_catalysts(actdf, catdf, nh3scale=100):
+    """
+
+    :param actdf:
+    :param catdf:
+    :param nh3scale: Scale of the NH3 concentration in the raw files.
+    :return:
+    """
     final_cols = ['Reactor', 'Wt(g)', 'Tot(SCCM)', 'HE(SCCM)', 'NH3', 'Space Velocity',
                   'ID', 'Ele1', 'Wt1', 'Ele2', 'Wt2', 'Ele3', 'Wt3',
                   'Reactor(2)', 'Ramp Direction', 'Temperature', 'Pred Value']
@@ -144,12 +151,12 @@ def merge_activity_catalysts(actdf, catdf, nh3scale=100):
     output_df.loc[output_df['Pred Value'] < 0, 'Pred Value'] = 0
 
     # Use nominal NH3 concentration
-    output_df['NH3'] = 1
-    output_df['Conversion'] = (1 - output_df['Pred Value']) / 1
+    # output_df['NH3'] = 1
+    # output_df['Conversion'] = (1 - output_df['Pred Value']) / 1
 
     # Use reported NH3 concentration
-    # output_df['NH3'] = output_df['NH3'] * nh3scale
-    # output_df['Conversion'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
+    output_df['NH3'] = output_df['NH3'] * nh3scale
+    output_df['Conversion'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
 
     output_df.loc[output_df['Conversion'] < 0,  'Conversion'] = 0
 
@@ -356,7 +363,7 @@ def read_data_12():
 def create_super_monster_file():
     pths = glob.glob('..//Data//Processed//SS*.csv')
 
-    df = pd.concat([pd.read_csv(pth, index_col=0) for pth in pths], ignore_index=True)
+    df = pd.concat([pd.read_csv(pth, index_col=0) for pth in pths], ignore_index=True, sort=True)
     df.to_csv('..//Data//Processed//AllData.csv')
 
     uniid = np.unique(df.loc[:, 'ID'].values)
@@ -407,11 +414,28 @@ def read_data0_data1():
     df.columns = ['ID','Ele1','Wt1','Ele2','Wt2','Ele3','Wt3','Reactor','Wt(g)','NH3','Space Velocity','Ramp Direction','Temperature','Pred Value','Conversion']
     df.to_csv('..//Data//Processed//SS1.csv')
 
+def read_data_11():
+    datpth = r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\RAW\NH3_v9_data_11.xlsx"
+    referencedata_df = load_info_sheet(datpth, sheetname='Info', thresh=10, skip_footer=14, skiprow=1)
+    activitydata_df = load_activity_sheet(datpth, sheet='Data', cols='A,D')
+
+    actdf = extract_activity_information(activitydata_df, proc='default')
+
+    # Katie said to drop the down ramp because they were exposed to a higher concentration of NH3
+    actdf.drop(actdf[actdf.loc[:, 'Ramp Direction'] == 'down'].index, inplace=True)
+
+    catdf = merge_ids_flows(referencedata_df, split_katies_ID(referencedata_df))
+
+    df = merge_activity_catalysts(actdf, catdf, nh3scale=1)
+    df.to_csv('..//Data//Processed//SS11.csv')
+
 if __name__ == '__main__':
     # read_data0_data1()
     # read_v4_data()
     # read_v4_data_8()
     # read_data_9()
     # read_data_9_updated()
+    # read_data_11()
     # read_data_12()
+    # exit()
     create_super_monster_file()
