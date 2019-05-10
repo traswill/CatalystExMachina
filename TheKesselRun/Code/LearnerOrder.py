@@ -387,7 +387,7 @@ class SupervisedLearner():
 
         filter_dict_ammonia = {
             1: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'ammonia_concentration'] > 0.5) &
-                                    (self.dynamic_dataset.loc[:, 'ammonia_concentration'] < 1.5)],
+                                    (self.dynamic_dataset.loc[:, 'ammonia_concentration'] < 1.9)],
             5: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'ammonia_concentration'] > 4.8) &
                                     (self.dynamic_dataset.loc[:, 'ammonia_concentration'] < 5.2)]
         }

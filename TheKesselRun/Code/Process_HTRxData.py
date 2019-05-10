@@ -151,12 +151,13 @@ def merge_activity_catalysts(actdf, catdf, nh3scale=100):
     output_df.loc[output_df['Pred Value'] < 0, 'Pred Value'] = 0
 
     # Use nominal NH3 concentration
-    # output_df['NH3'] = 1
-    # output_df['Conversion'] = (1 - output_df['Pred Value']) / 1
+    output_df['NH3'] = output_df['NH3'] * nh3scale
+    output_df.loc[output_df['NH3'] < 2, 'NH3'] = 1
+    output_df['Conversion'] = (1 - output_df['Pred Value']) / 1
 
     # Use reported NH3 concentration
-    output_df['NH3'] = output_df['NH3'] * nh3scale
-    output_df['Conversion'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
+    # output_df['NH3'] = output_df['NH3'] * nh3scale
+    # output_df['Conversion'] = (output_df['NH3'] - output_df['Pred Value']) / (output_df['NH3'])
 
     output_df.loc[output_df['Conversion'] < 0,  'Conversion'] = 0
 
@@ -430,12 +431,12 @@ def read_data_11():
     df.to_csv('..//Data//Processed//SS11.csv')
 
 if __name__ == '__main__':
-    # read_data0_data1()
-    # read_v4_data()
-    # read_v4_data_8()
-    # read_data_9()
-    # read_data_9_updated()
-    # read_data_11()
-    # read_data_12()
+    read_data0_data1()
+    read_v4_data()
+    read_v4_data_8()
+    read_data_9()
+    read_data_9_updated()
+    read_data_11()
+    read_data_12()
     # exit()
     create_super_monster_file()

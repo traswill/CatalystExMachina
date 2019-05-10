@@ -87,7 +87,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
     catcont.build_master_container(drop_empty_columns=drop_empty_columns)
 
 
-def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
+def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0, k_filter=True):
     # Load Data
     catcontainer = CatalystContainer()
     load_nh3_catalysts(catcont=catcontainer, drop_empty_columns=drop_na_columns)
@@ -106,6 +106,8 @@ def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
     # Set algorithm and add data
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_static_dataset(catalyst_container=catcontainer)
+    if k_filter:
+        skynet.static_dataset = skynet.static_dataset.loc[skynet.static_dataset['K Loading'] == 0.12]
 
     # Set parameters
     skynet.set_target_columns(cols=['Measured Conversion'])
@@ -138,6 +140,10 @@ def explore_bayesian_of_initial_design_space():
     Compare
 
     """
+
+    np.random.seed(42)
+
+    ''' Load Catalyst Data'''
     skynet = load_skynet(version='v80_htescreen_bayes')
     skynet.set_filters(
         element_filter=3,
@@ -147,14 +153,39 @@ def explore_bayesian_of_initial_design_space():
         ru_filter=0,
         pressure_filter=None
     )
-
     skynet.filter_static_dataset()
-    feat_selector = SelectKBest(score_func=f_regression, k=20)
-    feats = feat_selector.fit_transform(skynet.features, skynet.labels)
-    feats = feat_selector.inverse_transform(feats)
-    skynet.features_df[:] = feats
-    kbest_column_list = list(skynet.features_df.loc[:, skynet.features_df.sum() != 0].columns)
-    print(kbest_column_list)
+
+    ''' Single throughput iteration '''
+    # randomly select 5 catalysts
+    trainset = skynet.dynamic_dataset.sample(5)
+
+    for ii in range(len(trainset), 80):
+        skynet.dynamic_dataset = trainset
+        skynet.set_training_data()
+        skynet.train_data()
+        skynet.calculate_tau()
+
+        skynet.filter_static_dataset()
+        skynet.filter_out_ids(ids=trainset['ID'].values.tolist())
+        skynet.predict_data()
+        skynet.calculate_uncertainty()
+        skynet.compile_results(sv=True, svnm='{} catalysts - ST'.format(len(trainset)))
+        g = Graphic(df=skynet.result_dataset, svfl=skynet.svfl, svnm='{} catalysts - ST'.format(len(trainset)))
+        g.plot_err()
+
+        ids = trainset.index.values.tolist() + [skynet.result_dataset['Uncertainty'].idxmax()]
+        trainset = skynet.static_dataset[skynet.static_dataset.index.isin(ids)]
+    
+    #
+    #
+    # feat_selector = SelectKBest(score_func=f_regression, k=20)
+    # feats = feat_selector.fit_transform(skynet.features, skynet.labels)
+    # feats = feat_selector.inverse_transform(feats)
+    # skynet.features_df[:] = feats
+    # kbest_column_list = list(skynet.features_df.loc[:, skynet.features_df.sum() != 0].columns)
+    # print(kbest_column_list)
+
+
 
 if __name__ == '__main__':
     explore_bayesian_of_initial_design_space()

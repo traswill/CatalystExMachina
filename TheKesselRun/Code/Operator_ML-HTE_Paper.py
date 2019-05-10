@@ -61,7 +61,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.add_element(dat['Ele3'], dat['Wt3'])
             cat.set_group(dat['Groups'])
             try:
-                cat.add_n_cl_atoms(cl_atom_df.loc[dat['ID']].values[0])
+                cat.add_n_cl_atoms(cl_atom_df.loc[dat['ID'], 'Precursor mol Cl'])
             except KeyError:
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
@@ -347,6 +347,7 @@ def test_all_ML_models(version, note, three_ele=True, ru_filter=3):
     plt.tight_layout()
     plt.ylim(0,0.4)
     plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
+    plt.close()
 
 def determine_algorithm_learning_rate(version, note):
     skynet = load_skynet(version=version, note=note)
@@ -484,7 +485,7 @@ def read_learning_rate(pth):
     plt.ylim(0.10, 0.25)
     plt.savefig(r'{}//learningrate.png'.format(pth), dpi=400)
 
-def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter=0):
+def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter=0, k_filter=True):
     # Load Data
     catcontainer = CatalystContainer()
     load_nh3_catalysts(catcont=catcontainer, drop_empty_columns=drop_na_columns)
@@ -503,6 +504,8 @@ def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter
     # Set algorithm and add data
     skynet.set_learner(learner='etr', params='etr')
     skynet.load_static_dataset(catalyst_container=catcontainer)
+    if k_filter:
+        skynet.static_dataset = skynet.static_dataset.loc[skynet.static_dataset['K Loading'] == 0.12]
 
     # Set parameters
     skynet.set_target_columns(cols=['Measured Conversion'])
@@ -519,7 +522,7 @@ def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter
         load_list = []
 
     skynet.set_drop_columns(
-        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
+        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band']
     )
 
     skynet.filter_static_dataset()
@@ -574,26 +577,50 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
         g.bokeh_predictions()
         # learner.bokeh_by_elements()
 
-def CaMnIn_prediction(learner):
-    learner.set_filters(temperature_filter='350orless')
+def CaMnIn_prediction(version, note):
+    # Load the database
+    learner = load_skynet(version=version, note=note, ru_filter=0)
     learner.filter_static_dataset()
+
+    # Filter out everything but Ca, Mn, In catalysts, train
     eles = [x.replace(' Loading', '') for x in learner.dynamic_dataset.columns if 'Loading' in x]
     eles = [x for x in eles if x not in ['Ca','Mn','In','Ru','K']]
     learner.filter_out_elements(eles=eles)
-    print(learner.dynamic_dataset)
     learner.train_data()
 
+    # Reset, filter Ca, Mn, and In out, and predict
     learner.filter_static_dataset()
     learner.filter_out_elements(eles=['Ca','Mn','In'])
     learner.predict_data()
 
     learner.evaluate_regression_learner()
-    learner.compile_results()
+    learner.compile_results(sv=True)
 
     g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_CaMnIn'.format(learner.svnm))
     g.plot_basic()
     g.plot_err()
     g.plot_err(metadata=False, svnm='{}_CaMnIn_nometa'.format(learner.svnm))
+    plt.close()
+
+def crossvalidation(version, note, ru=0):
+    # Load the database
+    learner = load_skynet(version=version, note=note, ru_filter=ru)
+    learner.filter_static_dataset()
+    learner.train_data()
+
+    for cv_task in [3, 10, 'LSO']:
+        learner.predict_crossvalidate(kfold=cv_task)
+        learner.evaluate_regression_learner()
+        learner.compile_results(sv=True, svnm=cv_task)
+
+        g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, cv_task))
+        g.plot_basic()
+        g.plot_err()
+        g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, cv_task))
+        plt.close()
+
+        g.bokeh_predictions()
+        g.bokeh_by_elements()
 
 
 def element_predictor(elements):
@@ -1117,7 +1144,7 @@ def make_all_predictions(version, note):
         skynet.load_static_dataset(catcont)
         skynet.set_training_data()
         skynet.predict_data()
-        skynet.compile_results(svnm=svnm)
+        skynet.compile_results(svnm=svnm, sv=True)
 
     def crossvalidate(svnm):
         skynet.predict_crossvalidate(kfold='LOO')
@@ -1255,7 +1282,10 @@ def make_all_predictions(version, note):
 
 def compile_predictions(version):
     """ Begin importing data generated above for compilation into single dataframe """
-    pths = glob.glob(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\result*.csv')
+    pths = glob.glob(
+        r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\{}\result*.csv'.format(version)
+    )
+
     output_df = pd.DataFrame(
         columns=['Catalyst', 'Ru Loading', 'Secondary Metal', 'Secondary Metal Loading', 'Temperature',
                  'Measured Conversion', 'CaMnIn Prediction', '3% Ru Prediction', '3% and 2% Ru Prediction',
@@ -1263,7 +1293,6 @@ def compile_predictions(version):
 
     for pth in pths:
         df = pd.read_csv(pth, index_col=0)
-        print(pth)
         parse_df = df[['Name', 'Load1', 'Ele2', 'Load2', 'temperature', 'Predicted Conversion']]
         parse_df.columns = ['Catalyst', 'Ru Loading', 'Secondary Metal', 'Secondary Metal Loading', 'Temperature',
                             'Predicted Conversion']
@@ -1280,13 +1309,15 @@ def compile_predictions(version):
         col_nm = pdict.get(pth.split('-')[-1], 'Error')
 
         for idx, val in parse_df.iterrows():
-            print(idx)
             try:
                 output_df.loc[idx, col_nm] = val.values
             except ValueError:
                 output_df = pd.concat([output_df, parse_df], sort=False)
 
-    output_df.to_csv(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v52\compiled_data.csv')
+    output_df.to_csv(
+        r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\{}\compiled_data.csv'.format(version)
+    )
+
 
 def feature_extraction_with_XRD():
     catcont = CatalystContainer()
@@ -1422,114 +1453,27 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v81'
-    note = 'Changed data files to use measured NH3 conversion rather than nominal conversion'
-    test_all_ML_models(version=version, three_ele=False, ru_filter=None)
-    exit()
+    version = 'v83'
+    note = 'Changed data files back to nominal 1% conversion'
 
-    predict_all_elements_with_3Ru_21CaMnIn(version)
-    exit()
+    CaMnIn_prediction(version, note=note)
 
+    # crossvalidation(version, note, ru=0)
 
-    test_ML_models_with_feature_reduction(version, note)
-    exit()
+    # test_all_ML_models(version=version, note=note, three_ele=False, ru_filter=0)
 
-    # feature_extraction_with_XRD()
-    # exit()
-
-    # determine_algorithm_learning_rate(version)
-    # exit()
-    # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v61-learning-rate")
-    # exit()
-
-    eval_3Ru_vs_3RuplusCaMnIn(version, note)
-    # make_all_predictions(version=version)
-    exit()
+    # make_all_predictions(version, note)
     # compile_predictions(version=version)
 
-    skynet = load_skynet(version=version, note=note, ru_filter=3, drop_na_columns=False)
-    # predict_lanthanides()
-    # Lists for dropping certain features
-    zpp_list = ['Zunger Pseudopotential (d)', 'Zunger Pseudopotential (p)',
-                'Zunger Pseudopotential (pi)', 'Zunger Pseudopotential (s)',
-                'Zunger Pseudopotential (sigma)']
+    # predict_all_elements_with_3Ru_21CaMnIn(version)
 
-    # load_list = ['{} Loading'.format(x) for x in
-    #              ['Ru', 'Cu', 'Y', 'Mg', 'Mn',
-    #               'Ni', 'Cr', 'W', 'Ca', 'Hf',
-    #               'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
-    #               'Mo', 'In', 'Rh', 'K']]
+    # test_ML_models_with_feature_reduction(version, note)
 
-    skynet.set_drop_columns(cols=
-                            ['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band', 'n_Cl_atoms']
-                            + ['Number Unfilled Electrons', 'Number s-shell Unfilled Electrons',
-                               'Number p-shell Unfilled Electrons', 'Number d-shell Unfilled Electrons',
-                               'Number f-shell Unfilled Electrons']
-                            + zpp_list
-                            # + load_list
-                            )
+    # feature_extraction_with_XRD()
 
-    # Random Thing!
-    # train_elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc',
-    #                   'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh', 'Ca', 'Mn', 'In']
-    #
-    # for _ in range(50):
-    #     eleslist = random.sample(train_elements, 3)
-    #     print(eleslist)
-    #     element_predictor(eleslist)
-    #
-    # exit()
+    # determine_algorithm_learning_rate(version)
 
-    skynet.set_filters(temperature_filter='350orless')
-    skynet.filter_static_dataset()
-    skynet.train_data()
-    skynet.calculate_tau()
+    # read_learning_rate(pth=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\v61-learning-rate")
 
-    catcont = generate_empty_container()
-    skynet.load_static_dataset(catcont)
-    catcont = CatalystContainer()
-    cat = CatalystObject()
-    cat.ID = 'A_{}'.format('TEST')
-    cat.add_element('Cu', 3)
-    cat.add_element('Y', 1)
-    cat.add_element('Na', 12)
-    cat.set_group(-1)
-    cat.feature_add_n_elements()
-    cat.feature_add_Lp_norms()
-    cat.feature_add_elemental_properties()
+    # eval_3Ru_vs_3RuplusCaMnIn(version, note)
 
-    cat.add_observation(
-        temperature=250,
-        space_velocity=2000,
-        gas_concentration=1,
-        reactor_number=0
-    )
-
-    cat.add_observation(
-        temperature=300,
-        space_velocity=2000,
-        gas_concentration=1,
-        reactor_number=0
-    )
-
-    cat.add_observation(
-        temperature=350,
-        space_velocity=2000,
-        gas_concentration=1,
-        reactor_number=0
-    )
-
-    catcont.add_catalyst(index=cat.ID, catalyst=cat)
-    catcont.build_master_container(drop_empty_columns=False)
-
-    skynet.dynamic_dataset = skynet.dynamic_dataset.append(catcont.master_container, sort=False)
-
-    skynet.set_training_data()
-    skynet.predict_data()
-    skynet.calculate_uncertainty()
-    skynet.compile_results(sv=True)
-
-    # temperature_slice(learner=skynet, tslice=['350orless'], fold=0, kde=False)
-
-    # three_catalyst_model()
-    # test_all_ML_models()
