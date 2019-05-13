@@ -525,14 +525,13 @@ class SupervisedLearner():
         for nth_tree, tree in enumerate(self.machina.estimators_):
             tree_predition_df.loc[:, 'Tree {}'.format(nth_tree)] = tree.predict(self.features)
 
-        ## Note: Removed as of 5/13/19
-        ## Remove observations (i.e. trees) that are outside 90% CI (less than 5% or greater than 95%)
-        # forest_stats = tree_predition_df.apply(lambda x: np.percentile(a=x, q=[5, 95]), axis=1)
-        # for idx, rw in tree_predition_df.iterrows():
-        #     forest_min = forest_stats[idx][0]
-        #     forest_max = forest_stats[idx][1]
-        #     rw[(rw > forest_max) | (rw < forest_min)] = np.nan
-        #     tree_predition_df.loc[idx] = rw
+        # Remove observations (i.e. trees) that are outside 90% CI (less than 5% or greater than 95%)
+        forest_stats = tree_predition_df.apply(lambda x: np.percentile(a=x, q=[5, 95]), axis=1)
+        for idx, rw in tree_predition_df.iterrows():
+            forest_min = forest_stats[idx][0]
+            forest_max = forest_stats[idx][1]
+            rw[(rw > forest_max) | (rw < forest_min)] = np.nan
+            tree_predition_df.loc[idx] = rw
 
         # Calculate scaling parameter per...
         # J. W. Coulston, C. E. Blinn, V. A. Thomas, R. H. Wynne,
