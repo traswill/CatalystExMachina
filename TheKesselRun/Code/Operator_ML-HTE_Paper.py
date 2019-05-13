@@ -1453,10 +1453,12 @@ def feature_extraction_with_XRD():
 
 
 if __name__ == '__main__':
-    version = 'v83'
-    note = 'Changed data files back to nominal 1% conversion'
+    version = 'v85'
 
-    CaMnIn_prediction(version, note=note)
+
+    # note = 'Changed data files back to nominal 1% conversion'
+
+    # CaMnIn_prediction(version, note=note)
 
     # crossvalidation(version, note, ru=0)
 
