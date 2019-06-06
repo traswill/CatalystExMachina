@@ -84,10 +84,15 @@ class Graphic():
         plt.ylim(0, 1)
         if legend_label is None:
             plt.legend(title=self.color_column)
+        elif legend_label == 'temperature':
+            plt.legend(title='Temperature')
         else:
             plt.legend(title=legend_label)
 
-        plt.tight_layout()
+        try:
+            plt.tight_layout()
+        except ValueError:
+            pass
 
         if len(uniq_tmps) == 1:
             plt.savefig('{}//figures//{}-basic-{}C.png'.format(self.svfl, self.svnm, uniq_tmps[0]),
@@ -332,10 +337,6 @@ class Graphic():
         save(p)
 
     def bokeh_by_elements(self):
-        """ HTML with overview with colorscheme that is per-element """
-        if self.predictions is None:
-            self.predict_crossvalidate()
-
         tools = "pan,wheel_zoom,box_zoom,reset,save".split(',')
         hover = HoverTool(tooltips=[
             ('Name', '@Name'),
@@ -353,9 +354,11 @@ class Graphic():
         p.yaxis.axis_label = "Measured Conversion"
         p.grid.grid_line_color = "white"
 
-        self.plot_df['bokeh_color'] = self.plot_df['Ele2_hues'].apply(rgb2hex)
+        # self.plot_df['bokeh_color'] = self.plot_df['Ele2_hues'].apply(rgb2hex)
+        # source = ColumnDataSource(self.plot_df)
+        self.set_color(self.graphdf['Ele2'])
 
-        source = ColumnDataSource(self.plot_df)
+        source = ColumnDataSource(self.graphdf)
 
         p.circle("Predicted Conversion", "Measured Conversion", size=12, source=source,
                  color='bokeh_color', line_color="black", fill_alpha=0.8)

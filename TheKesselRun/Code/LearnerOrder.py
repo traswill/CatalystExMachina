@@ -23,7 +23,9 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.decomposition import PCA
 from sklearn.cluster import k_means
-from sklearn.feature_selection import SelectKBest
+from sklearn.feature_selection import SelectKBest, RFECV, RFE
+from sklearn.metrics.pairwise import polynomial_kernel, sigmoid_kernel, chi2_kernel
+
 
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
     LeaveOneOut, learning_curve
@@ -478,6 +480,14 @@ class SupervisedLearner():
         else:
             self.features = self.features_df.values
 
+    def reduce_features(self):
+        """ Use a feature selection algorithm to drop features. """
+
+        rfe = RFE(estimator=self.machina, n_features_to_select=20)
+        rfe.fit(self.features, self.labels)
+        self.features_df[:] = rfe.inverse_transform(self.features)
+        self.features_df.to_csv('{}\\{}'.format(self.svfl, 'feature_list.csv'))
+
     def set_training_set(self, training_elements=None):
         pass # TODO I want to come up with a clever way to segment into training and test sets...
 
@@ -752,14 +762,24 @@ class SupervisedLearner():
             'min_impurity_decrease': [0, 0.1, 0.4]
         }
 
-        if grid:
-            gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=10, return_train_score=True)
-        else:
-            gs = RandomizedSearchCV(self.machina, etr_tuning_params, cv=GroupKFold(3),
-                                return_train_score=True, n_iter=1000)
+        svm_tuning_params = {
+            'epsilon': [1, 1e-1, 1e-2, 1e-3, 0],
+            'kernel': ['linear', 'poly', 'rbf', 'sigmoid', 'precomputed'],
+            'gamma': [1, 1e-1, 1e-2, 'auto'],
+            'degree': [2, 3, 5, 7],
+            'coef0': [0, 1, 1e-1, 1e1, 1e2, 1e-2]
+        }
 
-        gs.fit(self.features_df.values, self.labels_df.values, groups=self.groups)
-        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune-gbr_{}.csv'.format(self.svfl, self.svnm))
+        self.machina_tuning_parameters = svm_tuning_params
+
+        if grid:
+            gs = GridSearchCV(self.machina, self.machina_tuning_parameters, cv=3, return_train_score=True)
+        else:
+            gs = RandomizedSearchCV(self.machina, self.machina_tuning_parameters, cv=GroupKFold(3),
+                                    return_train_score=True, n_iter=200)
+
+        gs.fit(X=self.features, y=self.labels, groups=self.groups)
+        pd.DataFrame(gs.cv_results_).to_csv('{}\\p-tune-svm_{}.csv'.format(self.svfl, self.svnm))
 
     def visualize_tree(self, n=1):
         """ Comment """
@@ -841,3 +861,85 @@ class SupervisedLearner():
 
             ]
         ).to_csv('{}//eval//{}_modelparam.csv'.format(self.svfl, self.svnm))
+
+    def find_optimal_feature_count(self):
+        ''' '''
+        # TODO groups is not working for this method for some reason...
+
+        rfe = RFECV(estimator=self.machina, cv=GroupKFold(10), scoring='neg_mean_squared_error')
+        rfe.fit(X=self.features, y=self.labels)
+        # rfe.fit(X=self.features, y=self.labels, groups=self.groups)
+
+        print("Optimal number of features : %d" % rfe.n_features_)
+
+        plt.figure()
+        plt.xlabel("Number of features selected")
+        plt.ylabel("Cross validation score (nb of correct classifications)")
+        plt.plot(range(1, len(rfe.grid_scores_) + 1), rfe.grid_scores_)
+        plt.show()
+
+    def random_feature_test(self, combined=False):
+        ''' Create a set of random features to test feature efficacy '''
+
+        random_features = np.random.random_sample(self.features.shape)
+
+        if combined is True:
+            rand_df = pd.DataFrame(
+                random_features,
+                columns=['RandFeat {}'.format(i) for i in range(len(self.features.transpose()))],
+                index=self.features_df.index
+            )
+
+            self.features_df = pd.concat([self.features_df, rand_df], axis=1)
+
+        elif combined is 'temp_only':
+            # temperature is correct, but everything else is random
+            self.features_df[:] = random_features
+            self.features_df.columns = ['RandFeat {}'.format(i) for i in range(len(self.features.transpose()) - 1)] + [
+                'temperature']
+            self.features_df['temperature'] = self.dynamic_dataset['temperature']
+
+        elif combined is 'temp_and_weights':
+            self.features_df[:] = random_features
+            self.features_df.columns = ['RandFeat {}'.format(i) for i in range(len(self.features.transpose()) - 1)] + [
+                'temperature']
+
+            self.features_df['temperature'] = self.dynamic_dataset['temperature']
+
+            weight_loading_columns = [col for col in self.dynamic_dataset.columns if 'Loading' in col]
+            self.features_df = pd.concat([self.features_df, self.dynamic_dataset.loc[:, weight_loading_columns]], axis=1)
+
+        else:
+            self.features_df[:] = random_features
+            self.features_df.columns = ['RandFeat {}'.format(i) for i in range(len(self.features.transpose())-1)] + ['temperature']
+            rand_temperature = np.random.choice([250, 300, 350], len(self.features))
+            self.features_df['temperature'] = rand_temperature
+
+        self.dynamic_dataset = pd.concat(
+            [self.features_df,
+             self.labels_df,
+             self.hold_df,
+             pd.DataFrame(self.groups, index=self.labels_df.index)
+             ],
+            axis=1
+        )
+
+        self.features = self.features_df.values
+
+    def drop_all_features(self, exclude=None):
+        if exclude is None:
+            self.features_df = pd.DataFrame()
+        else:
+            self.features_df.drop(columns=[x for x in self.features_df.columns if x not in exclude], inplace=True)
+
+        self.dynamic_dataset = pd.concat(
+            [self.features_df,
+             self.labels_df,
+             self.hold_df,
+             pd.DataFrame(self.groups, index=self.labels_df.index)
+             ],
+            axis=1
+        )
+
+        self.features = self.features_df.values
+

@@ -272,6 +272,24 @@ def test_ML_models_with_feature_reduction(version, note):
     plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
 
 
+def test_and_tune_all_ML_models(version, note, three_ele=True, ru_filter=3):
+    skynet = load_skynet(version=version, note=note)
+    catcontainer = CatalystContainer()
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=ru_filter,
+        pressure_filter=None
+    )
+
+    if three_ele:
+        train_elements = ['Ca', 'Mn', 'In']
+    else:
+        train_elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc',
+                          'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh', 'Ca', 'Mn', 'In', 'Os', 'Pt', 'Au', 'Nb', 'Fe']
+
 def test_all_ML_models(version, note, three_ele=True, ru_filter=3):
     skynet = load_skynet(version=version, note=note)
     catcontainer = CatalystContainer()
@@ -579,7 +597,7 @@ def temperature_slice(learner, tslice, kde=False, fold=10):
 
 def CaMnIn_prediction(version, note):
     # Load the database
-    learner = load_skynet(version=version, note=note, ru_filter=0)
+    learner = load_skynet(version=version, note=note, ru_filter=3)
     learner.filter_static_dataset()
 
     # Filter out everything but Ca, Mn, In catalysts, train
@@ -619,8 +637,8 @@ def crossvalidation(version, note, ru=0):
         g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, cv_task))
         plt.close()
 
-        g.bokeh_predictions()
-        g.bokeh_by_elements()
+        # g.bokeh_predictions()
+        # g.bokeh_by_elements()
 
 
 def element_predictor(elements):
@@ -1318,7 +1336,6 @@ def compile_predictions(version):
         r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Results\{}\compiled_data.csv'.format(version)
     )
 
-
 def feature_extraction_with_XRD():
     catcont = CatalystContainer()
 
@@ -1451,16 +1468,170 @@ def feature_extraction_with_XRD():
     # g.svnm = '{}_dshell.png'.format(g.svnm.split('.')[0])
     # g.plot_kernel_density(feat_list=['58 2Th', '28 2Th'], pointcolor='r', ylim=None)
 
+def crossvalidation_reduced_features(version, note, ru=0):
+    ''' Looking at feature selection and combination to improve model predictions '''
+
+    # Load the database
+    learner = load_skynet(version=version, note=note, ru_filter=ru)
+    learner.reduce_features()
+    learner.train_data()
+
+    for cv_task in [3, 10]:
+        learner.predict_crossvalidate(kfold=cv_task)
+        learner.evaluate_regression_learner()
+        learner.compile_results(sv=True, svnm=cv_task)
+
+        g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, cv_task))
+        g.plot_basic()
+        g.plot_err()
+        g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, cv_task))
+        plt.close()
+
+        g.bokeh_predictions()
+
+def static_feature_test(version, note, combined_features=False):
+    ''' Generate random numbers for features to evaluate if the model is performing well. '''
+
+    # Load the database
+    learner = load_skynet(version=version, note=note, ru_filter=0)
+    learner.random_feature_test(combined=combined_features)
+    learner.train_data()
+
+    for cv_task in ['LSO']:
+        learner.predict_crossvalidate(kfold=cv_task)
+        learner.evaluate_regression_learner()
+        learner.compile_results(sv=True, svnm=cv_task)
+        learner.extract_important_features(sv=True, prnt=True)
+
+        g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, combined_features))
+        g.plot_basic()
+        g.plot_err()
+        g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, combined_features))
+        plt.close()
+
+def feature_test_crossvalidation(version, note):
+    ''' Use results from the static_feature_test to update the model and test. '''
+
+    learner = load_skynet(version=version, note=note, ru_filter=0)
+    # feat_list = ['Number d-shell Valence Electrons', 'Covalent Radius', 'Number Unfilled Electrons', 'Electronegativity',
+    #              'Polarizability', 'Number Valence Electrons', 'Number s-shell Valence Electrons', 'Second Ionization Energy',
+    #              'Conductivity','IsAlkali','Heat Capacity (Mass)','Eighth Ionization Energy','Atomic Number','Melting Temperature',
+    #              'Density','Electron Affinity','Fusion Enthalpy','Third Ionization Energy','Atomic Weight','Atomic Volume']
+
+    feat_list = ['Number d-shell Valence Electrons', 'Covalent Radius', 'Number Unfilled Electrons',
+                 'Electronegativity','Polarizability']
+    learner.drop_all_features(exclude=
+                              ['temperature', 'Rh Loading'] +
+                              ['{}_mean'.format(x) for x in feat_list] +
+                              ['{}_mad'.format(x) for x in feat_list]
+                              )
+    learner.train_data()
+
+    learner.predict_crossvalidate(kfold='LSO')
+    learner.evaluate_regression_learner()
+    learner.compile_results(sv=True, svnm='LSO')
+    learner.extract_important_features(sv=True, prnt=True)
+
+    g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, 'LSO'))
+    g.plot_basic()
+    g.plot_err()
+    g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, 'LSO'))
+    plt.close()
+
+    exit()
+    # Test all ML algorithms OOB
+
+    eval_dict = dict()
+
+    for algs in ['rfr', 'adaboost', 'tree', 'neuralnet', 'svr', 'knnr', 'krr', 'etr', 'gbr', 'ridge', 'lasso']:
+        if algs == 'neuralnet':
+            learner.set_learner(learner=algs, params='nnet')
+        else:
+            learner.set_learner(learner=algs, params='empty')
+
+        try:
+            learner.predict_crossvalidate(kfold=10)
+            eval_dict[algs] = mean_absolute_error(learner.labels_df.values, learner.predictions)
+        except ValueError:
+            eval_dict[algs] = -1
+
+    print(eval_dict)
+
+    nm_dict = {
+        'rfr':       'Random Forest',
+        'adaboost':  'AdaBoost',
+        'tree':      'Decision Tree',
+        'neuralnet': 'Neural Net',
+        'svr':       'Support Vector Machine',
+        'knnr':      'k-Nearest Neighbor Regression',
+        'krr':       'Kernel Ridge Regression',
+        'etr':       'Extremely Randomized Trees',
+        'gbr':       'Gradient Tree Boosting',
+        'ridge':     'Ridge Regressor',
+        'lasso':     'Lasso Regressor'
+    }
+
+    names = eval_dict.keys()
+    vals = eval_dict.values()
+
+    df = pd.DataFrame([names, vals], index=['rgs', 'Mean Absolute Error']).T
+    df['Machine Learning Algorithm'] = [nm_dict.get(x, 'ERROR') for x in df['rgs'].values]
+    df.sort_values(by='Mean Absolute Error', inplace=True, ascending=False)
+
+    df.to_csv(r'{}\ML_models.csv'.format(learner.svfl))
+
+    g = sns.barplot(x='Machine Learning Algorithm', y='Mean Absolute Error', data=df, palette="GnBu_d")
+    g.set_xticklabels(g.get_xticklabels(), rotation=30, ha='right')
+    plt.xlabel('Machine learning algorithm')
+    plt.ylabel('Mean absolute error')
+    plt.tight_layout()
+    plt.ylim(0, 0.4)
+    plt.savefig(r'{}\ML_models.png'.format(learner.svfl))
+    plt.close()
+
+def krr_testing(version, note):
+    ''' Use results from the static_feature_test to update the model and test. '''
+
+    learner = load_skynet(version=version, note=note, ru_filter=0)
+    learner.drop_all_features(exclude=[
+        'temperature', 'Number d-shell Valence Electrons_mad', 'Covalent Radius_mad',
+        'Rh Loading', 'Electronegativity_mad', 'Polarizability_mad'
+    ])
+    learner.set_learner(learner='svr', params='empty')
+    learner.hyperparameter_tuning(grid=False)
+    exit()
+
+    learner.train_data()
+
+    learner.predict_crossvalidate(kfold=10)
+    learner.evaluate_regression_learner()
+    learner.compile_results(sv=True, svnm=10)
+    learner.extract_important_features(sv=True, prnt=True)
+
+    g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, 10))
+    g.plot_basic()
+    g.plot_err()
+    g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, 10))
+    plt.close()
+
 
 if __name__ == '__main__':
-    version = 'v85'
+    version = 'v91 - 3% LSOCV'
+    note = ''
 
+    # krr_testing(version, note)
 
-    # note = 'Changed data files back to nominal 1% conversion'
+    # feature_test_crossvalidation(version, note)
 
-    # CaMnIn_prediction(version, note=note)
+    CaMnIn_prediction(version, note=note)
 
-    # crossvalidation(version, note, ru=0)
+    # static_feature_test(version, note, combined_features='temp_only')
+    # static_feature_test(version, note, combined_features='temp_and_weights')
+    # static_feature_test(version, note, combined_features=True)
+    # static_feature_test(version, note, combined_features=False)
+
+    # crossvalidation_reduced_features(version, note, ru=0)
+    # crossvalidation(version, note, ru=3)
 
     # test_all_ML_models(version=version, note=note, three_ele=False, ru_filter=0)
 
