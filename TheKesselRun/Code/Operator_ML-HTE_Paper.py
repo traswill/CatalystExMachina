@@ -25,6 +25,9 @@ import glob
 import random
 import os
 
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
+    LeaveOneOut, learning_curve
+
 def load_nh3_catalysts(catcont, drop_empty_columns=True):
     """ Import NH3 data from Katie's HiTp dataset(cleaned). """
     df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
@@ -281,14 +284,88 @@ def test_and_tune_all_ML_models(version, note, three_ele=True, ru_filter=3):
         ammonia_filter=1,
         space_vel_filter=2000,
         ru_filter=ru_filter,
-        pressure_filter=None
+        pressure_filter=None,
+        promoter_filter='K12'
     )
 
     if three_ele:
         train_elements = ['Ca', 'Mn', 'In']
     else:
         train_elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc',
-                          'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh', 'Ca', 'Mn', 'In', 'Os', 'Pt', 'Au', 'Nb', 'Fe']
+                          'Zn', 'Sr', 'Bi', 'Pd', 'Mo', 'In', 'Rh', 'Ca', 'Mn', 'In',
+                          'Os', 'Pt', 'Au', 'Nb', 'Fe']
+
+    df = skynet.static_dataset
+    element_dataframe = pd.DataFrame()
+
+    for ele in train_elements:
+        dat = df.loc[(df['{} Loading'.format(ele)] > 0) & (df['K Loading'] == 0.12) & (df['n_elements'] == 3)]
+        element_dataframe = pd.concat([element_dataframe, dat])
+
+    catcontainer.master_container = element_dataframe
+
+    skynet.load_static_dataset(catalyst_container=catcontainer)
+    skynet.filter_static_dataset()
+    eval_dict = dict()
+
+    for algs in ['svr', 'neuralnet', 'rfr', 'adaboost', 'tree',  'knnr', 'krr', 'etr', 'gbr', 'ridge', 'lasso']:
+        print(algs)
+        params = skynet.set_learner(algs, tuning=True)
+
+        n_combi = len(list(itertools.product(*params.values())))
+        print(n_combi)
+
+        # if n_combi > 200:
+        #     gs = RandomizedSearchCV(skynet.machina, param_distributions=params, cv=GroupKFold(3),
+        #                             return_train_score=True, n_iter=np.round(n_combi/100), n_jobs=4, error_score=0.0)
+        # else:
+        #     gs = GridSearchCV(skynet.machina, param_grid=params, cv=GroupKFold(3), return_train_score=True, error_score=0.0)
+
+        gs = GridSearchCV(skynet.machina, param_grid=params, cv=GroupKFold(3),
+                          return_train_score=True, error_score=0.0, n_jobs=4)
+        gs.fit(X=skynet.features, y=skynet.labels, groups=skynet.groups)
+        pd.DataFrame(gs.cv_results_).to_csv('{fl}\\tune-{alg}_{nm}.csv'.format(fl=skynet.svfl, alg=algs, nm=skynet.svnm))
+
+        skynet.set_learner(learner=algs, params=gs.best_params_)
+        try:
+            skynet.predict_crossvalidate(kfold='LOO')
+            eval_dict[algs] = mean_absolute_error(skynet.labels_df.values, skynet.predictions)
+        except ValueError:
+            eval_dict[algs] = -1
+
+    print(eval_dict)
+
+    nm_dict = {
+        'rfr':       'Random Forest',
+        'adaboost':  'AdaBoost',
+        'tree':      'Decision Tree',
+        'neuralnet': 'Neural Net',
+        'svr':       'Support Vector Machine',
+        'knnr':      'k-Nearest Neighbor Regression',
+        'krr':       'Kernel Ridge Regression',
+        'etr':       'Extremely Randomized Trees',
+        'gbr':       'Gradient Tree Boosting',
+        'ridge':     'Ridge Regressor',
+        'lasso':     'Lasso Regressor'
+    }
+
+    names = eval_dict.keys()
+    vals = eval_dict.values()
+
+    df = pd.DataFrame([names, vals], index=['rgs', 'Mean Absolute Error']).T
+    df['Machine Learning Algorithm'] = [nm_dict.get(x, 'ERROR') for x in df['rgs'].values]
+    df.sort_values(by='Mean Absolute Error', inplace=True, ascending=False)
+
+    df.to_csv(r'{}\ML_models.csv'.format(skynet.svfl))
+
+    g = sns.barplot(x='Machine Learning Algorithm', y='Mean Absolute Error', data=df, palette="GnBu_d")
+    g.set_xticklabels(g.get_xticklabels(), rotation=30, ha='right')
+    plt.xlabel('Machine learning algorithm')
+    plt.ylabel('Mean absolute error')
+    plt.tight_layout()
+    plt.ylim(0, 0.4)
+    plt.savefig(r'{}\ML_models.png'.format(skynet.svfl))
+    plt.close()
 
 def test_all_ML_models(version, note, three_ele=True, ru_filter=3):
     skynet = load_skynet(version=version, note=note)
@@ -1616,14 +1693,16 @@ def krr_testing(version, note):
 
 
 if __name__ == '__main__':
-    version = 'v91 - 3% LSOCV'
+    version = 'v92 - Tune-Test All ML Models'
     note = ''
+
+    test_and_tune_all_ML_models(version, note, three_ele=True, ru_filter=3)
 
     # krr_testing(version, note)
 
     # feature_test_crossvalidation(version, note)
 
-    CaMnIn_prediction(version, note=note)
+    # CaMnIn_prediction(version, note=note)
 
     # static_feature_test(version, note, combined_features='temp_only')
     # static_feature_test(version, note, combined_features='temp_and_weights')

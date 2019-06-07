@@ -143,6 +143,7 @@ class SupervisedLearner():
         self.ru_filter = None
         self.pressure_filter = None
         self.sv_filter = None
+        self.promoter_filter = None
         self.version = version
 
         '''Initialize and create path, folder, and filename'''
@@ -189,7 +190,7 @@ class SupervisedLearner():
             os.makedirs('{}\\{}'.format(self.svfl, 'features'))
             os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
 
-    def set_learner(self, learner, params='default'):
+    def set_learner(self, learner, tuning=False, params='default'):
         """ Select which ML algorithm the learner should use.  Also selects appropriate parameters. """
 
         learn_selector = {
@@ -207,32 +208,155 @@ class SupervisedLearner():
             'lasso': Lasso,
         }
 
-        param_selector = {
-            'rfr': {'n_estimators':25, 'max_depth':10, 'max_leaf_nodes':50, 'min_samples_leaf':1,
-                        'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
-                        'criterion':'mae'},
-            'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
-                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
-            'etr-uncertainty': {'n_estimators': 500, 'min_samples_split': 5, 'min_samples_leaf': 4, 'min_impurity_decrease': 0,
-                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
-            'etr-CaMnIn': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
-                    'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
-            'etr-old': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
-                    'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
-            'gbr': {'subsample': 0.5, 'n_estimators': 500, 'min_samples_split': 10, 'min_samples_leaf': 3,
-                    'min_impurity_decrease': 0, 'max_leaf_nodes': 5, 'max_features': 'sqrt', 'max_depth': 5,
-                    'loss': 'ls', 'learning_rate': 0.05, 'criterion': 'mae'},
-            'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
-            'nnet': {'hidden_layer_sizes':1, 'solver':'lbfgs'},
-            'empty': {},
-            'SGD': {'alpha': 0.01, 'tol': 1e-4, 'max_iter': 1000}
-        }
+        if tuning:
+            tuning_parameters = {
+                'rfr': {
+                    'n_estimators':          [10, 25, 50, 100, 200],
+                    'max_features':          ['auto', 'sqrt'],
+                    'max_depth':             [None, 3, 5, 10],
+                    'min_samples_split':     [2, 5, 10],
+                    'min_samples_leaf':      [1, 2, 3, 5],
+                    'max_leaf_nodes':        [None, 5, 20, 50],
+                    'min_impurity_decrease': [0, 0.1, 0.4]
+                },
 
-        self.machina = learn_selector.get(learner, lambda: 'Error')()
-        self.machina.set_params(**param_selector.get(params))
+                'adaboost': {
+                    'base_estimator': [None, tree.ExtraTreeRegressor()],
+                    'n_estimators': [10,50,200,500],
+                    'learning_rate': [0.5, 1, 2],
+                    'loss': ['linear','square','exponential']
+                },
+
+                'tree': {
+                    'criterion': ['mse', 'mae'],
+                    'splitter': ['best','random'],
+                    'max_depth': [None, 2, 5],
+                    'min_samples_split': [2, 5, 0.1, 0.5],
+                    'max_features': ['auto', 'sqrt']
+                },
+
+                'SGD': {
+                    'loss': ['squared loss', 'huber', 'epsilon_insensitive'],
+                    'penalty': ['none','l2','l1','elasticnet'],
+                    'alpha': [1e-5, 1e-4, 1e-3, 1e-2],
+                    'learning_rate': ['optimal', 'invscaling', 'adaptive'],
+                    'eta0': [1e-2, 1e-1, 1],
+                    'power_t': [0.05, 0.5, 1.5]
+                },
+
+                'neuralnet': {
+                    'hidden_layer_sizes': [1, 2, 3, 5, 10],
+                    'activation': ['identity', 'logistic', 'tanh', 'relu'],
+                    'solver': ['lbfgs'],
+                    'alpha': [1e-5, 1e-4, 1e-3, 1e-2],
+                    'learning_rate': ['constant', 'invscaling', 'adaptive'],
+                    'learning_rate_init': [1e-4, 1e-3, 1e-2],
+                    # 'power_t': [0.05, 0.5, 1.5],
+                    'max_iter': [100, 200, 500],
+                    'tol': [1e-5, 1e-4, 1e-3],
+                    'momentum': [0.8, 0.9, 0.95, 0.99],
+                    'early_stopping': [True],
+                    # 'n_iter_no_change': [10, 20, 50]
+                },
+
+                'svr': {
+                    'epsilon': [1e-1, 1e-2, 1e-3],
+                    'kernel':  ['linear', 'poly', 'rbf'],
+                    'gamma':   [1, 1e-1, 1e-2, 'auto'],
+                    # 'degree':  [2, 3, 5], # full dat set
+                    'degree': [2, 3], # 3 cat set
+                    'coef0':   [0, 1, 1e-1, 1e1, 1e2, 1e-2],
+                    'max_iter': [200]
+                },
+
+                'knnr': {
+                    # 'n_neighbors': [2, 5, 7, 10], # full dat set
+                    'n_neighbors': [1, 2, 3, 4], # 3 cat set
+                    'weights': ['uniform', 'distance'],
+                    'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],
+                    'leaf_size': [2, 5, 10, 30, 50],
+                    'p': [1, 2, 3],
+                },
+
+                'krr': {
+                    'alpha': [0.9, 1, 1.1, 1.5],
+                    'degree': [2, 3, 5],
+                    'coef0': [0, 1, 5],
+                },
+
+                'etr': {
+                    'n_estimators':          [10, 25, 50, 100, 200, 400],
+                    'criterion':             ['mae'],
+                    'max_features':          ['auto', 'sqrt', 'log2', 0.2, 0.1, 0.05, 0.01],
+                    'max_depth':             [None, 3, 5, 10],
+                    'min_samples_split':     [2, 5, 10],
+                    'min_samples_leaf':      [1, 2, 3, 5],
+                    'max_leaf_nodes':        [None, 5, 20, 50],
+                    'min_impurity_decrease': [0, 0.1, 0.4]
+                },
+
+                'gbr': {
+                    'loss':                  ['ls', 'lad', 'quantile', 'huber'],
+                    'learning_rate':         [0.05, 0.1, 0.2],
+                    'subsample':             [0.5, 1],
+                    'n_estimators':          [25, 100, 500],
+                    'max_depth':             [None, 3, 5, 10],
+                    'criterion':             ['friedman_mse', 'mae'],
+                    'min_samples_split':     [2, 5, 10],
+                    'min_samples_leaf':      [1, 2, 3, 5],
+                    'max_features':          ['auto', 'sqrt'],
+                    'max_leaf_nodes':        [None, 5, 20, 50],
+                    'min_impurity_decrease': [0, 0.1, 0.4]
+                 },
+
+                'ridge': {
+                    'alpha': [0.9, 1, 1.1, 1.5],
+                    'solver': ['auto','svd','cholesky','lsqr','sparse_cg','sag','saga'],
+                },
+
+                'lasso': {
+                    'alpha': [0.9, 1, 1.1, 1.5],
+                    'fit_intercept': [True, False],
+                    'normalize': [True, False],
+                    'max_iter': [100, 200, 500, 1000],
+                },
+            }
+
+            self.machina = learn_selector.get(learner, lambda: 'Error')()
+            return tuning_parameters.get(learner, lambda : 'Error')
+
+        elif isinstance(params, dict):
+            self.machina = learn_selector.get(learner, lambda: 'Error')()
+            self.machina.set_params(**params)
+
+        else:
+
+            param_selector = {
+                'rfr': {'n_estimators':25, 'max_depth':10, 'max_leaf_nodes':50, 'min_samples_leaf':1,
+                            'min_samples_split':2, 'max_features':'auto', 'bootstrap':True, 'n_jobs':4,
+                            'criterion':'mae'},
+                'etr': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                        'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+                'etr-uncertainty': {'n_estimators': 500, 'min_samples_split': 5, 'min_samples_leaf': 4, 'min_impurity_decrease': 0,
+                        'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+                'etr-CaMnIn': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                        'max_leaf_nodes': 50, 'max_features': 'auto', 'max_depth': 10, 'criterion': 'mae'},
+                'etr-old': {'n_estimators': 100, 'min_samples_split': 2, 'min_samples_leaf': 1, 'min_impurity_decrease': 0,
+                        'max_leaf_nodes': None, 'max_features': 'sqrt', 'max_depth': 10, 'criterion': 'mae'},
+                'gbr': {'subsample': 0.5, 'n_estimators': 500, 'min_samples_split': 10, 'min_samples_leaf': 3,
+                        'min_impurity_decrease': 0, 'max_leaf_nodes': 5, 'max_features': 'sqrt', 'max_depth': 5,
+                        'loss': 'ls', 'learning_rate': 0.05, 'criterion': 'mae'},
+                'adaboost': {'base_estimator':RandomForestRegressor(), 'n_estimators':1000},
+                'nnet': {'hidden_layer_sizes':1, 'solver':'lbfgs'},
+                'empty': {},
+                'SGD': {'alpha': 0.01, 'tol': 1e-4, 'max_iter': 1000}
+            }
+
+            self.machina = learn_selector.get(learner, lambda: 'Error')()
+            self.machina.set_params(**param_selector.get(params))
 
     def set_filters(self, element_filter=None, temperature_filter=None, ammonia_filter=None, space_vel_filter=None,
-                 ru_filter=None, pressure_filter=None):
+                 ru_filter=None, pressure_filter=None, promoter_filter=None):
         """ Update filters and reset naming convention """
 
         if element_filter is not None:
@@ -247,6 +371,8 @@ class SupervisedLearner():
             self.pressure_filter = pressure_filter
         if space_vel_filter is not None:
             self.sv_filter = space_vel_filter
+        if promoter_filter is not None:
+            self.promoter_filter = promoter_filter
 
         self.set_name_paths()
 
@@ -428,6 +554,14 @@ class SupervisedLearner():
         """ Filter by reaction pressure. """
 
         pass
+
+    def filter_promoter(self):
+
+        filter_dict_promoter = {
+            'K12': self.dynamic_dataset[self.dynamic_dataset.loc[:, 'K Loading'] == 0.12],
+        }
+
+        self.dynamic_dataset = filter_dict_promoter.get(self.promoter_filter, self.dynamic_dataset)
 
     def filter_out_elements(self, eles):
         """ Remove specified elements (eles) from the dataset. """
