@@ -63,7 +63,7 @@ class Anarchy():
 
             # Reset loading dictionary
             load_df = self.loading_dataframe.copy()
-            for ele, wt in cat.elements.items():
+            for ele, wt in cat.elements_wt.items():
                 load_df.loc[index, '{} Loading'.format(ele)] = wt / 100
 
             featdf = pd.DataFrame.from_dict(cat.feature_dict, orient='index').transpose()

@@ -20,7 +20,8 @@ class CatalystObject():
 
         self.observation_dict = dict() # dictionary of observation objects (see class below)
         self.feature_dict = dict() # dictionary of feature-value pairs
-        self.elements = dict() # dictionary of element-weight loading pairs
+        self.elements_wt = dict() # dictionary of element-weight loading pairs
+        self.elements_mol = dict() # dictionary of element-mol fraction pairs
         self.support = None
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
@@ -42,7 +43,7 @@ class CatalystObject():
 
     def add_element(self, element, weight_loading):
         if (element != '-') & (element != '--'):
-            self.elements[element] = weight_loading
+            self.elements_wt[element] = weight_loading
 
     def set_support(self, support):
         self.support = support
@@ -61,7 +62,7 @@ class CatalystObject():
         eledf = pd.read_csv(r'./Data/Elements_01Feb19.csv', index_col=1)
 
         # Slice Elements.csv based on elements present
-        eledf = eledf.loc[list(self.elements.keys())]
+        eledf = eledf.loc[list(self.elements_wt.keys())]
 
         for prop in eledf:
             self.feature_add('{}_mean'.format(prop), eledf.loc[:, prop].mean())
@@ -72,7 +73,7 @@ class CatalystObject():
         eledf = pd.read_csv(r'./Data/Elements_01Feb19.csv', index_col=1)
 
         # Slice Elements.csv based on elements present
-        eledf = eledf.loc[list(self.elements.keys())]
+        eledf = eledf.loc[list(self.elements_wt.keys())]
 
         def calc_weighted_average(a, b):
             num = np.sum(a * b)
@@ -80,17 +81,17 @@ class CatalystObject():
             return num/den
 
         for feature_name, feature_values in eledf.T.iterrows():
-            feat = calc_weighted_average(feature_values.values, np.fromiter(self.elements.values(), dtype=float))
+            feat = calc_weighted_average(feature_values.values, np.fromiter(self.elements_wt.values(), dtype=float))
             self.feature_add('{nm}_wtavg'.format(nm=feature_name), feat)
 
     def feature_add_unsupervised_properties(self):
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
         eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
-        eledf = eledf.loc[list(self.elements.keys())]
+        eledf = eledf.loc[list(self.elements_wt.keys())]
 
         for feature_name, feature_values in eledf.T.iterrows():
             # Drop elements with 0 weight loading
-            weights = np.fromiter(self.elements.values(), dtype=float)
+            weights = np.fromiter(self.elements_wt.values(), dtype=float)
             feature_values = feature_values[weights != 0]
             weights = weights[weights != 0]
 
@@ -107,10 +108,10 @@ class CatalystObject():
             self.feature_add('{}_min'.format(feature_name), mn)
             self.feature_add('{}_rng'.format(feature_name), mx-mn)
 
-    def feature_add_elemental_properties(self):
+    def feature_add_elemental_properties(self, mol_fraction=False):
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
         eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
-        eledf = eledf.loc[list(self.elements.keys())]
+        eledf = eledf.loc[list(self.elements_wt.keys())]
 
         # Methods of processing different features
         def calc_valence(self, values, weights, feature_name):
@@ -230,17 +231,27 @@ class CatalystObject():
             'Zunger Pseudopotential (sigma)': calc_zunger,
         }
 
-        for feature_name, feature_values in eledf.T.iterrows():
-            process_dict.get(feature_name,
-                             lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
-                self,
-                feature_values,
-                np.fromiter(self.elements.values(), dtype=float),
-                feature_name
-            )
+        if mol_fraction:
+            for feature_name, feature_values in eledf.T.iterrows():
+                process_dict.get(feature_name,
+                                 lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
+                    self,
+                    feature_values,
+                    np.fromiter(self.elements_mol.values(), dtype=float),
+                    feature_name
+                )
+        else:
+            for feature_name, feature_values in eledf.T.iterrows():
+                process_dict.get(feature_name,
+                                 lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
+                    self,
+                    feature_values,
+                    np.fromiter(self.elements_wt.values(), dtype=float),
+                    feature_name
+                )
 
     def feature_add_Lp_norms(self):
-        vals = np.fromiter(self.elements.values(), dtype=float)
+        vals = np.fromiter(self.elements_wt.values(), dtype=float)
         sm = np.sum(vals)
 
         for p in [2, 3, 5, 7, 10]:
@@ -249,12 +260,25 @@ class CatalystObject():
 
     def feature_add_n_elements(self):
         n_eles = 0
-        for val in self.elements.values():
+        for val in self.elements_wt.values():
             if val > 0:
                 n_eles += 1
 
         self.feature_add('n_elements',n_eles)
 
+    def calc_mole_fraction(self):
+        eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
+
+        alumina_mol = (1 - np.sum(list(self.elements_wt.values())) / 100) * 2 / 101.96 # mol of alumina
+
+        for ele, wt in self.elements_wt.items():
+            at_wt = eledf.loc[eledf.index == ele, 'Atomic Weight'].values[0]
+            self.elements_mol[ele] = wt / 100 * 2 / at_wt
+
+        tot_mol = np.sum(list(self.elements_mol.values()) + [alumina_mol])
+
+        for ele, wt in self.elements_mol.items():
+            self.elements_mol[ele] = np.round(wt / tot_mol * 100, 2)
 
 class CatalystObservation():
     def __init__(self):

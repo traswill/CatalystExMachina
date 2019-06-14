@@ -62,6 +62,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.add_element(dat['Ele1'], dat['Wt1'])
             cat.add_element(dat['Ele2'], dat['Wt2'])
             cat.add_element(dat['Ele3'], dat['Wt3'])
+            cat.calc_mole_fraction()
             cat.set_group(dat['Groups'])
             try:
                 cat.add_n_cl_atoms(cl_atom_df.loc[dat['ID'], 'Precursor mol Cl'])
@@ -69,7 +70,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
                 print('Catalyst {} didn\'t have Cl atoms'.format(cat.ID))
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_elemental_properties()
+            cat.feature_add_elemental_properties(mol_fraction=True)
 
             cat.add_observation(
                 temperature=dat['Temperature'],
@@ -109,6 +110,7 @@ def three_catalyst_model(version):
                 gas_concentration=1,
                 reactor_number=0
             )
+
         # Create a catalyst of 3,1,12 Ru-ele-K for testing
         cat = CatalystObject()
         cat.ID = 'A_{}'.format(atnum)
@@ -612,12 +614,13 @@ def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter
                      ['Ru', 'Cu', 'Y', 'Mg', 'Mn',
                       'Ni', 'Cr', 'W', 'Ca', 'Hf',
                       'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
-                      'Mo', 'In', 'Rh', 'K']]
+                      'Mo', 'In', 'Rh', 'K', 'Os',
+                      'Pt','Au','Nb','Fe']]
     else:
         load_list = []
 
     skynet.set_drop_columns(
-        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band']
+        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band'] + load_list
     )
 
     skynet.filter_static_dataset()
@@ -699,7 +702,7 @@ def CaMnIn_prediction(version, note):
 
 def crossvalidation(version, note, ru=0):
     # Load the database
-    learner = load_skynet(version=version, note=note, ru_filter=ru)
+    learner = load_skynet(version=version, note=note, ru_filter=ru, drop_loads=True)
     learner.filter_static_dataset()
     learner.train_data()
 
@@ -1693,10 +1696,10 @@ def krr_testing(version, note):
 
 
 if __name__ == '__main__':
-    version = 'v92 - Tune-Test All ML Models'
-    note = ''
+    version = 'v94 - Mole Percent'
+    note = 'Change wt loading to mol loading'
 
-    test_and_tune_all_ML_models(version, note, three_ele=True, ru_filter=3)
+    # test_and_tune_all_ML_models(version, note, three_ele=False, ru_filter=0)
 
     # krr_testing(version, note)
 
@@ -1710,7 +1713,7 @@ if __name__ == '__main__':
     # static_feature_test(version, note, combined_features=False)
 
     # crossvalidation_reduced_features(version, note, ru=0)
-    # crossvalidation(version, note, ru=3)
+    crossvalidation(version, note, ru=0)
 
     # test_all_ML_models(version=version, note=note, three_ele=False, ru_filter=0)
 

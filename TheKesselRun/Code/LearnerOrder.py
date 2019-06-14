@@ -65,8 +65,11 @@ class CatalystContainer(object):
             load_df = loading_df.copy()
 
             # Add elements and loading to loading dict
-            for ele, wt in catobj.elements.items():
+            for ele, wt in catobj.elements_wt.items():
                 load_df.loc[catid, '{} Loading'.format(ele)] = wt / 100
+
+            for ele, mol in catobj.elements_mol.items():
+                load_df.loc[catid, '{} mol%'.format(ele)] = mol / 100
 
             # Create group
             groupdf = pd.DataFrame(catobj.group, index=[catid], columns=['group'])
@@ -76,7 +79,7 @@ class CatalystContainer(object):
             featdf.index = [catid]
 
             # Create element dictionary
-            eldictdf = pd.DataFrame(catobj.elements.items(), index=[catid], columns=['Element Dictionary'])
+            eldictdf = pd.DataFrame(catobj.elements_wt.items(), index=[catid], columns=['Element Dictionary'])
 
             df = pd.concat([load_df, featdf, eldictdf, groupdf], axis=1)
 
@@ -191,7 +194,9 @@ class SupervisedLearner():
             os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
 
     def set_learner(self, learner, tuning=False, params='default'):
-        """ Select which ML algorithm the learner should use.  Also selects appropriate parameters. """
+        """ Select which ML algorithm the learner should use.
+          If tuning is True, then select parameter grid.
+          ELse, selects appropriate parameters for ML learner. """
 
         learn_selector = {
             'rfr': RandomForestRegressor,
@@ -377,11 +382,14 @@ class SupervisedLearner():
         self.set_name_paths()
 
     def reset_filters(self):
+        """ Set all filter variables to None and reset naming convention """
+
         self.num_element_filter = None
         self.temperature_filter = None
         self.ammonia_filter = None
         self.ru_filter = None
         self.pressure_filter = None
+        self.promoter_filter = None
         self.sv_filter = None
 
         self.set_name_paths()
@@ -401,7 +409,6 @@ class SupervisedLearner():
         :param shuffle_dataset: randomize the order of data within the dynamic dataframe
         """
 
-
         self.reset_dynamic_dataset()
         self.filter_temperatures()
         self.filter_n_elements()
@@ -409,6 +416,7 @@ class SupervisedLearner():
         self.filter_concentrations()
         self.filter_ruthenium_loading()
         self.filter_space_velocities()
+        self.filter_promoter()
 
         if shuffle_dataset:
             self.shuffle_dynamic_dataset()
@@ -546,6 +554,7 @@ class SupervisedLearner():
             21: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02) |
                                      (self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
             '3+': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] >= 0.03)],
+            'mol3': self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.0252)],
         }
 
         self.dynamic_dataset = filter_dict_ruthenium.get(self.ru_filter, self.dynamic_dataset)
@@ -670,7 +679,7 @@ class SupervisedLearner():
             tree_predition_df.loc[:, 'Tree {}'.format(nth_tree)] = tree.predict(self.features)
 
         # Remove observations (i.e. trees) that are outside 90% CI (less than 5% or greater than 95%)
-        forest_stats = tree_predition_df.apply(lambda x: np.percentile(a=x, q=[5, 95]), axis=1)
+        forest_stats = tree_predition_df.apply(lambda x: np.percentile(a=x, q=[0, 100]), axis=1)
         for idx, rw in tree_predition_df.iterrows():
             forest_min = forest_stats[idx][0]
             forest_max = forest_stats[idx][1]

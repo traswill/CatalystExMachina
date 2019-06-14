@@ -146,14 +146,14 @@ class Graphic():
 
         if metadata:
             plt.figtext(0.99, 0.01,
-                        'Within 5%: {five:0.2f} \nWithin 10%: {ten:0.2f} \nWithin 20%: {twenty:0.2f}'.format(
+                        'W/I 5%: {five:0.2f} \nW/I 10%: {ten:0.2f} \nW/I 20%: {twenty:0.2f}'.format(
                             five=wi5 / rat_count, ten=wi10 / rat_count, twenty=wi20 / rat_count),
                         horizontalalignment='right', fontsize=6)
 
             mean_abs_err = mean_absolute_error(self.graphdf[self.y_axis_value], self.graphdf[self.x_axis_value])
             rmse = np.sqrt(mean_squared_error(self.graphdf[self.y_axis_value], self.graphdf[self.x_axis_value]))
 
-            plt.figtext(0, 0.01, 'MeanAbsErr: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
+            plt.figtext(0, 0.01, 'MAE: {:0.2f} \nRMSE: {:0.2f}'.format(mean_abs_err, rmse),
                         horizontalalignment='left', fontsize=6)
 
         # plt.xlabel(self.x_axis_value)

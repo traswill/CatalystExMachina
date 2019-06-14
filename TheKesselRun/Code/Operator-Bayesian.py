@@ -50,7 +50,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
                 space_velocity=dat['Space Velocity'],
                 gas=None,
                 gas_concentration=dat['NH3'],
-                pressure=None,
+                pressure=1,
                 reactor_number=int(dat['Reactor']),
                 activity=dat['Conversion'],
                 selectivity=None
@@ -75,7 +75,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
                 space_velocity=dat['Space Velocity'],
                 gas=None,
                 gas_concentration=dat['NH3'],
-                pressure=None,
+                pressure=1,
                 reactor_number=int(dat['Reactor']),
                 activity=dat['Conversion'],
                 selectivity=None
@@ -85,17 +85,67 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
 
     catcont.build_master_container(drop_empty_columns=drop_empty_columns)
 
-def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0):
+def load_single_reactor_catalysts(catcont, drop_empty_columns=True):
+    """ Import NH3 data from Katie's HiTp dataset(cleaned). """
+    df = pd.read_csv(r"..\Data\Processed\Single Reactor Data.csv", index_col=0)
+    df.dropna(axis=0, inplace=True, how='all')
+
+    # Loop through all data
+    for index, dat in df.iterrows():
+        # If the ID already exists in container, then only add an observation.  Else, generate a new catalyst.
+        if dat['ID'] in catcont.catalyst_dictionary:
+            catcont.catalyst_dictionary[dat['ID']].add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=dat['Pressure'],
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Conversion'],
+                selectivity=None
+            )
+        else:
+            cat = CatalystObject()
+            cat.ID = dat['ID']
+            cat.add_element(dat['Ele1'], dat['Wt1'])
+            cat.add_element(dat['Ele2'], dat['Wt2'])
+            cat.add_element(dat['Ele3'], dat['Wt3'])
+            cat.set_group(dat['Groups'])
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties()
+
+            cat.add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=dat['Pressure'],
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Conversion'],
+                selectivity=None
+            )
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    catcont.build_master_container(drop_empty_columns=drop_empty_columns)
+
+def load_skynet(version, drop_loads=False, drop_na_columns=True, ru_filter=0, load_single_reactor_data=False):
     # Load Data
     catcontainer = CatalystContainer()
     load_nh3_catalysts(catcont=catcontainer, drop_empty_columns=drop_na_columns)
+
+    if load_single_reactor_data:
+        temp_cat_cont = CatalystContainer()
+        load_single_reactor_catalysts(catcont=temp_cat_cont, drop_empty_columns=drop_na_columns)
+        catcontainer.master_container = pd.concat([catcontainer.master_container, temp_cat_cont.master_container], axis=0)
 
     # Init Learner
     skynet = SupervisedLearner(version=version)
     skynet.set_filters(
         element_filter=3,
         temperature_filter='350orless',
-        ammonia_filter=1,
+        ammonia_filter=None,
         space_vel_filter=2000,
         ru_filter=ru_filter,
         pressure_filter=None
@@ -199,7 +249,136 @@ def predict_design_space(version):
     skynet.compile_results(sv=True)
     return skynet
 
-def predict_design_space_with_subset_catalysts(version):
+def predict_design_space_with_subset_catalysts(version, lsrd=False):
+    skynet = load_skynet(version=version, ru_filter=0, drop_na_columns=False, load_single_reactor_data=lsrd)
+    skynet.static_dataset = skynet.static_dataset[(
+        (   # Filter to 5 selected elements
+            (skynet.static_dataset['Ca Loading'] > 0) |
+            (skynet.static_dataset['Mg Loading'] > 0) |
+            (skynet.static_dataset['Sr Loading'] > 0) |
+            (skynet.static_dataset['Hf Loading'] > 0) |
+            (skynet.static_dataset['Y Loading'] > 0)
+        ) &
+
+        (   # Filter to 5 selected promoters
+            (skynet.static_dataset['K Loading'] > 0) |
+            (skynet.static_dataset['Cs Loading'] > 0) |
+            (skynet.static_dataset['Ba Loading'] > 0) |
+            (skynet.static_dataset['Na Loading'] > 0) |
+            (skynet.static_dataset['Rb Loading'] > 0)
+        ) &
+
+        (skynet.static_dataset['K Loading'] != 0.12) &
+        # (skynet.static_dataset['K Loading'] == 0.12) &
+        (skynet.static_dataset['n_elements'] == 3)
+    )]
+
+    skynet.set_learner('etr', 'etr-uncertainty')
+    skynet.set_filters(temperature_filter=None)
+    skynet.filter_static_dataset()
+    skynet.train_data()
+    skynet.calculate_tau()
+    skynet.predict_crossvalidate(kfold='LSO')
+    skynet.evaluate_regression_learner()
+
+    # init catcont
+    catcont = CatalystContainer()
+
+    # Setup element-promoter-loading combinations
+    ch_eles = ['Y','Hf','Mg','Ca','Sr']
+    ch_prom = ['K','Na','Cs','Ba', 'Rb']
+    prom_load = [5, 10, 15, 20, 25]
+
+    # loop through all combinations
+    for ele in ch_eles:
+        for prom in ch_prom:
+            for load in prom_load:
+                cat = CatalystObject()
+                cat.ID = 'A_{}'.format('{}-{}-{}'.format(ele, prom, load))
+                cat.add_element('Ru', 3)
+                cat.add_element(ele, 1)
+                cat.add_element(prom, load)
+                cat.set_group(-1)
+                cat.feature_add_n_elements()
+                cat.feature_add_Lp_norms()
+                cat.feature_add_elemental_properties()
+
+                cat.add_observation(
+                    temperature=250,
+                    space_velocity=2000,
+                    gas_concentration=100,
+                    reactor_number=-1,
+                    pressure=1
+                )
+
+                cat.add_observation(
+                    temperature=300,
+                    space_velocity=2000,
+                    gas_concentration=100,
+                    reactor_number=-1,
+                    pressure=1
+                )
+
+                cat.add_observation(
+                    temperature=350,
+                    space_velocity=2000,
+                    gas_concentration=100,
+                    reactor_number=-1,
+                    pressure=1
+                )
+
+                catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    catcont.build_master_container(drop_empty_columns=False)
+    skynet.load_static_dataset(catcont)
+
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.calculate_uncertainty()
+    skynet.compile_results(sv=True)
+
+    # Plot Uncertainty
+    res_df = skynet.result_dataset
+    print(res_df)
+
+    res_df = res_df[res_df['temperature'] == 300]
+
+    g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
+    eles = res_df['Ele2'].unique()
+
+    for i, ele in enumerate(eles):
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+
+        for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'Uncertainty']].iterrows():
+            plotdf.loc[x.Ele3, x.Load3] = x.Uncertainty
+
+        plotdf = plotdf.apply(pd.to_numeric)
+        sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=0.38, linewidths=0.5)
+        g.axes[i].set_title(ele)
+
+    plt.savefig('{}\\figures\\{}-Uncertainty.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.close()
+
+    # Plot Conversion
+    g = sns.FacetGrid(res_df, col='Ele2', col_wrap=3)
+    eles = res_df['Ele2'].unique()
+
+    for i, ele in enumerate(eles):
+        plotdf = pd.DataFrame(columns=[5, 10, 15, 20, 25], index=['Na', 'Cs', 'Ba', 'K', 'Rb'])
+
+        for idx, x in res_df.loc[res_df['Ele2'] == ele, ['Ele3', 'Load3', 'Predicted Conversion']].iterrows():
+            plotdf.loc[x.Ele3, x.Load3] = x['Predicted Conversion']
+
+        plotdf = plotdf.apply(pd.to_numeric)
+        sns.heatmap(data=plotdf, cmap='plasma', ax=g.axes[i], vmin=0, vmax=1, linewidths=0.5)
+        g.axes[i].set_title(ele)
+
+    plt.savefig('{}\\figures\\{}-Conversion.png'.format(skynet.svfl, skynet.svnm), dpi=400)
+    plt.close()
+
+    return skynet
+
+def v80_predict_design_space_with_subset_catalysts(version):
     skynet = load_skynet(version=version, ru_filter=0, drop_na_columns=False)
     skynet.static_dataset = skynet.static_dataset[((skynet.static_dataset['K Loading'] != 0.12) &
                                                    (skynet.static_dataset['n_elements'] == 3))]
@@ -419,8 +598,8 @@ def select_catalysts(df, groups='kmean', svfl=None, svnm=None):
     return sel_df
 
 if __name__ == '__main__':
-    version = 'v80-MLDOE_redo'
-    skynet = predict_design_space_with_subset_catalysts(version)
+    version = 'v95 APRA-E Promoter Study - Screening Data'
+    skynet = predict_design_space_with_subset_catalysts(version, lsrd=False)
     exit()
 
     version = 'v70-v68+13catalysts'
