@@ -751,21 +751,27 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
                 temperature=250,
                 space_velocity=2000,
                 gas_concentration=1,
-                reactor_number=0
+                reactor_number=0,
+                pressure=None,
+                selectivity=None
             )
 
             cat.add_observation(
                 temperature=300,
                 space_velocity=2000,
                 gas_concentration=1,
-                reactor_number=0
+                reactor_number=0,
+                pressure = None,
+                selectivity = None
             )
 
             cat.add_observation(
                 temperature=350,
                 space_velocity=2000,
                 gas_concentration=1,
-                reactor_number=0
+                reactor_number=0,
+                pressure=None,
+                selectivity=None
             )
 
         # Create a catalyst of 3,1,12 Ru-ele-K for testing
@@ -775,10 +781,11 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 3)
             cat.add_element(ele, 1)
             cat.add_element('K', 12)
+            cat.calc_mole_fraction()
             cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_elemental_properties()
+            cat.feature_add_elemental_properties(mol_fraction=True)
             add_obs(cat)
 
             catcont.add_catalyst(index=cat.ID, catalyst=cat)
@@ -790,10 +797,11 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 2)
             cat.add_element(ele, 2)
             cat.add_element('K', 12)
+            cat.calc_mole_fraction()
             cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_elemental_properties()
+            cat.feature_add_elemental_properties(mol_fraction=True)
             add_obs(cat)
 
             catcont.add_catalyst(index=cat.ID, catalyst=cat)
@@ -805,10 +813,11 @@ def generate_empty_container(ru3=True, ru2=True, ru1=True):
             cat.add_element('Ru', 1)
             cat.add_element(ele, 3)
             cat.add_element('K', 12)
+            cat.calc_mole_fraction()
             cat.set_group(atnum)
             cat.feature_add_n_elements()
             cat.feature_add_Lp_norms()
-            cat.feature_add_elemental_properties()
+            cat.feature_add_elemental_properties(mol_fraction=True)
             add_obs(cat)
 
             catcont.add_catalyst(index=cat.ID, catalyst=cat)
@@ -1573,7 +1582,7 @@ def static_feature_test(version, note, combined_features=False):
     ''' Generate random numbers for features to evaluate if the model is performing well. '''
 
     # Load the database
-    learner = load_skynet(version=version, note=note, ru_filter=0)
+    learner = load_skynet(version=version, note=note, ru_filter=0, drop_loads=True)
     learner.random_feature_test(combined=combined_features)
     learner.train_data()
 
@@ -1694,10 +1703,230 @@ def krr_testing(version, note):
     g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, 10))
     plt.close()
 
+def MAE_per_number_added():
+    skynet = load_skynet(version=version, note=note, drop_na_columns=False)
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=0,
+        pressure_filter=None,
+        promoter_filter='K12'
+    )
+
+    catcont = generate_empty_container(ru3=False, ru2=True, ru1=True)
+    all_columns = catcont.master_container.columns
+
+    def process_dataframe(df):
+        outdf = df.copy()
+        for index, edict in df['Element Dictionary'].iteritems():
+            outdf.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
+
+            i = 1
+            for key, val in edict:
+                outdf.loc[index, 'Ele{}'.format(i)] = key
+                outdf.loc[index, 'Load{}'.format(i)] = val
+                i += 1
+
+        return outdf
+
+    df = skynet.static_dataset
+    df = df[
+        (df['temperature'] <= 350) &
+        (df['K Loading'] == 0.12) &
+        (df['ammonia_concentration'] > 0.5) &
+        (df['ammonia_concentration'] < 1.9) &
+        (df['space_velocity'] > 1400) &
+        (df['space_velocity'] < 3000)
+    ]
+
+
+    df3 = df[df['Ru Loading'] == 0.03].copy()
+    df3 = df3.reindex(columns=all_columns).fillna(0)
+    df3_post = process_dataframe(df3)
+
+    df2 = df[df['Ru Loading'] == 0.02].copy()
+    df2 = df2.reindex(columns=all_columns).fillna(0)
+    df2_post = process_dataframe(df2)
+
+    df1 = df[df['Ru Loading'] == 0.01].copy()
+    df1 = df1.reindex(columns=all_columns).fillna(0)
+    df1_post = process_dataframe(df1)
+
+    # Base Prediction
+    skynet.dynamic_dataset = df3
+    skynet.set_training_data()
+    skynet.train_data()
+
+    catcont = generate_empty_container(ru3=False, ru2=True, ru1=True)
+    skynet.load_static_dataset(catcont)
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.compile_results(svnm='3% Predictions', sv=True)
+
+    results = pd.DataFrame()
+    cats = pd.DataFrame()
+
+    elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc', 'Zn', 'Sr', 'Bi', 'Pd', 'Mo',
+                'In', 'Rh', 'Os', 'Pt', 'Au', 'Nb', 'Fe']
+
+    # Base Prediction
+    skynet.dynamic_dataset = df3
+    skynet.set_training_data()
+    skynet.train_data()
+
+    skynet.dynamic_dataset = pd.concat([df2, df1], axis=0)
+    skynet.set_training_data()
+    skynet.predict_data()
+    skynet.compile_results(sv=False)
+    mae = mean_absolute_error(skynet.result_dataset['Measured Conversion'].values,
+                              skynet.result_dataset['Predicted Conversion'].values)
+
+    print(mae)
+    results.loc[0, 0] = mae
+
+    for i in range(1, 16): # iterate from 1 to 10 catalysts to add
+        for j in range(20): # randomly generate 5 catalyst combinations times
+            catalyst_set = list(random.sample(elements, i))
+            print(catalyst_set)
+            append_2percent = df2[df2_post['Ele2'].isin(catalyst_set)]
+            append_1percent = df1[df1_post['Ele2'].isin(catalyst_set)]
+
+            remove_2percent = df2[~df2_post['Ele2'].isin(catalyst_set)]
+            remove_1percent = df1[~df1_post['Ele2'].isin(catalyst_set)]
+
+            train_df = pd.concat([df3, append_2percent, append_1percent], axis=0)
+            test_df = pd.concat([remove_2percent, remove_1percent], axis=0)
+
+            skynet.dynamic_dataset = train_df
+            skynet.set_training_data()
+            skynet.train_data()
+
+            skynet.dynamic_dataset = test_df
+            skynet.set_training_data()
+            skynet.predict_data()
+            skynet.compile_results(sv=False)
+
+            mae = mean_absolute_error(skynet.result_dataset['Measured Conversion'].values,
+                                      skynet.result_dataset['Predicted Conversion'].values)
+
+            results.loc[i, j] = mae
+            cats.loc[i, j] = catalyst_set
+
+    results.to_csv(r'{}/learning_per_catalyst_added2.csv'.format(skynet.svfl))
+    cats.to_csv(r'{}/catalysts_added2.csv'.format(skynet.svfl))
+
+def MAE_per_number_added_for_3_percent_data_only():
+    skynet = load_skynet(version=version, note=note, drop_na_columns=False)
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=0,
+        pressure_filter=None,
+        promoter_filter='K12'
+    )
+
+    catcont = generate_empty_container(ru3=False, ru2=True, ru1=True)
+    all_columns = catcont.master_container.columns
+
+    def process_dataframe(df):
+        outdf = df.copy()
+        for index, edict in df['Element Dictionary'].iteritems():
+            outdf.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
+
+            i = 1
+            for key, val in edict:
+                outdf.loc[index, 'Ele{}'.format(i)] = key
+                outdf.loc[index, 'Load{}'.format(i)] = val
+                i += 1
+
+        return outdf
+
+    df = skynet.static_dataset
+    df = df[
+        (df['temperature'] <= 350) &
+        (df['K Loading'] == 0.12) &
+        (df['ammonia_concentration'] > 0.5) &
+        (df['ammonia_concentration'] < 1.9) &
+        (df['space_velocity'] > 1400) &
+        (df['space_velocity'] < 3000)
+    ]
+
+    df3 = df[df['Ru Loading'] == 0.03].copy()
+    df3 = df3.reindex(columns=all_columns).fillna(0)
+    df3_post = process_dataframe(df3)
+
+    results = pd.DataFrame()
+    cats = pd.DataFrame()
+
+    elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc', 'Zn', 'Sr', 'Bi', 'Pd', 'Mo',
+                'In', 'Rh', 'Os', 'Pt', 'Au', 'Nb', 'Fe']
+
+    for i in range(1, 10): # iterate from 1 to 10 catalysts to add
+        for j in range(20): # randomly generate 20 catalyst combinations times
+            catalyst_set = list(random.sample(elements, i))
+            print(catalyst_set)
+            train_df = df3[df3_post['Ele2'].isin(catalyst_set)]
+            test_df = df3[~df3_post['Ele2'].isin(catalyst_set)]
+
+            skynet.dynamic_dataset = train_df
+            skynet.set_training_data()
+            skynet.train_data()
+
+            skynet.dynamic_dataset = test_df
+            skynet.set_training_data()
+            skynet.predict_data()
+            skynet.compile_results(sv=False)
+
+            mae = mean_absolute_error(skynet.result_dataset['Measured Conversion'].values,
+                                      skynet.result_dataset['Predicted Conversion'].values)
+
+            results.loc[i, j] = mae
+            cats.loc[i, j] = catalyst_set
+
+    results.to_csv(r'{}/learning_per_catalyst_added.csv'.format(skynet.svfl))
+    cats.to_csv(r'{}/catalysts_added.csv'.format(skynet.svfl))
+
+def test_multiple_3cat_combinations():
+    # Load the database
+    learner = load_skynet(version=version, note=note, ru_filter=3)
+    learner.filter_static_dataset()
+
+    elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc', 'Zn', 'Sr', 'Bi', 'Pd', 'Mo',
+                'In', 'Rh', 'Os', 'Pt', 'Au', 'Nb', 'Fe']
+
+    maes = list()
+
+    for i in range(100):
+        eles_3 = list(random.sample(elements, 3))
+        print(eles_3)
+        eles = [x for x in elements if x not in eles_3 + ['Ru', 'K']]
+        learner.filter_out_elements(eles=eles)
+        learner.train_data()
+
+        # Reset, filter
+        learner.filter_static_dataset()
+        learner.filter_out_elements(eles=eles_3)
+        learner.predict_data()
+
+        learner.evaluate_regression_learner()
+        learner.compile_results(sv=True, svnm=''.join(eles_3))
+
+        maes += [mean_absolute_error(learner.labels, learner.predictions)]
+
+    pd.DataFrame(maes).to_csv('{}//maes.csv'.format(learner.svfl))
 
 if __name__ == '__main__':
-    version = 'v94 - Mole Percent'
-    note = 'Change wt loading to mol loading'
+    version = 'v96 - predict-n-catalysts-secondary-elements-3pRu'
+    note = ''
+
+    MAE_per_number_added_for_3_percent_data_only()
+
+    # test_multiple_3cat_combinations()
+    # MAE_per_number_added()
 
     # test_and_tune_all_ML_models(version, note, three_ele=False, ru_filter=0)
 
@@ -1713,7 +1942,7 @@ if __name__ == '__main__':
     # static_feature_test(version, note, combined_features=False)
 
     # crossvalidation_reduced_features(version, note, ru=0)
-    crossvalidation(version, note, ru=0)
+    # crossvalidation(version, note, ru=0)
 
     # test_all_ML_models(version=version, note=note, three_ele=False, ru_filter=0)
 

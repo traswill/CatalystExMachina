@@ -11,19 +11,29 @@ import skimage.color as skic
 
 # fft.fft2()
 
+# 1610.31 Hz framerate
+# Scan velocity: 2850 Hz
+
 class HTRx():
     def __init__(self, debug=False):
         # Todo Image directory or single image?
         self.img_pth = None
         self.cali_pth = None
         self.img = None
+        self.rawdata = None
 
         if debug is True:
-            self.img_pth = r"C:\Users\quick\Desktop\testdata_htreactor.png"
+            self.img_pth = r"C:\Users\quick\Desktop\DataCleanup\NH3calib2-validation-3.5-1.img"
             self.cali_pth = None
 
     def load_image(self):
-        self.img = mpimg.imread(self.img_pth)
+        fid = open(self.img_pth, 'rb')
+        self.rawdata = np.fromfile(fid, np.dtype('>u2')) # big-endian unsigned integer (16bit)
+
+    def process_image(self):
+        if self.rawdata is None:
+            print('No raw data loaded.')
+            exit()
 
     def check_img_exists(self):
         if self.img is None:
@@ -78,4 +88,32 @@ class HTRx():
 
 if __name__ == '__main__':
     llama = HTRx(debug=True)
-    llama.examine_data()
+    llama.load_image()
+    print(llama.rawdata)
+    print(len(llama.rawdata))
+    print(llama.rawdata[:-82176])
+    image = llama.rawdata[82176:].reshape((128, 128, 1920, 32))
+    # image = llama.rawdata[82176:].reshape((1920, 128, 128, 32))
+    # print(image.shape)
+    plt.imshow(image[:,:,7,0])
+    plt.colorbar()
+    plt.show()
+
+    # plt.plot(image[0,0,:,0])
+    # plt.show()
+    # df = pd.DataFrame(image)
+    #
+    # ave_array = np.array([0])
+    # for i in range(1920):
+    #     df_cut = df[i*128:(i+1)*128].copy()
+    #
+    #     if i == 0:
+    #         ave_array = df_cut.values
+    #     else:
+    #         ave_array = np.mean(np.array([ave_array, df_cut.values]), axis=0)
+    #
+    # print(ave_array)
+
+    # plt.imshow(ave_array)
+    # plt.show()
+
