@@ -6,6 +6,7 @@
 
 import pandas as pd
 import numpy as np
+from sklearn.decomposition import PCA
 
 class CatalystObject():
     """
@@ -23,6 +24,18 @@ class CatalystObject():
         self.elements_wt = dict() # dictionary of element-weight loading pairs
         self.elements_mol = dict() # dictionary of element-mol fraction pairs
         self.support = None
+
+        # Raman - Red
+        self.spectrum638_x = None
+        self.spectrum638_y = None
+
+        # Raman - Blue
+        self.spectrum473_x = None
+        self.spectrum473_y = None
+
+        # XRD
+        self.spectrumXRD_x = None
+        self.spectrumXRD_y = None
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
                         reactor_number=None, activity=None, selectivity=None, activity_error=None):
@@ -44,6 +57,18 @@ class CatalystObject():
     def add_element(self, element, weight_loading):
         if (element != '-') & (element != '--'):
             self.elements_wt[element] = weight_loading
+
+    def add_638nm_raman(self, x, y):
+        self.spectrum638_x = x
+        self.spectrum638_y = y
+
+    def add_473nm_raman(self, x, y):
+        self.spectrum473_x = x
+        self.spectrum473_y = y
+
+    def add_xrd(self, x, y):
+        self.spectrumXRD_x = x
+        self.spectrumXRD_y = y
 
     def set_support(self, support):
         self.support = support
@@ -309,3 +334,26 @@ class CatalystObservation():
         }
 
         return dict
+
+class Spectrum():
+    def __init__(self, x=None, y=None):
+        self.x = x
+        self.y = y
+
+    def remove_background(self):
+        ''' Separate background from spectrum '''
+
+        pass
+
+    def remove_noise(self):
+        ''' Separate noise from spectrum '''
+
+        pass
+
+if __name__ == '__main__':
+    df = pd.read_csv(r"C:\Users\quick\OneDrive - University of South Carolina\Data\Proc - Raman Data\Raman ML Project\Data\4_638nm.csv", index_col=0)
+    print(df)
+    spec = Spectrum(x=df.index.values, y=np.array([x[0] for x in df.values]))
+
+
+
