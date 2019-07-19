@@ -10,7 +10,6 @@ from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import os
 import time
 
@@ -21,12 +20,7 @@ from sklearn.linear_model import Ridge, Lasso, SGDRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
-from sklearn.decomposition import PCA
-from sklearn.cluster import k_means
 from sklearn.feature_selection import SelectKBest, RFECV, RFE
-from sklearn.metrics.pairwise import polynomial_kernel, sigmoid_kernel, chi2_kernel
-
-
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
     LeaveOneOut, learning_curve
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, make_scorer
@@ -81,7 +75,12 @@ class CatalystContainer(object):
             # Create element dictionary
             eldictdf = pd.DataFrame(catobj.elements_wt.items(), index=[catid], columns=['Element Dictionary'])
 
-            df = pd.concat([load_df, featdf, eldictdf, groupdf], axis=1)
+            # Create spectral dictionary
+            specdf = pd.DataFrame.from_dict(catobj.spectral_dict, orient='index').transpose()
+            if not specdf.empty:
+                specdf.index = [catid]
+
+            df = pd.concat([load_df, featdf, eldictdf, groupdf, specdf], axis=1)
 
             # Iterate through observations and add catalysts
             for key, obs in catobj.observation_dict.items():
@@ -268,8 +267,8 @@ class SupervisedLearner():
                     'epsilon': [1e-1, 1e-2, 1e-3],
                     'kernel':  ['linear', 'poly', 'rbf'],
                     'gamma':   [1, 1e-1, 1e-2, 'auto'],
-                    # 'degree':  [2, 3, 5], # full dat set
-                    'degree': [2, 3], # 3 cat set
+                    # 'degree':  [2, 3, 5], # use for full dataset
+                    'degree': [2, 3], # use for 3 catalyst set
                     'coef0':   [0, 1, 1e-1, 1e1, 1e2, 1e-2],
                     'max_iter': [200]
                 },

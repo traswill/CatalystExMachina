@@ -1896,34 +1896,65 @@ def test_multiple_3cat_combinations():
     learner.filter_static_dataset()
 
     elements = ['Cu', 'Y', 'Mg', 'Mn', 'Ni', 'Cr', 'W', 'Ca', 'Hf', 'Sc', 'Zn', 'Sr', 'Bi', 'Pd', 'Mo',
-                'In', 'Rh', 'Os', 'Pt', 'Au', 'Nb', 'Fe']
+                'In', 'Rh', 'Os', 'Pt', 'Au', 'Nb', 'Fe', 'Re']
 
     maes = list()
 
-    for i in range(100):
-        eles_3 = list(random.sample(elements, 3))
-        print(eles_3)
-        eles = [x for x in elements if x not in eles_3 + ['Ru', 'K']]
-        learner.filter_out_elements(eles=eles)
+    combos = list(itertools.combinations(elements, 3))
+    print(len(combos))
+    eles_3 = list(random.sample(combos, 200))
+
+    for eles in combos:
+        train_elements = list(eles)
+        test_elements = list(set(eles) ^ set(elements))
+
+        learner.filter_static_dataset()
+        learner.filter_out_elements(eles=test_elements)
         learner.train_data()
 
         # Reset, filter
         learner.filter_static_dataset()
-        learner.filter_out_elements(eles=eles_3)
+        learner.filter_out_elements(eles=train_elements)
         learner.predict_data()
 
         learner.evaluate_regression_learner()
-        learner.compile_results(sv=True, svnm=''.join(eles_3))
+        learner.compile_results(sv=True, svnm=''.join(train_elements))
 
         maes += [mean_absolute_error(learner.labels, learner.predictions)]
 
     pd.DataFrame(maes).to_csv('{}//maes.csv'.format(learner.svfl))
 
+def test_everything_random():
+    skynet = SupervisedLearner(version='v97 - Random Features and Target')
+    skynet.set_learner(learner='etr', params='etr')
+
+    mae_list = list()
+
+    for i in range(100):
+        X = np.random.rand(3, 100)
+        y = np.random.rand(3)
+
+        skynet.features = X
+        skynet.labels = y
+        skynet.train_data()
+
+        X_mod = np.random.rand(22, 100)
+        y_mod = np.random.rand(22)
+
+        skynet.features = X_mod
+        skynet.labels = y_mod
+        skynet.predict_data()
+
+        mae_list += [mean_absolute_error(y_mod, skynet.predictions)]
+
+    print(np.array(mae_list).mean())
+
+
 if __name__ == '__main__':
-    version = 'v96 - predict-n-catalysts-secondary-elements-3pRu'
+    version = 'v98'
     note = ''
 
-    MAE_per_number_added_for_3_percent_data_only()
+    # MAE_per_number_added_for_3_percent_data_only()
 
     # test_multiple_3cat_combinations()
     # MAE_per_number_added()

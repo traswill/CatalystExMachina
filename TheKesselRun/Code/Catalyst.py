@@ -21,6 +21,7 @@ class CatalystObject():
 
         self.observation_dict = dict() # dictionary of observation objects (see class below)
         self.feature_dict = dict() # dictionary of feature-value pairs
+        self.spectral_dict = dict()
         self.elements_wt = dict() # dictionary of element-weight loading pairs
         self.elements_mol = dict() # dictionary of element-mol fraction pairs
         self.support = None
@@ -81,6 +82,9 @@ class CatalystObject():
 
     def feature_add(self, key, value):
         self.feature_dict[key] = value
+
+    def spectral_add(self, key, value):
+        self.spectral_dict[key] = value
 
     def add_unweighted_features(self):
         # Load Elements.csv as DataFrame
@@ -265,7 +269,7 @@ class CatalystObject():
                     np.fromiter(self.elements_mol.values(), dtype=float),
                     feature_name
                 )
-        else:
+        else:  # Using weight loadings
             for feature_name, feature_values in eledf.T.iterrows():
                 process_dict.get(feature_name,
                                  lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
@@ -304,6 +308,7 @@ class CatalystObject():
 
         for ele, wt in self.elements_mol.items():
             self.elements_mol[ele] = np.round(wt / tot_mol * 100, 2)
+
 
 class CatalystObservation():
     def __init__(self):
