@@ -4,6 +4,7 @@ from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
 from TheKesselRun.Code.Plotter import Graphic
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import normalize
 
 from sklearn.metrics import r2_score, explained_variance_score, \
         mean_absolute_error, roc_curve, recall_score, precision_score, mean_squared_error, accuracy_score
@@ -25,7 +26,7 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_
     LeaveOneOut, learning_curve
 
 
-def load_nh3_catalysts(catcont, drop_empty_columns=True):
+def load_raw_nh3_catalysts(catcont, drop_empty_columns=True):
     """ Import NH3 data from Katie's HiTp dataset(cleaned). """
     df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
     df.dropna(axis=0, inplace=True, how='all')
@@ -59,7 +60,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.feature_add_elemental_properties(mol_fraction=True)
 
             # Input Raman Data
-            raman_root = r'C:\Users\quick\OneDrive - University of South Carolina\Data\Proc - Raman Data\Raman ML Project\Data'
+            raman_root = r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Raman Data Cleaned\RawRaman"
             pths = glob.glob('{}\{}_*.csv'.format(raman_root, dat['ID']))
 
             if pths:
@@ -77,6 +78,73 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
 
             if pth:
                 xrd_df = pd.read_csv(pth[0], index_col=0, header=None)
+                cat.add_xrd(xrd_df.index.values, np.array([x[0] for x in xrd_df.values]))
+
+            cat.add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=None,
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Conversion'],
+                selectivity=None
+            )
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+def load_bsub_nh3_catalysts(catcont, drop_empty_columns=True):
+    """ Import NH3 data from Katie's HiTp dataset(cleaned). """
+    df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
+    df.dropna(axis=0, inplace=True, how='all')
+
+    # Loop through all data
+    for index, dat in df.iterrows():
+        # If the ID already exists in container, then only add an observation.  Else, generate a new catalyst.
+        if dat['ID'] in catcont.catalyst_dictionary:
+            catcont.catalyst_dictionary[dat['ID']].add_observation(
+                temperature=dat['Temperature'],
+                space_velocity=dat['Space Velocity'],
+                gas=None,
+                gas_concentration=dat['NH3'],
+                pressure=None,
+                reactor_number=int(dat['Reactor']),
+                activity=dat['Conversion'],
+                selectivity=None
+            )
+        else:
+            cat = CatalystObject()
+
+            # Set up elements
+            cat.ID = dat['ID']
+            cat.add_element(dat['Ele1'], dat['Wt1'])
+            cat.add_element(dat['Ele2'], dat['Wt2'])
+            cat.add_element(dat['Ele3'], dat['Wt3'])
+            cat.calc_mole_fraction()
+            cat.set_group(dat['Groups'])
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties(mol_fraction=True)
+
+            # Input Raman Data
+            raman_root = r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Raman Data Cleaned\BsubRaman_5poly"
+            pths = glob.glob('{}\{}_*.txt'.format(raman_root, dat['ID']))
+
+            if pths:
+                base_pth = '\\'.join(pths[0].split('\\')[:-1])
+
+                raman_df = pd.read_csv('{}\\{}_638nm.txt'.format(base_pth, dat['ID']), index_col=0, header=None, delimiter='\t')
+                cat.add_638nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+
+                raman_df = pd.read_csv('{}\\{}_473nm.txt'.format(base_pth, dat['ID']), index_col=0, header=None, delimiter='\t')
+                cat.add_473nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+
+            # Input XRD Data
+            xrd_root = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\XRD Data Cleaned\Bsub_5poly_60twothetacut'
+            pth = glob.glob('{}\{} *.txt'.format(xrd_root, dat['ID']))
+
+            if pth:
+                xrd_df = pd.read_csv(pth[0], index_col=0, header=None, delimiter='\t')
                 cat.add_xrd(xrd_df.index.values, np.array([x[0] for x in xrd_df.values]))
 
             cat.add_observation(
@@ -112,6 +180,7 @@ def reduce_spectra(catcont, spectype=None, n_comp=2):
     spec.fillna(value=-1, inplace=True)           # Fill -1 flag for NaNs in XRD pattern... TODO handle this better
     X = spec.values
 
+    X = normalize(X)
     pca = PCA(n_components=n_comp)
     pca.fit(X)
     specpca = pd.DataFrame(list(zip(*pca.components_)), index=spec.T.index)
@@ -167,20 +236,77 @@ def bsub_and_add_spec(catcont, spectype=None, n_comp=2):
         for ii, val in enumerate(vals):
             catcont.catalyst_dictionary[idx].spectral_add('{}_PCA{}'.format(spectype, ii), val)
 
-
-if __name__ == '__main__':
-    version = 'v97 - Spectral Spelunking N=5'
+def v97():
+    version = 'v97 - Spectral Spelunking N=2'
     note = 'Added Spectroscopy ML Code'
 
     catcont = CatalystContainer()
-    load_nh3_catalysts(catcont)
+    load_raw_nh3_catalysts(catcont)
 
-    N = 5
+    N = 2
     bsub_and_add_spec(catcont, spectype='638nm', n_comp=N)
     bsub_and_add_spec(catcont, spectype='473nm', n_comp=N)
     bsub_and_add_spec(catcont, spectype='xrd', n_comp=N)
 
-    exit()
+    catcont.build_master_container()
+
+    # Init Learner
+    skynet = SupervisedLearner(version=version, note=note)
+    skynet.set_filters(
+        element_filter=3,
+        temperature_filter='350orless',
+        ammonia_filter=1,
+        space_vel_filter=2000,
+        ru_filter=0,
+        pressure_filter=None
+    )
+
+    # Set algorithm and add data
+    skynet.set_learner(learner='etr', params='etr')
+    skynet.load_static_dataset(catalyst_container=catcont)
+    skynet.static_dataset = skynet.static_dataset[skynet.static_dataset['K Loading'] == 0.12]
+    skynet.static_dataset = skynet.static_dataset[skynet.static_dataset['473nm_PCA0'] != 0]
+
+    # # Set parameters
+    targ_cols = list(['473nm_PCA{}'.format(i) for i in range(N)]) + \
+                list(['638nm_PCA{}'.format(i) for i in range(N)]) + \
+                list(['xrd_PCA{}'.format(i) for i in range(N)])
+
+    skynet.set_target_columns(cols=targ_cols)
+    skynet.set_group_columns(cols=['group'])
+    skynet.set_hold_columns(cols=['Element Dictionary', 'ID', 'Measured Conversion'])
+
+    skynet.filter_static_dataset()
+
+    skynet.predict_crossvalidate(kfold=3)
+    skynet.evaluate_regression_learner()
+
+    skynet.result_dataset = skynet.dynamic_dataset[skynet.features_df.columns].copy()
+
+    skynet.result_dataset = pd.concat(
+        [skynet.result_dataset,
+         pd.DataFrame(skynet.labels, index=skynet.labels_df.index, columns=skynet.target_columns)], axis=1)
+
+    skynet.result_dataset = pd.concat(
+        [skynet.result_dataset,
+         pd.DataFrame(skynet.predictions, index=skynet.labels_df.index,
+                      columns=['{}_predicted'.format(x) for x in skynet.target_columns])], axis=1)
+
+    skynet.result_dataset['Measured Conversion'] = skynet.hold_df['Measured Conversion']
+
+    skynet.result_dataset.to_csv('{}\\result_dataset-{}.csv'.format(skynet.svfl, skynet.svnm))
+
+if __name__ == '__main__':
+    version = 'v99 - Spectral Spelunking - Normalized Spectra'
+    note = 'Added Spectroscopy ML Code. Using background subtracted data.'
+
+    catcont = CatalystContainer()
+    load_bsub_nh3_catalysts(catcont)
+
+    N = 2
+    reduce_spectra(catcont, spectype='473nm', n_comp=N)
+    reduce_spectra(catcont, spectype='638nm', n_comp=N)
+    reduce_spectra(catcont, spectype='xrd', n_comp=N)
 
     catcont.build_master_container()
 
