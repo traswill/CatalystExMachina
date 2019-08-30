@@ -26,6 +26,7 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, make_scorer
 from sklearn.utils import shuffle
 
+import ast
 
 class CatalystContainer(object):
     def __init__(self):
@@ -73,7 +74,10 @@ class CatalystContainer(object):
             featdf.index = [catid]
 
             # Create element dictionary
-            eldictdf = pd.DataFrame(catobj.elements_wt.items(), index=[catid], columns=['Element Dictionary'])
+            # eldictdf = pd.DataFrame(catobj.elements_wt.items(), index=[catid], columns=['Element Dictionary']) # Pandas update breaks functionality
+            eldictdf = pd.DataFrame('{}'.format(catobj.elements_wt.items()),
+                                                index=[catid],
+                                                columns=['Element Dictionary'])
 
             # Create spectral dictionary
             specdf = pd.DataFrame.from_dict(catobj.spectral_dict, orient='index').transpose()
@@ -94,12 +98,17 @@ class CatalystContainer(object):
             self.master_container.dropna(how='all', axis=1, inplace=True)
         self.master_container.fillna(value=0, inplace=True)
 
-        # This code overwrites the groups provided to the ML model to force all similar-element catalyst into the same group
-        df = pd.DataFrame(sorted([ele[0] for ele in list(x)]) for x in self.master_container['Element Dictionary'].values)
-        df['edict'] = self.master_container['Element Dictionary'].values
-        df.fillna('', inplace=True)
-        df['group'] = df.groupby([0,1,2]).ngroup()
-        self.master_container['group'] = df['group'].values
+        # This code overwrites the groups provided to the ML model to force all similar-element catalysts into the same group
+        group_vals = pd.DataFrame([ast.literal_eval(eledict.replace('dict_items(', '').replace(')])', ')]')) for eledict in
+                      self.master_container['Element Dictionary'].values]).groupby([0, 1, 2]).ngroup()
+        self.master_container['group'] = group_vals
+
+
+        # df = pd.DataFrame(sorted([ele[0] for ele in list(x)]) for x in self.master_container['Element Dictionary'].values)
+        # df['edict'] = self.master_container['Element Dictionary'].values
+        # df.fillna('', inplace=True)
+        # df['group'] = df.groupby([0,1,2]).ngroup()
+        # self.master_container['group'] = df['group'].values
 
         # Transfer catalyst ID to column so each index is unique
         self.master_container['ID'] = self.master_container.index
@@ -421,7 +430,7 @@ class SupervisedLearner():
             self.shuffle_dynamic_dataset()
 
         if reset_training_data:
-            self.set_training_data() # This does nothing right now...
+            self.set_training_data()
 
     def set_target_columns(self, cols):
         """ Define measured values for ML algorithm (target values) """
@@ -813,6 +822,7 @@ class SupervisedLearner():
 
         """ Parse Catalyst Names """
         for index, edict in self.dynamic_dataset['Element Dictionary'].iteritems():
+            edict = ast.literal_eval(edict.replace('dict_items(', '').replace(')])', ')]'))
             self.result_dataset.loc[index, 'Name'] = ''.join('{}({})'.format(key, str(int(val))) for key, val in edict)
 
             i = 1

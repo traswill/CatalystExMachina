@@ -26,9 +26,13 @@ from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_
     LeaveOneOut, learning_curve
 
 
-def load_raw_nh3_catalysts(catcont, drop_empty_columns=True):
-    """ Import NH3 data from Katie's HiTp dataset(cleaned). """
-    df = pd.read_csv(r"..\Data\Processed\AllData_Condensed.csv", index_col=0)
+def load_raw_nh3_catalysts(catcont, drop_empty_columns=True,
+                           catalyst_pth=r"..\Data\Processed\AllData_Condensed.csv",
+                           raman_root=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Raman Data Cleaned\RawRaman",
+                           xrd_root=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\XRD Data Cleaned"):
+    """  """
+
+    df = pd.read_csv(catalyst_pth, index_col=0)
     df.dropna(axis=0, inplace=True, how='all')
 
     # Loop through all data
@@ -60,7 +64,7 @@ def load_raw_nh3_catalysts(catcont, drop_empty_columns=True):
             cat.feature_add_elemental_properties(mol_fraction=True)
 
             # Input Raman Data
-            raman_root = r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Raman Data Cleaned\RawRaman"
+            # raman_root = r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Raman Data Cleaned\RawRaman"
             pths = glob.glob('{}\{}_*.csv'.format(raman_root, dat['ID']))
 
             if pths:
@@ -73,7 +77,7 @@ def load_raw_nh3_catalysts(catcont, drop_empty_columns=True):
                 cat.add_473nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
 
             # Input XRD Data
-            xrd_root = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\XRD Data Cleaned'
+            # xrd_root = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\XRD Data Cleaned'
             pth = glob.glob('{}\{} *.txt'.format(xrd_root, dat['ID']))
 
             if pth:
