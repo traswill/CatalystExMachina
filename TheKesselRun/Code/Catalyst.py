@@ -309,6 +309,10 @@ class CatalystObject():
         for ele, wt in self.elements_mol.items():
             self.elements_mol[ele] = np.round(wt / tot_mol * 100, 2)
 
+    def calc_group(self):
+        eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
+        eledf = eledf.loc[list(self.elements_wt.keys())]
+        self.group = eledf['Atomic Number'].product()
 
 class CatalystObservation():
     def __init__(self):
@@ -356,9 +360,11 @@ class Spectrum():
         pass
 
 if __name__ == '__main__':
-    df = pd.read_csv(r"C:\Users\quick\OneDrive - University of South Carolina\Data\Proc - Raman Data\Raman ML Project\Data\4_638nm.csv", index_col=0)
-    print(df)
-    spec = Spectrum(x=df.index.values, y=np.array([x[0] for x in df.values]))
+    cat = CatalystObject()
+    cat.add_element('Ru', 0.03)
+    cat.add_element('Y', 0.01)
+    cat.add_element('K', 0.12)
+    cat.calc_group()
 
 
 

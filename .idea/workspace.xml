@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Added periodic table plotting function">
-      <change beforePath="$PROJECT_DIR$/.idea/CatalystExMachina.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CatalystExMachina.iml" afterDir="false" />
+    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Edits from package updates to maintain features">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator-Bayesian.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_Bayesian.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_NH3.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator-RamanML.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/PeriodicTablePlotter.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/PeriodicTablePlotter.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator_ML-HTE_Paper.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/TheKesselRun/Results/Storage/" />
     <ignored path="$PROJECT_DIR$/TheKesselRun/Results/Unsupervised/" />
@@ -23,8 +21,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="545">
-              <caret line="278" column="45" lean-forward="true" selection-start-line="278" selection-start-column="45" selection-end-line="278" selection-end-column="45" />
+            <state relative-caret-position="420">
+              <caret line="62" column="28" selection-start-line="62" selection-start-column="28" selection-end-line="62" selection-end-column="28" />
               <folding>
                 <element signature="e#0#79#0" expanded="true" />
               </folding>
@@ -32,11 +30,14 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_ML-HTE_Paper.py">
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="443">
-              <caret line="623" column="5" lean-forward="true" selection-start-line="607" selection-start-column="4" selection-end-line="623" selection-end-column="5" />
+            <state relative-caret-position="318">
+              <caret line="1611" column="32" lean-forward="true" selection-start-line="1611" selection-start-column="32" selection-end-line="1611" selection-end-column="32" />
+              <folding>
+                <element signature="e#170#249#0" expanded="true" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -44,8 +45,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="358">
-              <caret line="855" column="82" lean-forward="true" selection-start-line="855" selection-start-column="49" selection-end-line="855" selection-end-column="82" />
+            <state relative-caret-position="199">
+              <caret line="619" column="8" selection-start-line="619" selection-start-column="8" selection-end-line="619" selection-end-column="8" />
               <folding>
                 <element signature="e#170#215#0" expanded="true" />
               </folding>
@@ -53,7 +54,7 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Plotter.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="477">
@@ -65,8 +66,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="391">
-              <caret line="52" column="23" selection-start-line="52" selection-start-column="12" selection-end-line="52" selection-end-column="23" />
+            <state relative-caret-position="505">
+              <caret line="315" lean-forward="true" selection-start-line="315" selection-end-line="315" />
             </state>
           </provider>
         </entry>
@@ -85,8 +86,10 @@
     <option name="CHANGED_PATHS">
       <list>
         <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py" />
+        <option value="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" />
         <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" />
         <option value="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" />
+        <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py" />
       </list>
     </option>
   </component>
@@ -148,7 +151,28 @@
       </list>
     </option>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.Catalyst">
+    <configuration name="Catalyst" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="CatalystExMachina" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/TheKesselRun/Code" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <configuration name="Operator-NH3" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="CatalystExMachina" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -172,6 +196,7 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.Catalyst" />
         <item itemvalue="Python.Operator-NH3" />
       </list>
     </recent_temporary>
@@ -231,7 +256,14 @@
       <option name="project" value="LOCAL" />
       <updated>1539308260015</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="Edits from package updates to maintain features">
+      <created>1567131557208</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1567131557208</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -242,15 +274,15 @@
       <window_info content_ui="combo" id="Project" order="1" visible="true" weight="0.20628998" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32936078" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.29577464" />
+      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49946696" visible="true" weight="0.29577464" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="bottom" id="Version Control" order="7" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Terminal" order="8" />
-      <window_info anchor="bottom" id="Event Log" order="9" side_tool="true" />
-      <window_info anchor="bottom" id="Python Console" order="10" />
+      <window_info anchor="bottom" id="Terminal" order="8" weight="0.32936078" />
+      <window_info anchor="bottom" id="Event Log" order="9" sideWeight="0.50053304" side_tool="true" visible="true" weight="0.29577464" />
+      <window_info anchor="bottom" id="Python Console" order="10" sideWeight="0.49946696" weight="0.32936078" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -264,20 +296,14 @@
     <MESSAGE value="Housekeeping after flagging rework" />
     <MESSAGE value="Update" />
     <MESSAGE value="Added periodic table plotting function" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added periodic table plotting function" />
+    <MESSAGE value="Edits from package updates to maintain features" />
+    <option name="LAST_COMMIT_MESSAGE" value="Edits from package updates to maintain features" />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_Bayesian.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="102">
           <caret line="27" column="34" selection-start-line="27" selection-start-column="34" selection-end-line="27" selection-end-column="34" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="391">
-          <caret line="52" column="23" selection-start-line="52" selection-start-column="12" selection-end-line="52" selection-end-column="23" />
         </state>
       </provider>
     </entry>
@@ -291,37 +317,47 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Plotter.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="477">
+          <caret line="164" lean-forward="true" selection-start-line="164" selection-end-line="164" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="505">
+          <caret line="315" lean-forward="true" selection-start-line="315" selection-end-line="315" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="545">
-          <caret line="278" column="45" lean-forward="true" selection-start-line="278" selection-start-column="45" selection-end-line="278" selection-end-column="45" />
+        <state relative-caret-position="420">
+          <caret line="62" column="28" selection-start-line="62" selection-start-column="28" selection-end-line="62" selection-end-column="28" />
           <folding>
             <element signature="e#0#79#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_ML-HTE_Paper.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="443">
-          <caret line="623" column="5" lean-forward="true" selection-start-line="607" selection-start-column="4" selection-end-line="623" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="358">
-          <caret line="855" column="82" lean-forward="true" selection-start-line="855" selection-start-column="49" selection-end-line="855" selection-end-column="82" />
+        <state relative-caret-position="199">
+          <caret line="619" column="8" selection-start-line="619" selection-start-column="8" selection-end-line="619" selection-end-column="8" />
           <folding>
             <element signature="e#170#215#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Plotter.py">
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="477">
-          <caret line="164" lean-forward="true" selection-start-line="164" selection-end-line="164" />
+        <state relative-caret-position="318">
+          <caret line="1611" column="32" lean-forward="true" selection-start-line="1611" selection-start-column="32" selection-end-line="1611" selection-end-column="32" />
+          <folding>
+            <element signature="e#170#249#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
