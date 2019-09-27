@@ -25,7 +25,6 @@ import peakutils
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
     LeaveOneOut, learning_curve
 
-
 def load_raw_nh3_catalysts(catcont, drop_empty_columns=True,
                            catalyst_pth=r"..\Data\Processed\AllData_Condensed.csv",
                            raman_root=r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Raman Data Cleaned\RawRaman",

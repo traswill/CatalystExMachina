@@ -4,6 +4,8 @@
 # Contact: travisw@email.sc.edu
 # Project Start: February 15, 2018
 
+import numpy as np
+
 from TheKesselRun.Code.LearnerOrder import SupervisedLearner, CatalystContainer
 from TheKesselRun.Code.LearnerAnarchy import Anarchy
 from TheKesselRun.Code.Catalyst import CatalystObject, CatalystObservation
@@ -18,12 +20,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import seaborn as sns
-import numpy as np
+
 import time
 import scipy.cluster
 import glob
 import random
 import os
+import sys
 
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV, cross_val_predict, GroupKFold, LeaveOneGroupOut, \
     LeaveOneOut, learning_curve
@@ -86,6 +89,114 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
             catcont.add_catalyst(index=cat.ID, catalyst=cat)
 
     catcont.build_master_container(drop_empty_columns=drop_empty_columns)
+
+def load_support_catalysts(catcont, drop_empty_columns=True):
+    # Import Catalyst Support Dataframe
+    supp_df = pd.read_excel(r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Support Feature Set.xlsx")
+    supp_df = supp_df.loc[:, ['Feature', 'SiO2', 'a-Al2O3', 'TiO2']].dropna(axis=0) # Temporary while training TODO remove
+    supp_df.set_index(keys='Feature', drop=True, inplace=True)
+
+    # Import data and add to Catalyst()
+    pths = glob.glob(r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\RAW\Support Study\[!~]*')
+
+    for pth in pths:
+        cat = CatalystObject()
+
+        nm_vals = pth.split('\\')[-1].split('.')[0].split(' ')
+        cat.ID = nm_vals[0]
+        supp = nm_vals[-1]
+
+        if nm_vals[1] == '3112':
+            cat.add_element('Ru', 3)
+            cat.add_element('Hf', 1)
+            cat.add_element('K', 12)
+        elif nm_vals[1] == '2212':
+            cat.add_element('Ru', 2)
+            cat.add_element('Hf', 2)
+            cat.add_element('K', 12)
+        elif nm_vals[1] == '1312':
+            cat.add_element('Ru', 1)
+            cat.add_element('Hf', 3)
+            cat.add_element('K', 12)
+        else:
+            print('Unknown Elemental Loading for this study. See Line {}'.format(sys._getframe().f_lineno))
+            exit()
+
+        tmp_df = pd.read_excel(pth, sheet_name='NH3 H2', skiprows=8)
+        cat_conversions = tmp_df.groupby('Temperature').mean()['NH3 Conversion (h2 basis)']
+
+        for obs in cat_conversions.iteritems():
+            if obs[0] == 450:
+                continue
+
+            cat.add_observation(
+                temperature=obs[0],
+                space_velocity=44,
+                gas=None,
+                gas_concentration=100,
+                pressure=None,
+                reactor_number=0,
+                activity=obs[1],
+                selectivity=None
+            )
+
+        cat.calc_mole_fraction()
+        cat.feature_add_n_elements()
+        cat.feature_add_Lp_norms()
+        cat.feature_add_elemental_properties(mol_fraction=True)
+
+        # Add support
+        for vals in supp_df.loc[:, supp].iteritems():
+            cat.feature_add(key='Support {}'.format(vals[0]), value=vals[1])
+
+        catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    catcont.build_master_container(drop_empty_columns=drop_empty_columns)
+
+
+def create_pseudo_support_catalysts(catcont, drop_empty_columns=True):
+    # Import Catalyst Support Dataframe
+    supp_df = pd.read_excel(r"C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\Support Feature Set.xlsx")
+    supp_df = supp_df.dropna(axis=0, thresh=5).dropna(axis=1)
+    supp_df.set_index(keys='Feature', drop=True, inplace=True)
+
+    supps = supp_df.columns.values
+    loads = [3, 2, 1]
+
+    for support in supps:
+        for ld in loads:
+            cat = CatalystObject()
+            cat.ID = '{}% Hf on {}'.format(ld, support)
+
+            cat.add_element('Ru', 4-ld)
+            cat.add_element('Hf', ld)
+            cat.add_element('K', 12)
+
+            for temp in [250, 300, 350, 400]:
+                cat.add_observation(
+                    temperature=temp,
+                    space_velocity=44,
+                    gas=None,
+                    gas_concentration=100,
+                    pressure=None,
+                    reactor_number=0,
+                    activity=0,
+                    selectivity=None
+                )
+
+            cat.calc_mole_fraction()
+            cat.feature_add_n_elements()
+            cat.feature_add_Lp_norms()
+            cat.feature_add_elemental_properties(mol_fraction=True)
+
+            # Add support
+            for vals in supp_df.loc[:, support].iteritems():
+                cat.feature_add(key='Support {}'.format(vals[0]), value=vals[1])
+
+            catcont.add_catalyst(index=cat.ID, catalyst=cat)
+
+    catcont.build_master_container(drop_empty_columns=drop_empty_columns)
+
 
 def three_catalyst_model(version):
     def create_catalyst(catcont, ele, atnum):
@@ -1949,10 +2060,51 @@ def test_everything_random():
 
     print(np.array(mae_list).mean())
 
+def run_support_tests(version, note):
+    catcont = CatalystContainer()
+    load_support_catalysts(catcont)
+
+    skynet = SupervisedLearner(version=version, note=note)
+    skynet.set_learner(learner='etr', params='etr')
+    skynet.load_static_dataset(catalyst_container=catcont)
+
+    # Set parameters
+    skynet.set_target_columns(cols=['Measured Conversion'])
+    skynet.set_group_columns(cols=['ID'])
+    skynet.set_hold_columns(cols=['Element Dictionary'])
+
+    load_list = ['{} Loading'.format(x) for x in
+                     ['Ru', 'Cu', 'Y', 'Mg', 'Mn',
+                      'Ni', 'Cr', 'W', 'Ca', 'Hf',
+                      'Sc', 'Zn', 'Sr', 'Bi', 'Pd',
+                      'Mo', 'In', 'Rh', 'K', 'Os',
+                      'Pt', 'Au', 'Nb', 'Fe']]
+
+    skynet.set_drop_columns(
+        cols=['reactor', 'Periodic Table Column', 'Mendeleev Number', 'Norskov d-band'] + load_list
+    )
+
+    skynet.filter_static_dataset()
+    skynet.train_data()
+    skynet.extract_important_features(prnt=True)
+
+    test_catcont = CatalystContainer()
+    create_pseudo_support_catalysts(test_catcont)
+    skynet.load_static_dataset(test_catcont)
+    skynet.filter_static_dataset()
+    skynet.predict_data()
+
+    df = skynet.dynamic_dataset
+    df['Predictions'] = skynet.predictions
+    df.to_csv('{}\\{}.csv'.format(skynet.svfl, 'Results'))
 
 if __name__ == '__main__':
-    version = 'v98'
+    version = 'v100_support_study'
     note = ''
+
+    run_support_tests(version, note)
+
+
 
     # MAE_per_number_added_for_3_percent_data_only()
 

@@ -836,7 +836,7 @@ class SupervisedLearner():
         try:
             self.result_dataset['Uncertainty'] = self.uncertainty
         except ValueError:
-            print('No Uncertainty Generated')
+            pass
 
         """ Save if requested. """
         if sv:
