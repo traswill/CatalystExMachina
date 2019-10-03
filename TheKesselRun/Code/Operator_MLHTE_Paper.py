@@ -2099,7 +2099,7 @@ def run_support_tests(version, note):
     df.to_csv('{}\\{}.csv'.format(skynet.svfl, 'Results'))
 
 if __name__ == '__main__':
-    version = 'v100_support_study'
+    version = 'v101_support_study'
     note = ''
 
     run_support_tests(version, note)

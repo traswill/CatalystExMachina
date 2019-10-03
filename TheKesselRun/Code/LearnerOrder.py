@@ -739,7 +739,7 @@ class SupervisedLearner():
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              cv=LeaveOneOut())
 
-    def evaluate_regression_learner(self):
+    def evaluate_regression_learner(self, sv=False):
         """ Calculate model evaluation parameters, print, and save. """
 
         r2 = r2_score(self.labels_df.values, self.predictions)
@@ -753,9 +753,12 @@ class SupervisedLearner():
         print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
         print('\n')
 
-        pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
-                     index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
-                     ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
+        if sv:
+            pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
+                         index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
+                         ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
+
+        return mean_abs_err, rmse, r2
 
     def predict_all_from_elements(self, elements, loads=None, cv=False):
         """ Use given elements as a training dataset to predict all other catalysts
