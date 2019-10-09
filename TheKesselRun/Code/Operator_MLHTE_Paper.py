@@ -88,7 +88,7 @@ def load_nh3_catalysts(catcont, drop_empty_columns=True):
 
             catcont.add_catalyst(index=cat.ID, catalyst=cat)
 
-    catcont.build_master_container(drop_empty_columns=drop_empty_columns)
+    catcont.build_master_container(drop_empty_columns=drop_empty_columns, nh3_group=True)
 
 def load_support_catalysts(catcont, drop_empty_columns=True):
     # Import Catalyst Support Dataframe
@@ -702,7 +702,7 @@ def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter
     skynet = SupervisedLearner(version=version, note=note)
     skynet.set_filters(
         element_filter=3,
-        temperature_filter='350orless',
+        temperature_filter='300orless',
         ammonia_filter=1,
         space_vel_filter=2000,
         ru_filter=ru_filter,
@@ -821,6 +821,7 @@ def crossvalidation(version, note, ru=0):
         learner.predict_crossvalidate(kfold=cv_task)
         learner.evaluate_regression_learner()
         learner.compile_results(sv=True, svnm=cv_task)
+        learner.extract_important_features(sv=True)
 
         g = Graphic(df=learner.result_dataset, svfl=learner.svfl, svnm='{}_{}'.format(learner.svnm, cv_task))
         g.plot_basic()
@@ -1687,7 +1688,7 @@ def crossvalidation_reduced_features(version, note, ru=0):
         g.plot_err(metadata=False, svnm='{}_{}_nometa'.format(learner.svnm, cv_task))
         plt.close()
 
-        g.bokeh_predictions()
+        # g.bokeh_predictions()
 
 def static_feature_test(version, note, combined_features=False):
     ''' Generate random numbers for features to evaluate if the model is performing well. '''
@@ -2099,13 +2100,10 @@ def run_support_tests(version, note):
     df.to_csv('{}\\{}.csv'.format(skynet.svfl, 'Results'))
 
 if __name__ == '__main__':
-    version = 'v101_support_study'
+    version = 'v102'
     note = ''
 
-    run_support_tests(version, note)
-
-
-
+    # run_support_tests(version, note)
     # MAE_per_number_added_for_3_percent_data_only()
 
     # test_multiple_3cat_combinations()
@@ -2125,7 +2123,7 @@ if __name__ == '__main__':
     # static_feature_test(version, note, combined_features=False)
 
     # crossvalidation_reduced_features(version, note, ru=0)
-    # crossvalidation(version, note, ru=0)
+    crossvalidation(version, note, ru=0)
 
     # test_all_ML_models(version=version, note=note, three_ele=False, ru_filter=0)
 

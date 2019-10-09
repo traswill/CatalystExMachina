@@ -50,7 +50,7 @@ class CatalystContainer(object):
         else:
             self.catalyst_dictionary[index] = catalyst
 
-    def build_master_container(self, drop_empty_columns=True, nh3_group=True):
+    def build_master_container(self, drop_empty_columns=True, nh3_group=False):
         # Set up catalyst loading dictionary with loadings
         loading_df = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
         loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
@@ -98,19 +98,15 @@ class CatalystContainer(object):
             self.master_container.dropna(how='all', axis=1, inplace=True)
         self.master_container.fillna(value=0, inplace=True)
 
-        # if nh3_group:
-        #     # This code overwrites the groups provided to the ML model to force all similar-element catalysts into the same group
-        #     group_vals = pd.DataFrame([ast.literal_eval(eledict.replace('dict_items(', '').replace(')])', ')]')) for eledict in
-        #                   self.master_container['Element Dictionary'].values]).groupby([0, 1, 2]).ngroup()
-        #     self.master_container['group'] = group_vals
-
-
-            # df = pd.DataFrame(sorted([ele[0] for ele in list(x)]) for x in self.master_container['Element Dictionary'].values)
-            # df['edict'] = self.master_container['Element Dictionary'].values
-            # df.fillna('', inplace=True)
-            # df['group'] = df.groupby([0,1,2]).ngroup()
-            # self.master_container['group'] = df['group'].values
-
+        if nh3_group:
+            df = pd.DataFrame([ele[0] for ele in list(x)] for x in self.master_container['Element Dictionary'].values)
+            df = df.loc[:, [14,15,27,28,40,41]]
+            df[0] = df.apply(lambda rw: '{}{}'.format(rw[14], rw[15]), axis=1)
+            df[1] = df.apply(lambda rw: '{}{}'.format(rw[27], rw[28]).replace('\'', ''), axis=1)
+            df[2] = df.apply(lambda rw: '{}{}'.format(rw[40], rw[41]).replace('\'', ''), axis=1)
+            df['group'] = df.groupby([0,1,2]).ngroup()
+            self.master_container['group'] = df['group'].values
+            exit()
         # Transfer catalyst ID to column so each index is unique
         self.master_container['ID'] = self.master_container.index
         self.master_container.reset_index(inplace=True, drop=True)
@@ -635,7 +631,7 @@ class SupervisedLearner():
     def reduce_features(self):
         """ Use a feature selection algorithm to drop features. """
 
-        rfe = RFE(estimator=self.machina, n_features_to_select=20)
+        rfe = RFE(estimator=self.machina, n_features_to_select=25)
         rfe.fit(self.features, self.labels)
         self.features_df[:] = rfe.inverse_transform(self.features)
         self.features_df.to_csv('{}\\{}'.format(self.svfl, 'feature_list.csv'))
@@ -840,6 +836,8 @@ class SupervisedLearner():
             self.result_dataset['Uncertainty'] = self.uncertainty
         except ValueError:
             pass
+
+        self.result_dataset['group'] = self.groups
 
         """ Save if requested. """
         if sv:
