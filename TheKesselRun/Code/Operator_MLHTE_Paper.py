@@ -702,7 +702,7 @@ def load_skynet(version, note, drop_loads=False, drop_na_columns=True, ru_filter
     skynet = SupervisedLearner(version=version, note=note)
     skynet.set_filters(
         element_filter=3,
-        temperature_filter='300orless',
+        temperature_filter='350orless',
         ammonia_filter=1,
         space_vel_filter=2000,
         ru_filter=ru_filter,
