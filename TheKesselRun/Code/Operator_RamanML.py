@@ -71,11 +71,26 @@ def load_raw_nh3_catalysts(catcont, drop_empty_columns=True,
             if pths:
                 base_pth = '\\'.join(pths[0].split('\\')[:-1])
 
-                raman_df = pd.read_csv('{}\\{}_638nm.csv'.format(base_pth, dat['ID']), index_col=0)
-                cat.add_638nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+                ex_pth_nm = glob.glob(base_pth + '\\*')[0]
+                extn = ex_pth_nm.split('.')[-1]
 
-                raman_df = pd.read_csv('{}\\{}_473nm.csv'.format(base_pth, dat['ID']), index_col=0)
-                cat.add_473nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+                if extn == 'csv':
+                    raman_df = pd.read_csv('{}\\{}_638nm.csv'.format(base_pth, dat['ID']), index_col=0)
+                    cat.add_638nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+
+                    raman_df = pd.read_csv('{}\\{}_473nm.csv'.format(base_pth, dat['ID']), index_col=0)
+                    cat.add_473nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+                elif extn == 'txt':
+                    raman_df = pd.read_csv('{}\\{}_638nm.txt'.format(base_pth, dat['ID']), index_col=0, sep='\t')
+                    cat.add_638nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+
+                    raman_df = pd.read_csv('{}\\{}_473nm.txt'.format(base_pth, dat['ID']), index_col=0, sep='\t')
+                    cat.add_473nm_raman(raman_df.index.values, np.array([x[0] for x in raman_df.values]))
+                elif extn == 'xls':
+                    pass
+                else:
+                    pass
+
 
             # Input XRD Data
             # xrd_root = r'C:\Users\quick\PycharmProjects\CatalystExMachina\TheKesselRun\Data\XRD Data Cleaned'

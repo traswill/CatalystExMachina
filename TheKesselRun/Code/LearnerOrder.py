@@ -553,7 +553,7 @@ class SupervisedLearner():
         """ Filter by ruthenium weight loading.  This is specific to the ammonia project. """
 
         filter_dict_ruthenium = {
-            1: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)],
+            1: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.01)], # self.dynamic_dataset.query('  dataset?."Ru Loading" == 0.01  ')
             2: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.02)],
             3: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03)],
             32: self.dynamic_dataset[(self.dynamic_dataset.loc[:, 'Ru Loading'] == 0.03) |

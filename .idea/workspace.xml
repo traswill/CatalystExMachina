@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Edits from package updates to maintain features">
+    <list default="true" id="845ebe70-8de2-43a8-9363-fb1f01948a9c" name="Default" comment="Added support features datafile to git.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator_ML-HTE_Paper.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" beforeDir="false" afterPath="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" afterDir="false" />
     </list>
     <ignored path="$PROJECT_DIR$/TheKesselRun/Results/Storage/" />
@@ -21,8 +19,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="420">
-              <caret line="62" column="28" selection-start-line="62" selection-start-column="28" selection-end-line="62" selection-end-column="28" />
+            <state relative-caret-position="833">
+              <caret line="74" column="47" selection-start-line="74" selection-start-column="47" selection-end-line="74" selection-end-column="47" />
               <folding>
                 <element signature="e#0#79#0" expanded="true" />
               </folding>
@@ -30,11 +28,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="318">
-              <caret line="1611" column="32" lean-forward="true" selection-start-line="1611" selection-start-column="32" selection-end-line="1611" selection-end-column="32" />
+            <state relative-caret-position="565">
+              <caret line="614" column="26" selection-start-line="614" selection-start-column="26" selection-end-line="614" selection-end-column="26" />
               <folding>
                 <element signature="e#170#249#0" expanded="true" />
               </folding>
@@ -42,11 +40,11 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="199">
-              <caret line="619" column="8" selection-start-line="619" selection-start-column="8" selection-end-line="619" selection-end-column="8" />
+            <state relative-caret-position="216">
+              <caret line="555" column="155" selection-start-line="555" selection-start-column="155" selection-end-line="555" selection-end-column="155" />
               <folding>
                 <element signature="e#170#215#0" expanded="true" />
               </folding>
@@ -57,8 +55,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Plotter.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="477">
-              <caret line="164" lean-forward="true" selection-start-line="164" selection-end-line="164" />
+            <state relative-caret-position="204">
+              <caret line="29" lean-forward="true" selection-start-line="29" selection-end-line="29" />
             </state>
           </provider>
         </entry>
@@ -66,8 +64,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="505">
-              <caret line="315" lean-forward="true" selection-start-line="315" selection-end-line="315" />
+            <state relative-caret-position="565">
+              <caret line="82" column="8" selection-start-line="82" selection-start-column="8" selection-end-line="82" selection-end-column="8" />
             </state>
           </provider>
         </entry>
@@ -87,9 +85,9 @@
       <list>
         <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator-NH3.py" />
         <option value="$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py" />
+        <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py" />
         <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py" />
         <option value="$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py" />
-        <option value="$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py" />
       </list>
     </option>
   </component>
@@ -263,7 +261,21 @@
       <option name="project" value="LOCAL" />
       <updated>1567131557208</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Updated for coding from home.&#10;Revert if fails.">
+      <created>1567998944500</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1567998944500</updated>
+    </task>
+    <task id="LOCAL-00009" summary="Added support features datafile to git.">
+      <created>1567998985049</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1567998985049</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -271,10 +283,10 @@
     <editor active="true" />
     <layout>
       <window_info id="Favorites" order="0" side_tool="true" />
-      <window_info content_ui="combo" id="Project" order="1" visible="true" weight="0.20628998" />
+      <window_info content_ui="combo" id="Project" order="1" visible="true" weight="0.21481876" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32936078" />
-      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49946696" visible="true" weight="0.29577464" />
+      <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49946696" weight="0.29577464" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -297,7 +309,9 @@
     <MESSAGE value="Update" />
     <MESSAGE value="Added periodic table plotting function" />
     <MESSAGE value="Edits from package updates to maintain features" />
-    <option name="LAST_COMMIT_MESSAGE" value="Edits from package updates to maintain features" />
+    <MESSAGE value="Updated for coding from home.&#10;Revert if fails." />
+    <MESSAGE value="Added support features datafile to git." />
+    <option name="LAST_COMMIT_MESSAGE" value="Added support features datafile to git." />
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_Bayesian.py">
@@ -317,46 +331,46 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Plotter.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="477">
-          <caret line="164" lean-forward="true" selection-start-line="164" selection-end-line="164" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="505">
-          <caret line="315" lean-forward="true" selection-start-line="315" selection-end-line="315" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_RamanML.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="420">
-          <caret line="62" column="28" selection-start-line="62" selection-start-column="28" selection-end-line="62" selection-end-column="28" />
+        <state relative-caret-position="833">
+          <caret line="74" column="47" selection-start-line="74" selection-start-column="47" selection-end-line="74" selection-end-column="47" />
           <folding>
             <element signature="e#0#79#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Catalyst.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="199">
-          <caret line="619" column="8" selection-start-line="619" selection-start-column="8" selection-end-line="619" selection-end-column="8" />
-          <folding>
-            <element signature="e#170#215#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="565">
+          <caret line="82" column="8" selection-start-line="82" selection-start-column="8" selection-end-line="82" selection-end-column="8" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Plotter.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="204">
+          <caret line="29" lean-forward="true" selection-start-line="29" selection-end-line="29" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/Operator_MLHTE_Paper.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="318">
-          <caret line="1611" column="32" lean-forward="true" selection-start-line="1611" selection-start-column="32" selection-end-line="1611" selection-end-column="32" />
+        <state relative-caret-position="565">
+          <caret line="614" column="26" selection-start-line="614" selection-start-column="26" selection-end-line="614" selection-end-column="26" />
           <folding>
             <element signature="e#170#249#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/TheKesselRun/Code/LearnerOrder.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="216">
+          <caret line="555" column="155" selection-start-line="555" selection-start-column="155" selection-end-line="555" selection-end-column="155" />
+          <folding>
+            <element signature="e#170#215#0" expanded="true" />
           </folding>
         </state>
       </provider>
