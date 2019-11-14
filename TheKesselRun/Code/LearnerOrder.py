@@ -28,6 +28,7 @@ from sklearn.utils import shuffle
 
 import ast
 
+
 class CatalystContainer(object):
     def __init__(self):
         self.catalyst_dictionary = dict()
@@ -51,6 +52,13 @@ class CatalystContainer(object):
             self.catalyst_dictionary[index] = catalyst
 
     def build_master_container(self, drop_empty_columns=True, nh3_group=False):
+        """
+        Convert catalyst objects to DataFrame for machine learning through LearnerOrder
+        :param drop_empty_columns: Remove unused columns (sometimes kept for continuity with other datasets)
+        :param nh3_group: Use outdated NH3 project grouping method
+        """
+
+
         # Set up catalyst loading dictionary with loadings
         loading_df = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
         loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
@@ -99,6 +107,8 @@ class CatalystContainer(object):
         self.master_container.fillna(value=0, inplace=True)
 
         if nh3_group:
+            # Archaic leftover method for how I have been calculating groups.  Added as boolean for backcompotibility.
+            # TODO migrate to Catalyst (done), and test compatibility (not done)
             df = pd.DataFrame([ele[0] for ele in list(x)] for x in self.master_container['Element Dictionary'].values)
             df = df.loc[:, [14,15,27,28,40,41]]
             df[0] = df.apply(lambda rw: '{}{}'.format(rw[14], rw[15]), axis=1)
@@ -111,22 +121,22 @@ class CatalystContainer(object):
         self.master_container['ID'] = self.master_container.index
         self.master_container.reset_index(inplace=True, drop=True)
 
-class SupervisedLearner():
+class SupervisedLearner:
     """SupervisedLearner will use catalysts to construct feature-label set and perform machine learning"""
 
     def __init__(self, version='v00', note=None):
         """ Initialize Everything """
 
         '''Initialize Main Dataframes'''
-        self.static_dataset = pd.DataFrame() # Dataset that is never changed and used to reset
-        self.dynamic_dataset = pd.DataFrame() # Dataset that is always used as the working dataset
-        self.result_dataset = pd.DataFrame() # Dataset for use after testing model
+        self.static_dataset = pd.DataFrame()    # Dataset that is never changed and used to reset
+        self.dynamic_dataset = pd.DataFrame()   # Dataset that is always used as the working dataset
+        self.result_dataset = pd.DataFrame()    # Dataset for use after testing model
 
         '''Initialize Column Identifiers'''
-        self.target_columns = list() # list of columns in master_dataset with target values to be predicted
-        self.group_columns = list() # list of column in master_dataset to use for grouping catalysts
-        self.hold_columns = list() # list of columns to remove from the feature set during training
-        self.drop_columns = list() # features to drop from training dataset permanently
+        self.target_columns = list()    # list of columns in dynamic_dataset with target values to be predicted
+        self.group_columns = list()     # list of column in dynamic_dataset to use for grouping catalysts
+        self.hold_columns = list()      # list of columns to remove from the feature set during training
+        self.drop_columns = list()      # features to drop from training dataset permanently
 
         '''Initialize Sub Dataframes'''
         self.hold_df = pd.DataFrame()
@@ -153,6 +163,7 @@ class SupervisedLearner():
         self.sv_filter = None
         self.promoter_filter = None
         self.version = version
+        self.note = note
 
         '''Initialize and create path, folder, and filename'''
         self.svfl = '..//Results//{version}'.format(version=version)
@@ -170,13 +181,28 @@ class SupervisedLearner():
             os.makedirs('{}\\{}'.format(self.svfl, 'features'))
             os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
 
-        ''' Add Note text file if applicable '''
-        if note:
+        ''' Add Note text file '''
+        if self.note:
             with open('{}\\readme.txt'.format(self.svfl), 'w') as txtfl:
-                print(note, file=txtfl)
+                print(self.note, file=txtfl)
 
         '''Initialize Time for run-length statistics'''
         self.start_time = time.time()
+
+    # TODO note yet implemented
+    def update_note(self):
+        filters = '*****FILTERS*****\n' + 'n_ele: {nele}\ntemp: {T}\nammonia: {nh3}\nru: {ru}\npressure: {P}' \
+                                          '\nspace_velocity: {sv}\npromoter: {prom}'.format(
+            nele=self.num_element_filter, T=self.temperature_filter, nh3=self.ammonia_filter, ru=self.ru_filter,
+            P=self.pressure_filter, sv=self.sv_filter, prom=self.promoter_filter)
+
+        if isinstance(self.note, str):
+            note = self.note + '\n\n' + filters
+        else:
+            note = filters
+
+        with open('{}\\readme.txt'.format(self.svfl), 'w') as txtfl:
+            print(note, file=txtfl)
 
     def set_name_paths(self):
         """ These paths are used by all methods to save files to the proper location.  This method is used to reset

@@ -6,42 +6,41 @@
 
 import pandas as pd
 import numpy as np
-from sklearn.decomposition import PCA
 
-class CatalystObject():
+
+class CatalystObject:
     """
     CatalystObject contains all information needed to describe a catalyst.
     It possesses methods to calculate any required features from the information provided by the user.
     """
 
     def __init__(self):
-        """ All variables initialize to empty (None or empty dictionaries. """
-        self.ID = None
-        self.group = None
+        """ All variables initialize to empty (None or empty dictionaries). """
+        self.ID = None                          # catalyst identifier
+        self.group = None                       # catalyst group for group crossvalidation strategies
 
-        self.observation_dict = dict() # dictionary of observation objects (see class below)
-        self.feature_dict = dict() # dictionary of feature-value pairs
-        self.spectral_dict = dict()
-        self.elements_wt = dict() # dictionary of element-weight loading pairs
-        self.elements_mol = dict() # dictionary of element-mol fraction pairs
-        self.support = None
+        self.observation_dict = dict()          # dict of observation objects (see class below)
+        self.feature_dict = dict()              # dict of feature-value pairs
+        self.characterization_dict = dict()     # dict of characterization type-characterization data pairs
+        self.elements_wt = dict()               # dict of element-weight loading pairs
+        self.elements_mol = dict()              # dict of element-mol fraction pairs
+        self.support = None                     # catalyst support tag
 
-        # Raman - Red
+        # Characterization variables
+        # TODO: Collapse this functionality into self.characterization_dict and remove these variables.
         self.spectrum638_x = None
         self.spectrum638_y = None
-
-        # Raman - Blue
         self.spectrum473_x = None
         self.spectrum473_y = None
-
-        # XRD
         self.spectrumXRD_x = None
         self.spectrumXRD_y = None
 
     def add_observation(self, temperature=None, space_velocity=None, gas=None, gas_concentration=None, pressure=None,
                         reactor_number=None, activity=None, selectivity=None, activity_error=None):
-        """ Create and add observation object to the observation dictionary. Index increments based on number of
-        entries. """
+        """
+        Create and add observation object to the observation dictionary.
+        Index automatically increments based on number of entries.
+        """
         obs = CatalystObservation()
         obs.temperature = temperature
         obs.space_velocity = space_velocity
@@ -56,18 +55,25 @@ class CatalystObject():
         self.observation_dict[len(self.observation_dict)] = obs
 
     def add_element(self, element, weight_loading):
+        # Note: '-' and '--' are flags in the raw data that indicate no element is present.
+        # Ex. A Ru monometallic would be entered as Ru, "-", "--" as opposed to a RuYK catalyst being Ru, Y, K
+        # This skips if non-element flag is found.
+
         if (element != '-') & (element != '--'):
             self.elements_wt[element] = weight_loading
 
     def add_638nm_raman(self, x, y):
+        # TODO: Collapse 638 into characterization_dict
         self.spectrum638_x = x
         self.spectrum638_y = y
 
     def add_473nm_raman(self, x, y):
+        # TODO: Collapse 473 into characterization_dict
         self.spectrum473_x = x
         self.spectrum473_y = y
 
     def add_xrd(self, x, y):
+        # TODO: Collapse xrd into characterization_dict
         self.spectrumXRD_x = x
         self.spectrumXRD_y = y
 
@@ -84,7 +90,7 @@ class CatalystObject():
         self.feature_dict[key] = value
 
     def spectral_add(self, key, value):
-        self.spectral_dict[key] = value
+        self.characterization_dict[key] = value
 
     def add_unweighted_features(self):
         # Load Elements.csv as DataFrame
@@ -137,7 +143,13 @@ class CatalystObject():
             self.feature_add('{}_min'.format(feature_name), mn)
             self.feature_add('{}_rng'.format(feature_name), mx-mn)
 
+    # TODO mol_fraction should default to True, is currently (11/2019) False to preserve prior functionality
     def feature_add_elemental_properties(self, mol_fraction=False):
+        """
+        Method for calculating elemental features from composition and weight loadings
+        mol_fraction: if True, calc and use mol fractions rather than weight loadings
+        """
+
         # Load Elements.csv as DataFrame, Slice Elements.csv based on elements present
         eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
         eledf = eledf.loc[list(self.elements_wt.keys())]
@@ -174,7 +186,7 @@ class CatalystObject():
             except IndexError:
                 SE_Zpp = -1
 
-            # if no Ru, just ignore the sample (TODO: this is temporary for current project, but dumb in general)
+            # if no Ru, just ignore the sample (This is temporary for current project, but dumb in general. TODO Fix)
             if Ru_Zpp == -1:
                 return
 
@@ -205,7 +217,7 @@ class CatalystObject():
             else:
                 print('Error adding Zpp')
 
-        # Create Dictionary to process each feature differently
+        # process_dict allows each feature to be calculated by a different function.
         process_dict = {
             'Atomic Number': calc_statistics,
             'Atomic Volume': calc_statistics,
@@ -261,6 +273,7 @@ class CatalystObject():
         }
 
         if mol_fraction:
+            # TODO add check for mol_dict and compute if empty
             for feature_name, feature_values in eledf.T.iterrows():
                 process_dict.get(feature_name,
                                  lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
@@ -269,7 +282,8 @@ class CatalystObject():
                     np.fromiter(self.elements_mol.values(), dtype=float),
                     feature_name
                 )
-        else:  # Using weight loadings
+        else:
+            # Using weight loadings
             for feature_name, feature_values in eledf.T.iterrows():
                 process_dict.get(feature_name,
                                  lambda a,b,c,d: print('Feature Name ({}) Not Found'.format(feature_name)))(
@@ -280,6 +294,7 @@ class CatalystObject():
                 )
 
     def feature_add_Lp_norms(self):
+        # https://en.wikipedia.org/wiki/Lp_space
         vals = np.fromiter(self.elements_wt.values(), dtype=float)
         sm = np.sum(vals)
 
@@ -293,7 +308,7 @@ class CatalystObject():
             if val > 0:
                 n_eles += 1
 
-        self.feature_add('n_elements',n_eles)
+        self.feature_add('n_elements', n_eles)
 
     def calc_mole_fraction(self):
         eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
@@ -309,12 +324,26 @@ class CatalystObject():
         for ele, wt in self.elements_mol.items():
             self.elements_mol[ele] = np.round(wt / tot_mol * 100, 2)
 
-    def calc_group(self):
-        eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
-        eledf = eledf.loc[list(self.elements_wt.keys())]
-        self.group = eledf['Atomic Number'].product()
+    def calc_group(self, by='elements'):
+        if by == 'elements':
+            # Group by elements contained within catalyst (ex. 3,1 RuY identical to 10,10 RuY)
+            eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
+            eledf = eledf.loc[list(self.elements_wt.keys())]
+            self.group = eledf['Atomic Number'].product()
+        elif by == 'catalyst':
+            # Group by element and weight loadings (ex. 3,1 RuY not identical to 10,10 RuY)
+            eledf = pd.read_csv(r'../Data/Elements_01Feb19.csv', index_col=1)
+            eledf = eledf.loc[list(self.elements_wt.keys())]
+            self.group = np.round(np.sum(
+                eledf['Atomic Number'].values ** 1./np.fromiter(self.elements_wt.values(), dtype=float)), 3)
+        else:
+            self.group = 0
 
-class CatalystObservation():
+
+class CatalystObservation:
+    """
+    Stores information regarding observations made on a catalyst, such as reaction conditions and measured values
+    """
     def __init__(self):
         self.temperature = None
         self.pressure = None
@@ -344,19 +373,16 @@ class CatalystObservation():
 
         return dict
 
-class Spectrum():
+
+class Spectrum:
     def __init__(self, x=None, y=None):
         self.x = x
         self.y = y
 
     def remove_background(self):
-        ''' Separate background from spectrum '''
-
         pass
 
     def remove_noise(self):
-        ''' Separate noise from spectrum '''
-
         pass
 
 if __name__ == '__main__':
