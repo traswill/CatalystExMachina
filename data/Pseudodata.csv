@@ -1,0 +1,3 @@
+,ID,Ele1,Wt1,Ele2,Wt2,Ele3,Wt3,Reactor,NH3,Space Velocity,Temperature,Conversion,Standard Error,nAveraged,Groups
+0,1,Ru,5,Cu,2,K,30,1,1,10000,250,0.05,0.01,4,1
+1,2,Ru,5,Co,7,Cs,5,2,1,10000,250,0.11733,,1,1
