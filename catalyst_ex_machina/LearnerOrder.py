@@ -28,6 +28,7 @@ from sklearn.utils import shuffle
 
 import ast
 
+
 class CatalystContainer(object):
     def __init__(self):
         self.catalyst_dictionary = dict()
@@ -50,7 +51,14 @@ class CatalystContainer(object):
         else:
             self.catalyst_dictionary[index] = catalyst
 
-    def build_master_container(self, drop_empty_columns=True, nh3_group=True):
+    def build_master_container(self, drop_empty_columns=True, nh3_group=False):
+        """
+        Convert catalyst objects to DataFrame for machine learning through LearnerOrder
+        :param drop_empty_columns: Remove unused columns (sometimes kept for continuity with other datasets)
+        :param nh3_group: Use outdated NH3 project grouping method
+        """
+
+
         # Set up catalyst loading dictionary with loadings
         loading_df = pd.read_csv('..\\Data\\Elements.csv', usecols=['Abbreviation'], index_col='Abbreviation').transpose()
         loading_df.columns = ['{} Loading'.format(ele) for ele in loading_df.columns]
@@ -98,39 +106,37 @@ class CatalystContainer(object):
             self.master_container.dropna(how='all', axis=1, inplace=True)
         self.master_container.fillna(value=0, inplace=True)
 
-        # if nh3_group:
-        #     # This code overwrites the groups provided to the ML model to force all similar-element catalysts into the same group
-        #     group_vals = pd.DataFrame([ast.literal_eval(eledict.replace('dict_items(', '').replace(')])', ')]')) for eledict in
-        #                   self.master_container['Element Dictionary'].values]).groupby([0, 1, 2]).ngroup()
-        #     self.master_container['group'] = group_vals
-
-
-            # df = pd.DataFrame(sorted([ele[0] for ele in list(x)]) for x in self.master_container['Element Dictionary'].values)
-            # df['edict'] = self.master_container['Element Dictionary'].values
-            # df.fillna('', inplace=True)
-            # df['group'] = df.groupby([0,1,2]).ngroup()
-            # self.master_container['group'] = df['group'].values
+        if nh3_group:
+            # Archaic leftover method for how I have been calculating groups.  Added as boolean for backcompotibility.
+            # TODO migrate to Catalyst (done), and test compatibility (not done)
+            df = pd.DataFrame([ele[0] for ele in list(x)] for x in self.master_container['Element Dictionary'].values)
+            df = df.loc[:, [14,15,27,28,40,41]]
+            df[0] = df.apply(lambda rw: '{}{}'.format(rw[14], rw[15]), axis=1)
+            df[1] = df.apply(lambda rw: '{}{}'.format(rw[27], rw[28]).replace('\'', ''), axis=1)
+            df[2] = df.apply(lambda rw: '{}{}'.format(rw[40], rw[41]).replace('\'', ''), axis=1)
+            df['group'] = df.groupby([0,1,2]).ngroup()
+            self.master_container['group'] = df['group'].values
 
         # Transfer catalyst ID to column so each index is unique
         self.master_container['ID'] = self.master_container.index
         self.master_container.reset_index(inplace=True, drop=True)
 
-class SupervisedLearner():
+class SupervisedLearner:
     """SupervisedLearner will use catalysts to construct feature-label set and perform machine learning"""
 
     def __init__(self, version='v00', note=None):
         """ Initialize Everything """
 
         '''Initialize Main Dataframes'''
-        self.static_dataset = pd.DataFrame() # Dataset that is never changed and used to reset
-        self.dynamic_dataset = pd.DataFrame() # Dataset that is always used as the working dataset
-        self.result_dataset = pd.DataFrame() # Dataset for use after testing model
+        self.static_dataset = pd.DataFrame()    # Dataset that is never changed and used to reset
+        self.dynamic_dataset = pd.DataFrame()   # Dataset that is always used as the working dataset
+        self.result_dataset = pd.DataFrame()    # Dataset for use after testing model
 
         '''Initialize Column Identifiers'''
-        self.target_columns = list() # list of columns in master_dataset with target values to be predicted
-        self.group_columns = list() # list of column in master_dataset to use for grouping catalysts
-        self.hold_columns = list() # list of columns to remove from the feature set during training
-        self.drop_columns = list() # features to drop from training dataset permanently
+        self.target_columns = list()    # list of columns in dynamic_dataset with target values to be predicted
+        self.group_columns = list()     # list of column in dynamic_dataset to use for grouping catalysts
+        self.hold_columns = list()      # list of columns to remove from the feature set during training
+        self.drop_columns = list()      # features to drop from training dataset permanently
 
         '''Initialize Sub Dataframes'''
         self.hold_df = pd.DataFrame()
@@ -157,6 +163,7 @@ class SupervisedLearner():
         self.sv_filter = None
         self.promoter_filter = None
         self.version = version
+        self.note = note
 
         '''Initialize and create path, folder, and filename'''
         self.svfl = '..//Results//{version}'.format(version=version)
@@ -174,13 +181,28 @@ class SupervisedLearner():
             os.makedirs('{}\\{}'.format(self.svfl, 'features'))
             os.makedirs('{}\\{}'.format(self.svfl, 'eval'))
 
-        ''' Add Note text file if applicable '''
-        if note:
+        ''' Add Note text file '''
+        if self.note:
             with open('{}\\readme.txt'.format(self.svfl), 'w') as txtfl:
-                print(note, file=txtfl)
+                print(self.note, file=txtfl)
 
         '''Initialize Time for run-length statistics'''
         self.start_time = time.time()
+
+    # TODO note yet implemented
+    def update_note(self):
+        filters = '*****FILTERS*****\n' + 'n_ele: {nele}\ntemp: {T}\nammonia: {nh3}\nru: {ru}\npressure: {P}' \
+                                          '\nspace_velocity: {sv}\npromoter: {prom}'.format(
+            nele=self.num_element_filter, T=self.temperature_filter, nh3=self.ammonia_filter, ru=self.ru_filter,
+            P=self.pressure_filter, sv=self.sv_filter, prom=self.promoter_filter)
+
+        if isinstance(self.note, str):
+            note = self.note + '\n\n' + filters
+        else:
+            note = filters
+
+        with open('{}\\readme.txt'.format(self.svfl), 'w') as txtfl:
+            print(note, file=txtfl)
 
     def set_name_paths(self):
         """ These paths are used by all methods to save files to the proper location.  This method is used to reset
@@ -635,7 +657,7 @@ class SupervisedLearner():
     def reduce_features(self):
         """ Use a feature selection algorithm to drop features. """
 
-        rfe = RFE(estimator=self.machina, n_features_to_select=20)
+        rfe = RFE(estimator=self.machina, n_features_to_select=25)
         rfe.fit(self.features, self.labels)
         self.features_df[:] = rfe.inverse_transform(self.features)
         self.features_df.to_csv('{}\\{}'.format(self.svfl, 'feature_list.csv'))
@@ -739,7 +761,7 @@ class SupervisedLearner():
         self.predictions = cross_val_predict(self.machina, self.features, self.labels,
                                              cv=LeaveOneOut())
 
-    def evaluate_regression_learner(self):
+    def evaluate_regression_learner(self, sv=False):
         """ Calculate model evaluation parameters, print, and save. """
 
         r2 = r2_score(self.labels_df.values, self.predictions)
@@ -753,9 +775,12 @@ class SupervisedLearner():
         print('Time to Complete: {:0.1f} s'.format(time.time() - self.start_time))
         print('\n')
 
-        pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
-                     index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
-                     ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
+        if sv:
+            pd.DataFrame([r2, mean_abs_err, rmse, time.time() - self.start_time],
+                         index=['R2','Mean Abs Error','Root Mean Squared Error','Time']
+                         ).to_csv('{}\\eval\\{}-eval.csv'.format(self.svfl, self.svnm))
+
+        return mean_abs_err, rmse, r2
 
     def predict_all_from_elements(self, elements, loads=None, cv=False):
         """ Use given elements as a training dataset to predict all other catalysts
@@ -811,7 +836,7 @@ class SupervisedLearner():
         """ Create a results dataframe that merges dynamic with hold dataframe """
 
         # Create Result DF, add predictions and experimental data
-        self.result_dataset = self.dynamic_dataset[self.features_df.columns].copy()
+        self.result_dataset = self.dynamic_dataset.loc[self.features_df.index, self.features_df.columns].copy()
 
         """ Add predictions and labels. """
         try:
@@ -819,7 +844,7 @@ class SupervisedLearner():
         except ValueError:
             print('No Predictions Generated by model...')
 
-        self.result_dataset['Measured Conversion'] = self.labels_df.values
+        self.result_dataset['Measured Conversion'] = self.labels
 
         """ Parse Catalyst Names """
         for index, edict in self.dynamic_dataset['Element Dictionary'].iteritems():
@@ -832,11 +857,15 @@ class SupervisedLearner():
                 self.result_dataset.loc[index, 'Load{}'.format(i)] = val
                 i += 1
 
+        self.result_dataset.dropna(axis=0, inplace=True)
+
         """ Add uncertainty. """
         try:
             self.result_dataset['Uncertainty'] = self.uncertainty
         except ValueError:
-            print('No Uncertainty Generated')
+            pass
+
+        self.result_dataset['group'] = self.groups
 
         """ Save if requested. """
         if sv:
